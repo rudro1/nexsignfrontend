@@ -3153,7 +3153,7 @@ export default function SignerView() {
     if (!docData?.fileId) return;
     const loadPdf = async () => {
      // const proxyUrl = `https://nexsignbackend.onrender.com/api/documents/proxy/${docData.fileId}`;
- const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${docData.fileId}`;
+const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeURIComponent(docData.fileId)}`;
      try {
         const pdf = await pdfjsLib.getDocument({ url: proxyUrl, withCredentials: true }).promise;
         const containerWidth = containerRef.current?.clientWidth || 800;
