@@ -80,9 +80,13 @@ import axios from 'axios';
 
 // ১. বেস কনফিগারেশন
 export const api = axios.create({
-  // ✅ পোর্ট ৫০০১ পরিবর্তন করে ৫০০০ করা হয়েছে আপনার index.js এর সাথে মিলানোর জন্য
+  // baseURL চেক করুন আপনার .env এর সাথে মিল আছে কি না
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api',
-  withCredentials: true,
+  
+  // ✅ গুরুত্বপূর্ণ: এটি false করে দিন কারণ আপনি টোকেন localStorage এ রাখছেন।
+  // এটিই আপনার 'Preflight wildcard' এররটি ফিক্স করবে।
+  withCredentials: false, 
+  
   timeout: 100000, 
 });
 
