@@ -2037,7 +2037,7 @@ const handleUpload = async (e) => {
   try {
     // সরাসরি ক্লাউডিনারিতে হিট (Vercel কে বাইপাস করা হচ্ছে)
     const cloudRes = await axios.post(
-      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/raw/upload`,
+      `https://api.cloudinary.com/v1_1/${import.meta.env.CLOUDINARY_CLOUD_NAME}/raw/upload`,
       formData
     );
 
