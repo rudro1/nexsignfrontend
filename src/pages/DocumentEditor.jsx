@@ -1905,7 +1905,7 @@ import { Upload, Save, Send, ArrowLeft, FileText, Loader2 } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer from '@/components/editor/PdfViewer';
-
+import axios from 'axios'; // এটি না থাকলে যোগ করুন
 export default function DocumentEditor() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -1979,48 +1979,89 @@ const getCleanPayload = () => {
     totalPages
   };
 };
- const handleUpload = async (e) => {
-  const file = e.target.files[0];
+//  const handleUpload = async (e) => {
+//   const file = e.target.files[0];
   
-  // ভ্যালিডেশন
-  if (!file || file.type !== 'application/pdf') {
-    toast.error('Please upload a valid PDF file');
-    return;
-  }
+//   // ভ্যালিডেশন
+//   if (!file || file.type !== 'application/pdf') {
+//     toast.error('Please upload a valid PDF file');
+//     return;
+//   }
+
+//   setUploading(true);
+//   const formData = new FormData();
+  
+//   // 🌟 ফিক্স: 'file' এর বদলে 'pdf' ব্যবহার করুন (ব্যাকএন্ডের সাথে মিল রেখে)
+//   formData.append('pdf', file); 
+  
+//   // ঐচ্ছিক: ব্যাকএন্ড যদি প্রারম্ভিক ডেটা চায়
+//   formData.append('title', file.name.replace('.pdf', ''));
+//   formData.append('parties', JSON.stringify([]));
+
+//   try {
+//     const res = await api.post('/documents/upload', formData, {
+//       headers: { 'Content-Type': 'multipart/form-data' }
+//     });
+    
+//     const data = res.data;
+//     if (data.fileId || data._id) {
+//       const newId = data._id || data.id;
+//       setDocId(newId);
+//       setFileUrl(data.fileUrl);
+//       setFileId(data.fileId);
+//       setTitle(file.name.replace('.pdf', ''));
+//       setDoc(data);
+      
+//       const newUrl = `${window.location.pathname}?id=${newId}`;
+//       window.history.replaceState(null, '', newUrl);
+//       toast.success('Document uploaded');
+//     }
+//   } catch (error) { 
+//     console.error("Upload Error:", error);
+//     toast.error(error.response?.data?.error || 'Upload failed'); 
+//   } finally { 
+//     setUploading(false); 
+//   }
+// };
+
+const handleUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
   setUploading(true);
   const formData = new FormData();
-  
-  // 🌟 ফিক্স: 'file' এর বদলে 'pdf' ব্যবহার করুন (ব্যাকএন্ডের সাথে মিল রেখে)
-  formData.append('pdf', file); 
-  
-  // ঐচ্ছিক: ব্যাকএন্ড যদি প্রারম্ভিক ডেটা চায়
-  formData.append('title', file.name.replace('.pdf', ''));
-  formData.append('parties', JSON.stringify([]));
+  formData.append('file', file);
+  formData.append('upload_preset', 'nextsign'); // আপনার তৈরি করা প্রিসেট নাম
+  formData.append('folder', 'nexsign_docs');
 
   try {
-    const res = await api.post('/documents/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    // সরাসরি ক্লাউডিনারিতে হিট (Vercel কে বাইপাস করা হচ্ছে)
+    const cloudRes = await axios.post(
+      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/raw/upload`,
+      formData
+    );
+
+    // সফল হলে ব্যাকএন্ডে লিঙ্কটি পাঠানো
+    const res = await api.post('/documents/upload-metadata', {
+      title: file.name.replace('.pdf', ''),
+      fileUrl: cloudRes.data.secure_url,
+      fileId: cloudRes.data.public_id
     });
-    
+
     const data = res.data;
-    if (data.fileId || data._id) {
-      const newId = data._id || data.id;
-      setDocId(newId);
-      setFileUrl(data.fileUrl);
-      setFileId(data.fileId);
-      setTitle(file.name.replace('.pdf', ''));
-      setDoc(data);
-      
-      const newUrl = `${window.location.pathname}?id=${newId}`;
-      window.history.replaceState(null, '', newUrl);
-      toast.success('Document uploaded');
-    }
-  } catch (error) { 
+    setDocId(data._id);
+    setFileUrl(data.fileUrl);
+    setFileId(data.fileId);
+    setTitle(data.title);
+    setDoc(data);
+    
+    window.history.replaceState(null, '', `${window.location.pathname}?id=${data._id}`);
+    toast.success('Large document uploaded successfully!');
+  } catch (error) {
     console.error("Upload Error:", error);
-    toast.error(error.response?.data?.error || 'Upload failed'); 
-  } finally { 
-    setUploading(false); 
+    toast.error('Direct upload failed. Check your Cloudinary preset.');
+  } finally {
+    setUploading(false);
   }
 };
 
