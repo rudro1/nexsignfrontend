@@ -335,6 +335,7 @@ import { Link, useNavigate } from 'react-router-dom';
  import { Card } from "../ui/Card"; 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { FileText, Users, ArrowRight, Clock, CheckCircle2, AlertCircle, Pencil } from 'lucide-react';
 
 const statusConfig = {
@@ -360,7 +361,7 @@ export default function DocumentCard({ doc }) {
   };
 
   const currentSigner = parties.length > 0 && doc.status === 'in_progress'
-    ? parties[doc.current_party_index || 0]
+    ? parties[doc.currentPartyIndex || 0]
     : null;
 
   const formatDate = (dateString) => {

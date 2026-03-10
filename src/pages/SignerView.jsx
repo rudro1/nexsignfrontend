@@ -3090,6 +3090,216 @@
 //   );
 // }
 
+// import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+// import { api } from '@/api/apiClient';
+// import { Button } from '@/components/ui/button';
+// import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+// import { toast } from 'sonner';
+// import { Loader2, CheckCircle2, Lock, PenTool, AlertCircle, FileCheck } from 'lucide-react';
+// import SignaturePad from '../components/signing/SignaturePad';
+// import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+// const API_URL = import.meta.env.VITE_API_URL;
+// pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
+
+// export default function SignerView() {
+//   const urlParams = new URLSearchParams(window.location.search);
+//   const token = urlParams.get('token');
+
+//   const [session, setSession] = useState(null);
+//   const [docData, setDocData] = useState(null); 
+//   const [loading, setLoading] = useState(true);
+//   const [fields, setFields] = useState([]);
+//   const [activeFieldId, setActiveFieldId] = useState(null);
+//   const [showSigPad, setShowSigPad] = useState(false);
+//   const [submitting, setSubmitting] = useState(false);
+//   const [completed, setCompleted] = useState(false);
+//   const [pagesData, setPagesData] = useState([]);
+//   const containerRef = useRef(null);
+
+//   const myPartyIndex = useMemo(() => {
+//     if (!session?.party) return null;
+//     return session.party.index !== undefined ? Number(session.party.index) : null;
+//   }, [session]);
+
+//   // আপনার স্বাক্ষর গণনার লজিক
+//   const mySigningStatus = useMemo(() => {
+//     const myFields = fields.filter(f => Number(f.partyIndex) === myPartyIndex);
+//     const completedFields = myFields.filter(f => f.filled).length;
+//     const totalFields = myFields.length;
+//     const remaining = totalFields - completedFields;
+//     return { completedFields, totalFields, remaining };
+//   }, [fields, myPartyIndex]);
+
+//   const loadSession = useCallback(async () => {
+//     if (!token) { setLoading(false); return; }
+//     try {
+//       const res = await api.get(`/documents/sign/${token}`);
+//       setSession(res.data);
+//       setDocData(res.data.document);
+//       const rawFields = res.data.document.fields || [];
+//       const cleaned = rawFields.map(f => {
+//         const obj = typeof f === 'string' ? JSON.parse(f) : f;
+//         return { ...obj, id: obj.id || `f_${Math.random()}`, partyIndex: Number(obj.signerIndex ?? obj.partyIndex ?? 0), filled: !!obj.value };
+//       });
+//       setFields(cleaned);
+//       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') setCompleted(true);
+//     } catch (err) { toast.error('লিঙ্কটি কাজ করছে না।'); }
+//     finally { setLoading(false); }
+//   }, [token]);
+
+//   useEffect(() => { loadSession(); }, [loadSession]);
+
+//   useEffect(() => {
+//     if (!docData?.fileId) return;
+//     const loadPdf = async () => {
+//      // const proxyUrl = `https://nexsignbackend.onrender.com/api/documents/proxy/${docData.fileId}`;
+// const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeURIComponent(docData.fileId)}`;
+//      try {
+//         const pdf = await pdfjsLib.getDocument({ url: proxyUrl, withCredentials: true }).promise;
+//         const containerWidth = containerRef.current?.clientWidth || 800;
+//         const pages = [];
+//         for (let i = 1; i <= pdf.numPages; i++) {
+//           const page = await pdf.getPage(i);
+//           const viewport = page.getViewport({ scale: (containerWidth - 40) / page.getViewport({ scale: 1 }).width });
+//           pages.push({ num: i, viewport, pageObj: page });
+//         }
+//         setPagesData(pages);
+//       } catch (err) { console.error(err); }
+//     };
+//     loadPdf();
+//   }, [docData]);
+
+//   const handleFieldClick = (e, field) => {
+//     e.preventDefault();
+//     if (Number(field.partyIndex) !== myPartyIndex) { toast.error("এটি আপনার জায়গা নয়।"); return; }
+//     if (field.type === 'text') {
+//       const val = prompt("Enter text:", field.value || "");
+//       if (val !== null) {
+//         setFields(prev => prev.map(f => f.id === field.id ? { ...f, value: val, filled: true } : f));
+//       }
+//     } else {
+//       setActiveFieldId(field.id);
+//       setShowSigPad(true);
+//     }
+//   };
+
+//   const handleSignature = (sigValue) => {
+//     if (!sigValue) return;
+//     setFields(prev => prev.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f));
+//     setShowSigPad(false);
+//     setActiveFieldId(null);
+//   };
+
+//   const handleSubmit = async () => {
+//     if (mySigningStatus.remaining > 0) {
+//       toast.error(`অসম্পূর্ণ! আপনার আরও ${mySigningStatus.remaining}টি জায়গায় স্বাক্ষর বাকি।`, {
+//         icon: <AlertCircle className="text-red-500" />,
+//       });
+//       return;
+//     }
+
+//     setSubmitting(true);
+//     try {
+//       const res = await api.post(`/documents/sign/submit`, { token, fields });
+//       setCompleted(true);
+//       if (res.data.completed) {
+//         toast.success('সবাই স্বাক্ষর করেছেন! ফাইনাল পিডিএফ মেইলে পাঠানো হয়েছে।');
+//       } else {
+//         toast.success('আপনার স্বাক্ষর জমা হয়েছে। পরবর্তী সাইনারের জন্য অপেক্ষা করা হচ্ছে।');
+//       }
+//     } catch (err) { 
+//       toast.error('সাবমিট করা সম্ভব হয়নি। আবার চেষ্টা করুন।'); 
+//     } finally { 
+//       setSubmitting(false); 
+//     }
+//   };
+
+//   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
+//   if (completed) return <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4"><CheckCircle2 size={80} className="text-green-500 animate-bounce" /><h2 className="text-3xl font-bold">স্বাক্ষর সম্পন্ন!</h2><p className="text-slate-500 max-w-md">পিডিএফ জেনারেট করা হয়েছে। সবাই স্বাক্ষর শেষ করলে আপনি ইমেইলে কপি পেয়ে যাবেন। ধন্যবাদ!</p></div>;
+
+//   return (
+//     <div className="min-h-screen bg-slate-50">
+//       <header className="sticky top-0 z-[100] bg-white border-b p-4 flex justify-between items-center shadow-sm">
+//         <div className="flex flex-col">
+//           <span className="text-[10px] text-sky-500 font-black uppercase tracking-widest">Document Title</span>
+//           <h1 className="font-bold text-slate-800 leading-tight truncate max-w-[150px] sm:max-w-xs">{docData?.title}</h1>
+//         </div>
+        
+//         <div className="flex items-center gap-3 sm:gap-6">
+//           {/* লোডিং স্পিনার - বাটনের বাম পাশে */}
+//           {submitting && (
+//             <div className="flex items-center gap-2 text-sky-600 animate-pulse">
+//               <Loader2 className="h-5 w-5 animate-spin" />
+//               <span className="hidden md:inline text-xs font-bold uppercase tracking-tighter">Processing PDF...</span>
+//             </div>
+//           )}
+
+//           <div className="flex flex-col items-end">
+//             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mb-1">My Progress</span>
+//             <div className={`px-3 py-1 rounded-full text-[11px] font-black border-2 transition-colors flex items-center gap-1.5 ${mySigningStatus.remaining === 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
+//               {mySigningStatus.remaining === 0 && <FileCheck size={12} />}
+//               {mySigningStatus.completedFields} / {mySigningStatus.totalFields} SIGNED
+//             </div>
+//           </div>
+
+//           <Button 
+//             onClick={handleSubmit} 
+//             disabled={submitting} 
+//             className={`min-w-[130px] font-bold shadow-lg transition-all active:scale-95 ${mySigningStatus.remaining === 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+//           >
+//             {submitting ? 'Please wait...' : 'Finish Signing'}
+//           </Button>
+//         </div>
+//       </header>
+
+//       <main ref={containerRef} className="max-w-4xl mx-auto py-8 px-4 flex flex-col items-center">
+//         {pagesData.map((page) => (
+//           <div key={page.num} className="relative mb-6 bg-white shadow-xl border border-slate-200" style={{ width: page.viewport.width, height: page.viewport.height }}>
+//             <canvas ref={el => {
+//               if (el && !el.dataset.rendered) {
+//                 const ctx = el.getContext('2d');
+//                 el.width = page.viewport.width; el.height = page.viewport.height;
+//                 page.pageObj.render({ canvasContext: ctx, viewport: page.viewport });
+//                 el.dataset.rendered = 'true';
+//               }
+//             }} />
+            
+//             {fields.filter(f => Number(f.page) === page.num).map(field => {
+//               const isMine = Number(field.partyIndex) === myPartyIndex;
+//               return (
+//                 <div key={field.id} onClick={(e) => handleFieldClick(e, field)}
+//                   className={`absolute border-2 transition-all flex items-center justify-center ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/20 cursor-pointer animate-pulse ring-2 ring-sky-500/20' : 'border-slate-300'}`}
+//                   style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
+//                   {field.filled ? (
+//                     field.value.startsWith('data:image') ? 
+//                     <img src={field.value} className="w-full h-full object-contain p-1" /> :
+//                     <span className="font-serif text-[12px] font-bold text-black">{field.value}</span>
+//                   ) : (
+//                     <div className="flex flex-col items-center text-[9px] font-bold text-slate-500 leading-none">
+//                        {isMine ? <PenTool size={12} className="text-sky-600 mb-0.5" /> : <Lock size={10} />}
+//                        <span>{isMine ? 'YOUR SIGN' : `SIGNER ${Number(field.partyIndex) + 1}`}</span>
+//                     </div>
+//                   )}
+//                 </div>
+//               );
+//             })}
+//           </div>
+//         ))}
+//       </main>
+
+//       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
+//         <DialogContent className="max-w-lg p-6 bg-white rounded-2xl shadow-2xl">
+//           <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">আপনার স্বাক্ষর দিন</DialogTitle>
+//           <SignaturePad onSignatureComplete={handleSignature} />
+//         </DialogContent>
+//       </Dialog>
+//     </div>
+//   );
+// }
+
+
+//vercel deploy 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
@@ -3098,7 +3308,8 @@ import { toast } from 'sonner';
 import { Loader2, CheckCircle2, Lock, PenTool, AlertCircle, FileCheck } from 'lucide-react';
 import SignaturePad from '../components/signing/SignaturePad';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
-const API_URL = import.meta.env.VITE_API_URL;
+
+// Worker configuration
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
 export default function SignerView() {
@@ -3121,7 +3332,6 @@ export default function SignerView() {
     return session.party.index !== undefined ? Number(session.party.index) : null;
   }, [session]);
 
-  // আপনার স্বাক্ষর গণনার লজিক
   const mySigningStatus = useMemo(() => {
     const myFields = fields.filter(f => Number(f.partyIndex) === myPartyIndex);
     const completedFields = myFields.filter(f => f.filled).length;
@@ -3139,12 +3349,20 @@ export default function SignerView() {
       const rawFields = res.data.document.fields || [];
       const cleaned = rawFields.map(f => {
         const obj = typeof f === 'string' ? JSON.parse(f) : f;
-        return { ...obj, id: obj.id || `f_${Math.random()}`, partyIndex: Number(obj.signerIndex ?? obj.partyIndex ?? 0), filled: !!obj.value };
+        return { 
+          ...obj, 
+          id: obj.id || `f_${Math.random()}`, 
+          partyIndex: Number(obj.signerIndex ?? obj.partyIndex ?? 0), 
+          filled: !!obj.value 
+        };
       });
       setFields(cleaned);
       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') setCompleted(true);
-    } catch (err) { toast.error('লিঙ্কটি কাজ করছে না।'); }
-    finally { setLoading(false); }
+    } catch (err) { 
+      toast.error('লিঙ্কটি কাজ করছে না বা মেয়াদ শেষ হয়েছে।'); 
+    } finally { 
+      setLoading(false); 
+    }
   }, [token]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
@@ -3152,9 +3370,8 @@ export default function SignerView() {
   useEffect(() => {
     if (!docData?.fileId) return;
     const loadPdf = async () => {
-     // const proxyUrl = `https://nexsignbackend.onrender.com/api/documents/proxy/${docData.fileId}`;
-const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeURIComponent(docData.fileId)}`;
-     try {
+      const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeURIComponent(docData.fileId)}`;
+      try {
         const pdf = await pdfjsLib.getDocument({ url: proxyUrl, withCredentials: true }).promise;
         const containerWidth = containerRef.current?.clientWidth || 800;
         const pages = [];
@@ -3164,14 +3381,19 @@ const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeU
           pages.push({ num: i, viewport, pageObj: page });
         }
         setPagesData(pages);
-      } catch (err) { console.error(err); }
+      } catch (err) { 
+        console.error("PDF Load Error:", err); 
+      }
     };
     loadPdf();
   }, [docData]);
 
   const handleFieldClick = (e, field) => {
     e.preventDefault();
-    if (Number(field.partyIndex) !== myPartyIndex) { toast.error("এটি আপনার জায়গা নয়।"); return; }
+    if (Number(field.partyIndex) !== myPartyIndex) { 
+      toast.error("এটি আপনার স্বাক্ষরের জায়গা নয়।"); 
+      return; 
+    }
     if (field.type === 'text') {
       const val = prompt("Enter text:", field.value || "");
       if (val !== null) {
@@ -3192,51 +3414,49 @@ const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeU
 
   const handleSubmit = async () => {
     if (mySigningStatus.remaining > 0) {
-      toast.error(`অসম্পূর্ণ! আপনার আরও ${mySigningStatus.remaining}টি জায়গায় স্বাক্ষর বাকি।`, {
-        icon: <AlertCircle className="text-red-500" />,
-      });
+      toast.error(`অসম্পূর্ণ! আপনার আরও ${mySigningStatus.remaining}টি জায়গায় স্বাক্ষর বাকি।`);
       return;
     }
 
     setSubmitting(true);
     try {
+      // 🌟 API Path Fixed to match server.js mounting
       const res = await api.post(`/documents/sign/submit`, { token, fields });
       setCompleted(true);
       if (res.data.completed) {
         toast.success('সবাই স্বাক্ষর করেছেন! ফাইনাল পিডিএফ মেইলে পাঠানো হয়েছে।');
       } else {
-        toast.success('আপনার স্বাক্ষর জমা হয়েছে। পরবর্তী সাইনারের জন্য অপেক্ষা করা হচ্ছে।');
+        toast.success('আপনার স্বাক্ষর জমা হয়েছে।');
       }
     } catch (err) { 
-      toast.error('সাবমিট করা সম্ভব হয়নি। আবার চেষ্টা করুন।'); 
+      const msg = err.response?.data?.error || 'সাবমিট করা সম্ভব হয়নি।';
+      toast.error(msg); 
     } finally { 
       setSubmitting(false); 
     }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
-  if (completed) return <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4"><CheckCircle2 size={80} className="text-green-500 animate-bounce" /><h2 className="text-3xl font-bold">স্বাক্ষর সম্পন্ন!</h2><p className="text-slate-500 max-w-md">পিডিএফ জেনারেট করা হয়েছে। সবাই স্বাক্ষর শেষ করলে আপনি ইমেইলে কপি পেয়ে যাবেন। ধন্যবাদ!</p></div>;
+  
+  if (completed) return (
+    <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
+      <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
+      <h2 className="text-3xl font-bold">স্বাক্ষর সম্পন্ন!</h2>
+      <p className="text-slate-500 max-w-md">সবাই স্বাক্ষর শেষ করলে আপনি ইমেইলে কপি পেয়ে যাবেন। ধন্যবাদ!</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-[100] bg-white border-b p-4 flex justify-between items-center shadow-sm">
         <div className="flex flex-col">
-          <span className="text-[10px] text-sky-500 font-black uppercase tracking-widest">Document Title</span>
-          <h1 className="font-bold text-slate-800 leading-tight truncate max-w-[150px] sm:max-w-xs">{docData?.title}</h1>
+          <span className="text-[10px] text-sky-500 font-black uppercase tracking-widest">Document</span>
+          <h1 className="font-bold text-slate-800 leading-tight truncate max-w-[150px]">{docData?.title}</h1>
         </div>
         
-        <div className="flex items-center gap-3 sm:gap-6">
-          {/* লোডিং স্পিনার - বাটনের বাম পাশে */}
-          {submitting && (
-            <div className="flex items-center gap-2 text-sky-600 animate-pulse">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="hidden md:inline text-xs font-bold uppercase tracking-tighter">Processing PDF...</span>
-            </div>
-          )}
-
+        <div className="flex items-center gap-3">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mb-1">My Progress</span>
-            <div className={`px-3 py-1 rounded-full text-[11px] font-black border-2 transition-colors flex items-center gap-1.5 ${mySigningStatus.remaining === 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
+            <div className={`px-3 py-1 rounded-full text-[11px] font-black border-2 flex items-center gap-1.5 ${mySigningStatus.remaining === 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
               {mySigningStatus.remaining === 0 && <FileCheck size={12} />}
               {mySigningStatus.completedFields} / {mySigningStatus.totalFields} SIGNED
             </div>
@@ -3245,16 +3465,16 @@ const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeU
           <Button 
             onClick={handleSubmit} 
             disabled={submitting} 
-            className={`min-w-[130px] font-bold shadow-lg transition-all active:scale-95 ${mySigningStatus.remaining === 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+            className={`min-w-[130px] font-bold ${mySigningStatus.remaining === 0 ? 'bg-green-600' : 'bg-sky-600'}`}
           >
-            {submitting ? 'Please wait...' : 'Finish Signing'}
+            {submitting ? <Loader2 className="animate-spin" /> : 'Finish Signing'}
           </Button>
         </div>
       </header>
 
       <main ref={containerRef} className="max-w-4xl mx-auto py-8 px-4 flex flex-col items-center">
         {pagesData.map((page) => (
-          <div key={page.num} className="relative mb-6 bg-white shadow-xl border border-slate-200" style={{ width: page.viewport.width, height: page.viewport.height }}>
+          <div key={page.num} className="relative mb-6 bg-white shadow-xl border" style={{ width: page.viewport.width, height: page.viewport.height }}>
             <canvas ref={el => {
               if (el && !el.dataset.rendered) {
                 const ctx = el.getContext('2d');
@@ -3268,15 +3488,15 @@ const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeU
               const isMine = Number(field.partyIndex) === myPartyIndex;
               return (
                 <div key={field.id} onClick={(e) => handleFieldClick(e, field)}
-                  className={`absolute border-2 transition-all flex items-center justify-center ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/20 cursor-pointer animate-pulse ring-2 ring-sky-500/20' : 'border-slate-300'}`}
+                  className={`absolute border-2 transition-all flex items-center justify-center ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/20 cursor-pointer animate-pulse' : 'border-slate-300'}`}
                   style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
                   {field.filled ? (
                     field.value.startsWith('data:image') ? 
                     <img src={field.value} className="w-full h-full object-contain p-1" /> :
                     <span className="font-serif text-[12px] font-bold text-black">{field.value}</span>
                   ) : (
-                    <div className="flex flex-col items-center text-[9px] font-bold text-slate-500 leading-none">
-                       {isMine ? <PenTool size={12} className="text-sky-600 mb-0.5" /> : <Lock size={10} />}
+                    <div className="flex flex-col items-center text-[9px] font-bold text-slate-500">
+                       {isMine ? <PenTool size={12} /> : <Lock size={10} />}
                        <span>{isMine ? 'YOUR SIGN' : `SIGNER ${Number(field.partyIndex) + 1}`}</span>
                     </div>
                   )}
@@ -3288,7 +3508,7 @@ const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeU
       </main>
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
-        <DialogContent className="max-w-lg p-6 bg-white rounded-2xl shadow-2xl">
+        <DialogContent className="max-w-lg p-6 bg-white rounded-2xl">
           <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">আপনার স্বাক্ষর দিন</DialogTitle>
           <SignaturePad onSignatureComplete={handleSignature} />
         </DialogContent>
