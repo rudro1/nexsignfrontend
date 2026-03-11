@@ -63,7 +63,7 @@ export function HowItWorksSection() {
               }}
               transition={{
                 duration: 0.5,
-                delay: index * 0.2
+                delay: index * 0.5
               }}
               className="relative flex flex-col items-center text-center">
 
