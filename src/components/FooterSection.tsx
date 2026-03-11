@@ -18,23 +18,20 @@ export function FooterSection() {
               secure document workflows.
             </p>
           </div>
-          <Button
-            size="lg"
-            className="bg-white text-sky-600 hover:bg-sky-50 border-none shadow-lg whitespace-nowrap">
+          <button
+            
+            className="bg-white text-sky-500 btn hover:bg-sky-50 border-none shadow-lg whitespace-nowrap p-4 rounded-xl font-bold">
 
             Start Free Trial
-          </Button>
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 border-b border-slate-800 pb-12">
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-white">
-              <div className="bg-sky-500 p-1.5 rounded-md">
-                <PenTool className="h-5 w-5" />
-              </div>
-                 <Link to="/" className="flex items-center gap-2.5 group"> 
+             
              <Logo></Logo>
-             </Link>
+            
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
               Secure, fast, and legally binding digital signatures for modern

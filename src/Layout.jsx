@@ -1,31 +1,4 @@
-// import React, { useState, useEffect } from 'react';
-// import Navbar from './components/layout/Navbar';
 
-// export default function Layout({ children, currentPageName }) {
-//   const [theme, setTheme] = useState(() => localStorage.getItem('nexsign-theme') || 'light');
-
-//   useEffect(() => {
-//     const root = document.documentElement;
-//     if (theme === 'dark') {
-//       root.classList.add('dark');
-//     } else {
-//       root.classList.remove('dark');
-//     }
-//     localStorage.setItem('nexsign-theme', theme);
-//   }, [theme]);
-
-//   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
-//   const isSignerView = currentPageName === 'SignerView';
-
-//   return (
-//     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-//       <Navbar currentPageName={currentPageName} theme={theme} toggleTheme={toggleTheme} />
-//       <main className={isSignerView ? '' : 'pt-16'}>
-//         {children}
-//       </main>
-//     </div>
-//   );
-// }
 import React from 'react';
 import Navbar from './components/layout/Navbar';
 import { useTheme } from '@/App'; // আপনার App.jsx থেকে context hook টি ইম্পোর্ট করুন
