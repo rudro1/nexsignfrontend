@@ -1,8 +1,7 @@
 
 import React from 'react';
 import Navbar from './components/layout/Navbar';
-import { useTheme } from '@/App'; // আপনার App.jsx থেকে context hook টি ইম্পোর্ট করুন
-
+import { useTheme } from '@/App'; 
 export default function Layout({ children, currentPageName }) {
   // গ্লোবাল কন্টেক্সট থেকে থিম এবং টগল ফাংশন নিন
   const { theme, toggleTheme } = useTheme();

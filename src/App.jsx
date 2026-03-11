@@ -14,6 +14,7 @@ import SignerView from '@/pages/SignerView';
 import PageNotFound from './lib/PageNotFound';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
+import Pricing from './pages/Pricing';
 
 const { Pages, Layout } = pagesConfig;
 
@@ -76,6 +77,7 @@ const AuthenticatedApp = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/sign" element={<SignerView />} />
+      <Route path="/pricing" element={<Pricing/> }/>
 
       {Object.entries(Pages).map(([path, PageComponent]) => {
         if (publicRoutes.includes(path)) return null;
