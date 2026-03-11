@@ -1109,9 +1109,21 @@ export default function AdminDashboard() {
     return isValid(d) ? format(d, fStr) : 'N/A';
   };
 
-  const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
-  const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
-  const filteredLogs = logs.filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()));
+  // const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+  // const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
+ const filteredUsers = users
+  .filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()))
+  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+ const filteredDocs = documents
+  .filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()))
+  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+ 
+  // const filteredLogs = logs.filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()));
+const filteredLogs = logs
+  .filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()))
+  .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
 
   if (authLoading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-sky-600 w-10 h-10" /></div>;
 
