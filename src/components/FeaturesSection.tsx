@@ -30,10 +30,10 @@ export function FeaturesSection() {
   }];
 
   return (
-    <section id="features" className="py-24 bg-white">
+    <section id="features" className="py-24 bg-white dark:bg-[#0F172A]">
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
             Everything You Need for Seamless Signing
           </h2>
           <p className="text-lg text-slate-600">
@@ -59,11 +59,11 @@ export function FeaturesSection() {
             }}
             transition={{
               duration: 0.5,
-              delay: index * 0.1
+              delay: index * 0.3
             }}>
 
-              <Card className="h-full border-none shadow-lg shadow-slate-100 hover:shadow-xl transition-shadow duration-300">
-                <CardContent className="pt-8 flex flex-col items-center text-center h-full">
+              <Card className="h-full border-none shadow-lg shadow-slate-100 dark:shadow-[#0e3b51] dark:rounded hover:shadow-xl transition-shadow duration-300">
+                <CardContent className="pt-8 flex flex-col items-center text-center h-full dark:bg-[#0A9ADE]">
                   <div className="w-14 h-14 rounded-full bg-sky-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                     <feature.icon className="h-7 w-7 text-sky-500" />
                   </div>

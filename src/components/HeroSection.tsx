@@ -2,7 +2,29 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { motion } from 'framer-motion';
 import { CheckCircle2, ShieldCheck, Zap } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 export function HeroSection({ onGetStarted }) {
+
+
+  // See How It Works বাটন হ্যান্ডলার
+  const handleSeeHowItWorks = () => {
+    const section = document.getElementById('how-it-works');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const navigate = useNavigate();
+const { isAuthenticated } = useAuth();
+
+const handleGetStarted = () => {
+  if (isAuthenticated) {
+    navigate("/dashboard");
+  } else {
+    navigate("/login");
+  }
+};
   return (
     <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
       {/* Background Elements */}
@@ -36,7 +58,7 @@ export function HeroSection({ onGetStarted }) {
               New: Automated Workflows 2.0
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 mb-6 leading-[1.1]">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 mb-6 dark:text-white leading-[1.1]">
               Secure & Smart <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-sky-600">
                 Digital Document Signing
@@ -52,15 +74,16 @@ export function HeroSection({ onGetStarted }) {
             <div className="flex flex-col sm:flex-row gap-4 mb-10">
               <Button
                 size="lg"
-                className="rounded-full px-8 text-base shadow-sky-200 shadow-lg"
-                onClick={onGetStarted}>
+                className="rounded-full px-8 text-base shadow-sky-200  shadow-lg dark:shadow-sm bg-blue-500 hover:bg-blue-600"
+                onClick={handleGetStarted}>
 
                 Get Started Free
+
               </Button>
               <Button
                 variant="outline"
                 size="lg"
-                className="rounded-full px-8 text-base">
+                className="rounded-full px-8 text-blue-500 hover:text-blue-600"  onClick={handleSeeHowItWorks}>
 
                 See How It Works
               </Button>

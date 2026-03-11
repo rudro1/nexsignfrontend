@@ -29,11 +29,11 @@ export function HowItWorksSection() {
   return (
     <section
       id="how-it-works"
-      className="py-24 bg-slate-50 relative overflow-hidden">
+      className="py-24 bg-slate-50 relative overflow-hidden dark:bg-[#020617]">
 
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-20">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 dark:text-white">
             How It Works
           </h2>
           <p className="text-lg text-slate-600">
@@ -72,7 +72,7 @@ export function HowItWorksSection() {
                     {step.number}
                   </span>
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">
+                <h3 className="text-xl font-bold text-slate-900 mb-3 dark:text-white">
                   {step.title}
                 </h3>
                 <p className="text-slate-600">{step.description}</p>

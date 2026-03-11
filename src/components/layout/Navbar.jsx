@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Moon, Sun, Menu, X, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Logo from "@/components/ui/Logo";
 
 export default function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [activeLink, setActiveLink] = useState("");
 
-  // theme
+  // Theme
   const [isDark, setIsDark] = useState(() => {
     return (
       document.documentElement.classList.contains("dark") ||
@@ -29,57 +31,84 @@ export default function Navbar() {
 
   const toggleTheme = () => setIsDark(!isDark);
 
-  // scroll function
+  // Scroll to section
   const scrollToSection = (id) => {
-    if (window.location.pathname !== "/") {
-      navigate("/");
-      setTimeout(() => {
-        const el = document.getElementById(id);
-        el?.scrollIntoView({ behavior: "smooth" });
-      }, 200);
+    if (location.pathname !== "/") {
+      navigate("/", { state: { scrollTo: id } });
     } else {
       const el = document.getElementById(id);
       el?.scrollIntoView({ behavior: "smooth" });
+      setActiveLink(id);
     }
+  };
+
+  // Update active link
+  useEffect(() => {
+    const path = location.pathname;
+
+    if (path === "/") {
+      if (location.state?.scrollTo) {
+        setActiveLink(location.state.scrollTo);
+      }
+    } else if (path === "/pricing") {
+      setActiveLink("pricing");
+    } else if (path === "/dashboard") {
+      setActiveLink("dashboard");
+    } else if (path === "/login") {
+      setActiveLink("login");
+    } else if (path === "/register") {
+      setActiveLink("register");
+    } else {
+      setActiveLink("");
+    }
+  }, [location.pathname, location.state]);
+
+  const handleLinkClick = (linkName, route) => {
+    setActiveLink(linkName);
+    if (route) navigate(route);
   };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
       <div className="max-w-7xl mx-auto px-4">
-
         <div className="flex items-center justify-between h-16">
 
           {/* Logo */}
-
           <Logo />
 
           {/* Center Links */}
           <div className="hidden md:flex items-center gap-8 font-semibold text-slate-500 dark:text-blue-600">
-
             <button
               onClick={() => scrollToSection("features")}
-              className="hover:text-sky-500"
+              className={`hover:text-sky-500 ${activeLink === "features" ? "text-blue-600 font-bold" : ""}`}
             >
               Features
             </button>
 
             <button
               onClick={() => scrollToSection("how-it-works")}
-              className="hover:text-sky-500"
+              className={`hover:text-sky-500 ${activeLink === "how-it-works" ? "text-blue-600 font-bold" : ""}`}
             >
               How It Works
             </button>
 
-            <Link to="/pricing" className="hover:text-sky-500">
+            <Link
+              to="/pricing"
+              onClick={() => handleLinkClick("pricing", "/pricing")}
+              className={`hover:text-sky-500 ${activeLink === "pricing" ? "text-blue-600 font-bold" : ""}`}
+            >
               Pricing
             </Link>
 
             {isAuthenticated && (
-              <Link to="/dashboard" className="hover:text-sky-500">
+              <Link
+                to="/dashboard"
+                onClick={() => handleLinkClick("dashboard", "/dashboard")}
+                className={`hover:text-sky-500 ${activeLink === "dashboard" ? "text-blue-600 font-bold" : ""}`}
+              >
                 Dashboard
               </Link>
             )}
-
           </div>
 
           {/* Right Buttons */}
@@ -100,15 +129,15 @@ export default function Navbar() {
             {!isAuthenticated ? (
               <>
                 <button
-                  onClick={() => navigate("/login")}
-                  className="px-4 py-2 rounded-lg bg-gray-100 text-blue-600 hover:bg-gray-300"
+                  onClick={() => handleLinkClick("login", "/login")}
+                  className={`px-4 py-2 rounded-lg bg-gray-100 text-blue-600 hover:bg-gray-300 ${activeLink === "login" ? "text-blue-600 font-bold" : ""}`}
                 >
                   Sign In
                 </button>
 
                 <button
-                  onClick={() => navigate("/register")}
-                  className="px-4 py-2 rounded-lg bg-sky-500 text-white hover:bg-sky-600"
+                  onClick={() => handleLinkClick("register", "/register")}
+                  className={`px-4 py-2 rounded-lg bg-sky-500 text-white hover:bg-sky-600 ${activeLink === "register" ? "text-blue-600 font-bold" : ""}`}
                 >
                   Get Started
                 </button>
@@ -118,6 +147,7 @@ export default function Navbar() {
                 onClick={() => {
                   logout();
                   navigate("/");
+                  setActiveLink(""); // remove active on logout
                 }}
                 className="p-2 text-slate-500 hover:text-red-500"
               >
@@ -139,34 +169,40 @@ export default function Navbar() {
         {/* Mobile menu */}
         {mobileOpen && (
           <div className="md:hidden pb-4 space-y-3">
-
             <button
               onClick={() => scrollToSection("features")}
-              className="block w-full text-left"
+              className={`block w-full text-left ${activeLink === "features" ? "text-blue-600 font-bold" : ""}`}
             >
               Features
             </button>
 
             <button
-              onClick={() => scrollToSection("howitworks")}
-              className="block w-full text-left"
+              onClick={() => scrollToSection("how-it-works")}
+              className={`block w-full text-left ${activeLink === "how-it-works" ? "text-blue-600 font-bold" : ""}`}
             >
               How It Works
             </button>
 
-            <Link to="/pricing" className="block">
+            <Link
+              to="/pricing"
+              onClick={() => handleLinkClick("pricing", "/pricing")}
+              className={`block ${activeLink === "pricing" ? "text-blue-600 font-bold" : ""}`}
+            >
               Pricing
             </Link>
 
             {isAuthenticated && (
-              <Link to="/dashboard" className="block">
+              <Link
+                to="/dashboard"
+                onClick={() => handleLinkClick("dashboard", "/dashboard")}
+                className={`block ${activeLink === "dashboard" ? "text-blue-600 font-bold" : ""}`}
+              >
                 Dashboard
               </Link>
             )}
 
           </div>
         )}
-
       </div>
     </nav>
   );

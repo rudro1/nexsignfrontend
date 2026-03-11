@@ -14,7 +14,7 @@ export default function PageNotFound() {
         <h1 className="text-6xl font-extrabold text-slate-200 dark:text-slate-800 mb-4">404</h1>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Page not found</h2>
         <p className="text-slate-500 mb-8">The page you're looking for doesn't exist or has been moved.</p>
-        <Link to={createPageUrl('Landing')}>
+        <Link to= "/">
           <Button className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl gap-2">
             <Home className="w-4 h-4" />
             Back to Home
