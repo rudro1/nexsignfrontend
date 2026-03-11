@@ -1547,7 +1547,7 @@
 //   );
 // }
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card } from '@/components/ui/Card';
@@ -1556,7 +1556,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, ChevronLeft, ChevronRight, MapPin, Globe, Laptop, Mail, Calendar } from 'lucide-react';
+import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, ChevronLeft, ChevronRight, MapPin, Globe, Laptop, Mail, Calendar, Plus } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
 import { toast } from 'sonner';
@@ -1640,6 +1640,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 bg-[#F8FAFC] dark:bg-slate-950 min-h-screen font-sans transition-colors duration-300">
+      {/* Header Section with New Document Feature */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -1651,12 +1652,20 @@ export default function AdminDashboard() {
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">পুরো সিস্টেমের অ্যাক্টিভিটি এখান থেকে মনিটর করুন</p>
         </div>
-        <Button onClick={refreshAll} className="rounded-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 shadow-sm px-6 w-full md:w-auto">
-          <Activity size={16} className="mr-2 text-emerald-500 animate-pulse"/> Update Live Data
-        </Button>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <Link to="/DocumentEditor" className="w-full sm:w-auto">
+            <Button className="w-full bg-sky-500 hover:bg-sky-600 text-white rounded-xl gap-2 shadow-lg px-6">
+              <Plus className="w-4 h-4" /> New Document
+            </Button>
+          </Link>
+          <Button onClick={refreshAll} variant="outline" className="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-sm px-6">
+            <Activity size={16} className="mr-2 text-emerald-500 animate-pulse"/> Sync Data
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10">
         <StatsCard label="Total Users" value={users.length} icon={Users} color="sky" />
         <StatsCard label="Documents" value={documents.length} icon={FileText} color="violet" />
         <StatsCard label="Completed" value={documents.filter(d => d.status === 'completed').length} icon={CheckCircle2} color="green" />
@@ -1697,6 +1706,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="w-full">
+                {/* Users View */}
                 {tab === 'users' && (
                   <div className="grid grid-cols-1 divide-y divide-slate-100 dark:divide-slate-800 md:block">
                     <div className="hidden md:grid md:grid-cols-4 bg-slate-50/50 dark:bg-slate-900/50 p-4 font-bold text-slate-700 dark:text-slate-300 text-sm">
@@ -1720,6 +1730,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
+                {/* Documents View */}
                 {tab === 'documents' && (
                   <div className="grid grid-cols-1 divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredDocs.map(d => (
@@ -1733,70 +1744,3 @@ export default function AdminDashboard() {
                               <span className="mx-1">•</span>
                               <span className="text-[10px]">{safeFormatDate(d.createdAt, 'd MMM, yyyy')}</span>
                             </div>
-                          </div>
-                          <Badge className={`w-fit px-3 py-1 rounded-full font-bold text-[10px] ${d.status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400'}`}>
-                            {d.status?.toUpperCase()}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3 mt-2">
-                          {d.parties?.map((p, idx) => (
-                            <div key={idx} className="p-4 border border-slate-100 dark:border-slate-800 rounded-2xl bg-[#FCFDFF] dark:bg-slate-950/50 shadow-sm">
-                              <div className="flex justify-between items-start mb-3">
-                                <div className="flex flex-col">
-                                  <span className="font-extrabold text-slate-800 dark:text-slate-200 text-sm">{p.name}</span>
-                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1 mt-0.5 truncate max-w-[150px]"><Mail size={10}/>{p.email}</span>
-                                </div>
-                                <div className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${p.status === 'signed' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}>
-                                  {p.status}
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-50 dark:border-slate-800">
-                                <div className="flex items-center gap-1.5 font-medium"><Globe size={11}/>{p.ipAddress || '---'}</div>
-                                <div className="flex items-center gap-1.5 font-medium"><MapPin size={11}/>{p.location || 'Unknown'}</div>
-                                <div className="col-span-2 flex items-center gap-1.5 font-medium truncate"><Laptop size={11}/>{p.device || 'Mobile/PC'}</div>
-                                {p.signedAt && <div className="col-span-2 flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 mt-1 bg-emerald-50/50 dark:bg-emerald-900/20 p-1 rounded-md"><Calendar size={11}/> {safeFormatDate(p.signedAt)}</div>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {tab === 'logs' && (
-                  <div className="grid grid-cols-1 divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredLogs.map(log => (
-                      <div key={log._id} className="p-4 flex flex-col gap-2 hover:bg-slate-50/30 dark:hover:bg-slate-800/30 transition-all">
-                        <div className="flex justify-between items-start">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{log.performed_by?.name || 'System'}</span>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate max-w-[200px]">{log.performed_by?.email}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold italic">{safeFormatDate(log.timestamp, 'hh:mm aa, d MMM')}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline" className="text-[9px] font-black border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800">
-                            {log.action}
-                          </Badge>
-                          <span className="text-xs text-slate-600 dark:text-slate-400 font-bold truncate">Doc: {log.document_id?.title || 'N/A'}</span>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between p-6 bg-slate-50/20 dark:bg-slate-900/20">
-                      <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Pg {logPage}</p>
-                      <div className="flex gap-2">
-                        <Button onClick={() => fetchLogs(logPage - 1)} disabled={logPage === 1 || loading.logs} variant="outline" size="sm" className="rounded-xl bg-white dark:bg-slate-800 dark:border-slate-700 h-9 w-9 p-0 shadow-sm"><ChevronLeft size={18}/></Button>
-                        <Button onClick={() => fetchLogs(logPage + 1)} disabled={!hasMoreLogs || loading.logs} variant="outline" size="sm" className="rounded-xl bg-white dark:bg-slate-800 dark:border-slate-700 h-9 w-9 p-0 shadow-sm"><ChevronRight size={18}/></Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </Card>
-      </Tabs>
-    </div>
-  );
-}
