@@ -1023,6 +1023,271 @@
 //     </div>
 //   );
 // }
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { useNavigate } from 'react-router-dom';
+// import { api } from '@/api/apiClient';
+// import { useAuth } from '@/lib/AuthContext';
+// import { Card } from '@/components/ui/Card';
+// import { Button } from '@/components/ui/button';
+// import { Badge } from '@/components/ui/badge';
+// import { Input } from '@/components/ui/input';
+// import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+// import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, ChevronLeft, ChevronRight, MapPin, Globe, Laptop, Mail, Calendar } from 'lucide-react';
+// import { format, isValid } from 'date-fns';
+// import StatsCard from '../components/dashboard/StatsCard';
+// import { toast } from 'sonner';
+
+// export default function AdminDashboard() {
+//   const { user, loading: authLoading } = useAuth();
+//   const navigate = useNavigate();
+//   const [tab, setTab] = useState('users');
+//   const [search, setSearch] = useState('');
+  
+//   const [users, setUsers] = useState([]);
+//   const [documents, setDocuments] = useState([]);
+//   const [logs, setLogs] = useState([]); 
+  
+//   const [loading, setLoading] = useState({ users: true, docs: true, logs: true });
+//   const [logPage, setLogPage] = useState(1);
+//   const [hasMoreLogs, setHasMoreLogs] = useState(true);
+
+//   const fetchUsers = useCallback(async () => {
+//     try {
+//       const res = await api.get('/admin/users');
+//       setUsers(Array.isArray(res.data) ? res.data : []);
+//     } catch (err) { toast.error("User list error"); }
+//     finally { setLoading(prev => ({ ...prev, users: false })); }
+//   }, []);
+
+//   const fetchDocs = useCallback(async () => {
+//     try {
+//       const res = await api.get('/admin/documents');
+//       setDocuments(Array.isArray(res.data) ? res.data : []);
+//     } catch (err) { toast.error("Docs error"); }
+//     finally { setLoading(prev => ({ ...prev, docs: false })); }
+//   }, []);
+
+//   const fetchLogs = useCallback(async (pageNo = 1) => {
+//     setLoading(prev => ({ ...prev, logs: true }));
+//     try {
+//       const res = await api.get(`/admin/audit-logs?page=${pageNo}`);
+//       const newData = Array.isArray(res.data) ? res.data : [];
+//       setLogs(newData);
+//       setHasMoreLogs(newData.length === 10);
+//       setLogPage(pageNo);
+//     } catch (err) { toast.error("Logs error"); }
+//     finally { setLoading(prev => ({ ...prev, logs: false })); }
+//   }, []);
+
+//   const refreshAll = () => {
+//     setLoading({ users: true, docs: true, logs: true });
+//     fetchUsers();
+//     fetchDocs();
+//     fetchLogs(1);
+//   };
+
+//   useEffect(() => {
+//     if (authLoading) return;
+//     if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+//       navigate('/dashboard'); return;
+//     }
+//     refreshAll();
+//   }, [user, authLoading]);
+
+//   const handleDeleteUser = async (userId) => {
+//     if (!window.confirm("Are you sure?")) return;
+//     try {
+//       await api.delete(`/admin/users/${userId}`);
+//       setUsers(users.filter(u => u._id !== userId));
+//       toast.success("User deleted");
+//     } catch (error) { toast.error("Delete failed"); }
+//   };
+
+//   const safeFormatDate = (dateStr, fStr = 'hh:mm aa, d MMM yyyy') => {
+//     const d = new Date(dateStr);
+//     return isValid(d) ? format(d, fStr) : 'N/A';
+//   };
+
+//   // const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+//   // const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
+//  const filteredUsers = users
+//   .filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()))
+//   .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+//  const filteredDocs = documents
+//   .filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()))
+//   .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+ 
+//   // const filteredLogs = logs.filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()));
+// const filteredLogs = logs
+//   .filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()))
+//   .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+
+//   if (authLoading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-sky-600 w-10 h-10" /></div>;
+
+//   return (
+//     <div className="max-w-7xl mx-auto px-4 py-8 bg-[#F8FAFC] min-h-screen font-sans">
+//       {/* Header */}
+//       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+//         <div>
+//           <div className="flex items-center gap-2 mb-1">
+//             <Shield className="text-sky-600 w-5 h-5" />
+//             <span className="text-xs font-bold uppercase tracking-wider text-sky-600">Administrator</span>
+//           </div>
+//           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">NexSign Dashboard</h1>
+//         </div>
+//         <Button onClick={refreshAll} className="rounded-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm px-6">
+//           <Activity size={16} className="mr-2 text-emerald-500 animate-pulse"/> Update Live Data
+//         </Button>
+//       </div>
+
+//       {/* Stats Section */}
+//       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+//         <StatsCard label="Total Users" value={users.length} icon={Users} color="sky" />
+//         <StatsCard label="Documents" value={documents.length} icon={FileText} color="violet" />
+//         <StatsCard label="Completed" value={documents.filter(d => d.status === 'completed').length} icon={CheckCircle2} color="green" />
+//         <StatsCard label="Pending" value={documents.filter(d => d.status === 'in_progress').length} icon={Clock} color="amber" />
+//       </div>
+
+//       <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="space-y-6">
+//         <TabsList className="bg-slate-200/50 p-1 rounded-xl w-fit">
+//           <TabsTrigger value="users" className="rounded-lg px-6 font-semibold transition-all">Users</TabsTrigger>
+//           <TabsTrigger value="documents" className="rounded-lg px-6 font-semibold transition-all">Documents</TabsTrigger>
+//           <TabsTrigger value="logs" className="rounded-lg px-6 font-semibold transition-all">Activity Logs</TabsTrigger>
+//         </TabsList>
+
+//         <Card className="rounded-3xl shadow-xl shadow-slate-200/50 border-none bg-white overflow-hidden">
+//           <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-white">
+//             <div className="relative w-full md:max-w-sm">
+//               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+//               <Input 
+//                 placeholder={`Search ${tab}...`} 
+//                 value={search} 
+//                 onChange={e => setSearch(e.target.value)} 
+//                 className="pl-11 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white h-12 transition-all" 
+//               />
+//             </div>
+//             <div className="flex items-center gap-2">
+//               <span className="text-sm font-medium text-slate-400">Total {tab}:</span>
+//               <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50 border-none font-bold">
+//                 {tab === 'users' ? filteredUsers.length : tab === 'documents' ? filteredDocs.length : filteredLogs.length}
+//               </Badge>
+//             </div>
+//           </div>
+
+//           <div className="overflow-x-auto">
+//             {loading[tab] ? (
+//               <div className="flex flex-col items-center justify-center py-24 gap-4 text-slate-400">
+//                 <Loader2 className="animate-spin w-8 h-8 text-sky-500" />
+//                 <p className="font-medium animate-pulse">Syncing Database...</p>
+//               </div>
+//             ) : (
+//               <>
+//                 {tab === 'users' && (
+//                   <Table>
+//                     <TableHeader className="bg-slate-50/50"><TableRow><TableHead className="font-bold py-4">User Details</TableHead><TableHead className="font-bold">Access Role</TableHead><TableHead className="font-bold">Join Date</TableHead><TableHead className="text-right font-bold">Manage</TableHead></TableRow></TableHeader>
+//                     <TableBody>
+//                       {filteredUsers.map(u => (
+//                         <TableRow key={u._id} className="hover:bg-slate-50/30 transition-colors">
+//                           <TableCell><div className="flex flex-col"><span className="font-bold text-slate-900">{u.full_name}</span><span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><Mail size={10}/>{u.email}</span></div></TableCell>
+//                           <TableCell><Badge className={`rounded-md font-bold text-[10px] ${u.role === 'super_admin' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-600'}`} variant="outline">{u.role?.toUpperCase()}</Badge></TableCell>
+//                           <TableCell className="text-xs text-slate-500 font-medium">{safeFormatDate(u.createdAt, 'd MMM, yyyy')}</TableCell>
+//                           <TableCell className="text-right">{u.role !== 'super_admin' && <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u._id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"><Trash2 size={18}/></Button>}</TableCell>
+//                         </TableRow>
+//                       ))}
+//                     </TableBody>
+//                   </Table>
+//                 )}
+
+//                 {tab === 'documents' && (
+//                   <Table className="min-w-[1000px]">
+//                     <TableHeader className="bg-slate-50/50"><TableRow><TableHead className="font-bold py-4">Document Details</TableHead><TableHead className="font-bold">Overall Status</TableHead><TableHead className="font-bold">Signers Tracking</TableHead><TableHead className="font-bold">Creation Date</TableHead></TableRow></TableHeader>
+//                     <TableBody>
+//                       {filteredDocs.map(d => (
+//                         <TableRow key={d._id} className="align-top hover:bg-slate-50/30">
+//                           <TableCell className="max-w-[220px]">
+//                             <div className="flex flex-col gap-1.5 py-2">
+//                               <span className="font-bold text-slate-900 text-base leading-tight">{d.title}</span>
+//                               <div className="flex items-center gap-1.5 text-slate-400">
+//                                 <div className="w-5 h-5 rounded-full bg-sky-100 flex items-center justify-center text-[10px] text-sky-700 font-bold">
+//                                   {d.owner?.full_name?.charAt(0)}
+//                                 </div>
+//                                 <span className="text-[11px] font-medium italic">{d.owner?.full_name}</span>
+//                               </div>
+//                             </div>
+//                           </TableCell>
+//                           <TableCell className="py-4">
+//                             <Badge className={`px-3 py-1 rounded-full font-bold text-[10px] ${d.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
+//                               {d.status?.toUpperCase()}
+//                             </Badge>
+//                           </TableCell>
+//                           <TableCell className="py-4">
+//                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+//                               {d.parties?.map((p, idx) => (
+//                                 <div key={idx} className="p-4 border border-slate-100 rounded-2xl bg-[#FCFDFF] hover:border-sky-200 transition-all shadow-sm">
+//                                   <div className="flex justify-between items-start mb-3">
+//                                     <div className="flex flex-col">
+//                                       <span className="font-extrabold text-slate-800 text-sm">{p.name}</span>
+//                                       <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mt-0.5"><Mail size={10}/>{p.email}</span>
+//                                     </div>
+//                                     <div className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${p.status === 'signed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+//                                       {p.status}
+//                                     </div>
+//                                   </div>
+//                                   <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-2 border-t border-slate-50">
+//                                     <div className="flex items-center gap-1.5 font-medium"><Globe size={11} className="text-slate-300"/>{p.ipAddress || '---'}</div>
+//                                     <div className="flex items-center gap-1.5 font-medium"><MapPin size={11} className="text-slate-300"/>{p.location || 'Unknown'}</div>
+//                                     <div className="col-span-2 flex items-center gap-1.5 font-medium truncate"><Laptop size={11} className="text-slate-300"/>{p.device || 'Mobile/PC'}</div>
+//                                     {p.signedAt && <div className="col-span-2 flex items-center gap-1.5 font-bold text-emerald-600 mt-1 bg-emerald-50/50 p-1 rounded-md">
+//                                       <Calendar size={11}/> {safeFormatDate(p.signedAt)}
+//                                     </div>}
+//                                   </div>
+//                                 </div>
+//                               ))}
+//                             </div>
+//                           </TableCell>
+//                           <TableCell className="text-xs text-slate-400 font-medium py-4">{safeFormatDate(d.createdAt, 'd MMM, yyyy')}</TableCell>
+//                         </TableRow>
+//                       ))}
+//                     </TableBody>
+//                   </Table>
+//                 )}
+
+//                 {tab === 'logs' && (
+//                   <>
+//                     <Table>
+//                       <TableHeader className="bg-slate-50/50"><TableRow><TableHead className="font-bold py-4">Actor</TableHead><TableHead className="font-bold">Action Taken</TableHead><TableHead className="font-bold">Document Title</TableHead><TableHead className="font-bold">Time Stamp</TableHead></TableRow></TableHeader>
+//                       <TableBody>
+//                         {filteredLogs.map(log => (
+//                           <TableRow key={log._id} className="hover:bg-slate-50/30">
+//                             <TableCell><div className="flex flex-col"><span className="font-bold text-slate-900 text-sm">{log.performed_by?.name || 'System'}</span><span className="text-[10px] text-slate-400 font-medium tracking-tight">{log.performed_by?.email}</span></div></TableCell>
+//                             <TableCell><Badge variant="outline" className="text-[9px] font-black border-slate-200 text-slate-600 uppercase tracking-tighter bg-slate-50">{log.action}</Badge></TableCell>
+//                             <TableCell><span className="text-xs text-slate-600 font-bold max-w-[180px] truncate block">{log.document_id?.title || 'N/A'}</span></TableCell>
+//                             <TableCell className="text-[10px] text-slate-500 font-bold italic">{safeFormatDate(log.timestamp, 'hh:mm aa, d MMM')}</TableCell>
+//                           </TableRow>
+//                         ))}
+//                       </TableBody>
+//                     </Table>
+//                     <div className="flex items-center justify-between p-6 border-t border-slate-50 bg-slate-50/20">
+//                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Page {logPage}</p>
+//                       <div className="flex gap-2">
+//                         <Button onClick={() => fetchLogs(logPage - 1)} disabled={logPage === 1 || loading.logs} variant="outline" size="sm" className="rounded-xl bg-white h-9 w-9 p-0 shadow-sm"><ChevronLeft size={18}/></Button>
+//                         <Button onClick={() => fetchLogs(logPage + 1)} disabled={!hasMoreLogs || loading.logs} variant="outline" size="sm" className="rounded-xl bg-white h-9 w-9 p-0 shadow-sm"><ChevronRight size={18}/></Button>
+//                       </div>
+//                     </div>
+//                   </>
+//                 )}
+//               </>
+//             )}
+//           </div>
+//         </Card>
+//       </Tabs>
+//     </div>
+//   );
+// }
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
@@ -1109,27 +1374,23 @@ export default function AdminDashboard() {
     return isValid(d) ? format(d, fStr) : 'N/A';
   };
 
-  // const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
-  // const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
- const filteredUsers = users
-  .filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()))
-  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  // Improved Filtering & Sorting Logic
+  const filteredUsers = users
+    .filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
- const filteredDocs = documents
-  .filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()))
-  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
- 
-  // const filteredLogs = logs.filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()));
-const filteredLogs = logs
-  .filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()))
-  .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const filteredDocs = documents
+    .filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  const filteredLogs = logs
+    .filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   if (authLoading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-sky-600 w-10 h-10" /></div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 bg-[#F8FAFC] min-h-screen font-sans">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -1143,7 +1404,6 @@ const filteredLogs = logs
         </Button>
       </div>
 
-      {/* Stats Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <StatsCard label="Total Users" value={users.length} icon={Users} color="sky" />
         <StatsCard label="Documents" value={documents.length} icon={FileText} color="violet" />
