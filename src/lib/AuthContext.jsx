@@ -193,7 +193,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     localStorage.removeItem('nexsign_user');
     localStorage.removeItem('token'); // ✅ টোকেন রিমুভ করা
-    window.location.href = '/login';
+    //window.location.href = '/login';
   };
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
