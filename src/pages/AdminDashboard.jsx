@@ -1287,7 +1287,6 @@
 //     </div>
 //   );
 // }
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
@@ -1374,7 +1373,6 @@ export default function AdminDashboard() {
     return isValid(d) ? format(d, fStr) : 'N/A';
   };
 
-  // Improved Filtering & Sorting Logic
   const filteredUsers = users
     .filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -1399,7 +1397,7 @@ export default function AdminDashboard() {
           </div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">NexSign Dashboard</h1>
         </div>
-        <Button onClick={refreshAll} className="rounded-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm px-6">
+        <Button onClick={refreshAll} className="rounded-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm px-6 w-full md:w-auto">
           <Activity size={16} className="mr-2 text-emerald-500 animate-pulse"/> Update Live Data
         </Button>
       </div>
@@ -1412,10 +1410,10 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="space-y-6">
-        <TabsList className="bg-slate-200/50 p-1 rounded-xl w-fit">
-          <TabsTrigger value="users" className="rounded-lg px-6 font-semibold transition-all">Users</TabsTrigger>
-          <TabsTrigger value="documents" className="rounded-lg px-6 font-semibold transition-all">Documents</TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-lg px-6 font-semibold transition-all">Activity Logs</TabsTrigger>
+        <TabsList className="bg-slate-200/50 p-1 rounded-xl w-full md:w-fit flex">
+          <TabsTrigger value="users" className="flex-1 md:flex-none rounded-lg px-6 font-semibold transition-all">Users</TabsTrigger>
+          <TabsTrigger value="documents" className="flex-1 md:flex-none rounded-lg px-6 font-semibold transition-all">Docs</TabsTrigger>
+          <TabsTrigger value="logs" className="flex-1 md:flex-none rounded-lg px-6 font-semibold transition-all">Logs</TabsTrigger>
         </TabsList>
 
         <Card className="rounded-3xl shadow-xl shadow-slate-200/50 border-none bg-white overflow-hidden">
@@ -1426,120 +1424,121 @@ export default function AdminDashboard() {
                 placeholder={`Search ${tab}...`} 
                 value={search} 
                 onChange={e => setSearch(e.target.value)} 
-                className="pl-11 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white h-12 transition-all" 
+                className="pl-11 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white h-12 transition-all w-full" 
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-400">Total {tab}:</span>
+              <span className="text-sm font-medium text-slate-400">Total:</span>
               <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50 border-none font-bold">
                 {tab === 'users' ? filteredUsers.length : tab === 'documents' ? filteredDocs.length : filteredLogs.length}
               </Badge>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="p-0">
             {loading[tab] ? (
               <div className="flex flex-col items-center justify-center py-24 gap-4 text-slate-400">
                 <Loader2 className="animate-spin w-8 h-8 text-sky-500" />
                 <p className="font-medium animate-pulse">Syncing Database...</p>
               </div>
             ) : (
-              <>
+              <div className="w-full">
                 {tab === 'users' && (
-                  <Table>
-                    <TableHeader className="bg-slate-50/50"><TableRow><TableHead className="font-bold py-4">User Details</TableHead><TableHead className="font-bold">Access Role</TableHead><TableHead className="font-bold">Join Date</TableHead><TableHead className="text-right font-bold">Manage</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {filteredUsers.map(u => (
-                        <TableRow key={u._id} className="hover:bg-slate-50/30 transition-colors">
-                          <TableCell><div className="flex flex-col"><span className="font-bold text-slate-900">{u.full_name}</span><span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><Mail size={10}/>{u.email}</span></div></TableCell>
-                          <TableCell><Badge className={`rounded-md font-bold text-[10px] ${u.role === 'super_admin' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-600'}`} variant="outline">{u.role?.toUpperCase()}</Badge></TableCell>
-                          <TableCell className="text-xs text-slate-500 font-medium">{safeFormatDate(u.createdAt, 'd MMM, yyyy')}</TableCell>
-                          <TableCell className="text-right">{u.role !== 'super_admin' && <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u._id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"><Trash2 size={18}/></Button>}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <div className="grid grid-cols-1 divide-y divide-slate-100 md:block">
+                    {/* Desktop Header */}
+                    <div className="hidden md:grid md:grid-cols-4 bg-slate-50/50 p-4 font-bold text-slate-700 text-sm">
+                      <span>User Details</span><span>Access Role</span><span>Join Date</span><span className="text-right">Manage</span>
+                    </div>
+                    {filteredUsers.map(u => (
+                      <div key={u._id} className="p-4 md:grid md:grid-cols-4 md:items-center hover:bg-slate-50/30 transition-all flex flex-col gap-3">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900">{u.full_name}</span>
+                          <span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><Mail size={10}/>{u.email}</span>
+                        </div>
+                        <div className="flex items-center md:block">
+                          <Badge className={`rounded-md font-bold text-[10px] ${u.role === 'super_admin' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-600'}`} variant="outline">{u.role?.toUpperCase()}</Badge>
+                        </div>
+                        <span className="text-xs text-slate-500 font-medium">{safeFormatDate(u.createdAt, 'd MMM, yyyy')}</span>
+                        <div className="md:text-right">
+                          {u.role !== 'super_admin' && <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u._id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full"><Trash2 size={18}/></Button>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 {tab === 'documents' && (
-                  <Table className="min-w-[1000px]">
-                    <TableHeader className="bg-slate-50/50"><TableRow><TableHead className="font-bold py-4">Document Details</TableHead><TableHead className="font-bold">Overall Status</TableHead><TableHead className="font-bold">Signers Tracking</TableHead><TableHead className="font-bold">Creation Date</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {filteredDocs.map(d => (
-                        <TableRow key={d._id} className="align-top hover:bg-slate-50/30">
-                          <TableCell className="max-w-[220px]">
-                            <div className="flex flex-col gap-1.5 py-2">
-                              <span className="font-bold text-slate-900 text-base leading-tight">{d.title}</span>
-                              <div className="flex items-center gap-1.5 text-slate-400">
-                                <div className="w-5 h-5 rounded-full bg-sky-100 flex items-center justify-center text-[10px] text-sky-700 font-bold">
-                                  {d.owner?.full_name?.charAt(0)}
+                  <div className="grid grid-cols-1 divide-y divide-slate-100">
+                    {filteredDocs.map(d => (
+                      <div key={d._id} className="p-4 lg:p-6 hover:bg-slate-50/30 transition-all flex flex-col gap-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="font-bold text-slate-900 text-lg leading-tight">{d.title}</span>
+                            <div className="flex items-center gap-1.5 text-slate-400">
+                              <div className="w-5 h-5 rounded-full bg-sky-100 flex items-center justify-center text-[10px] text-sky-700 font-bold uppercase">{d.owner?.full_name?.charAt(0)}</div>
+                              <span className="text-[11px] font-medium italic">{d.owner?.full_name}</span>
+                              <span className="mx-1">•</span>
+                              <span className="text-[10px]">{safeFormatDate(d.createdAt, 'd MMM, yyyy')}</span>
+                            </div>
+                          </div>
+                          <Badge className={`w-fit px-3 py-1 rounded-full font-bold text-[10px] ${d.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
+                            {d.status?.toUpperCase()}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3 mt-2">
+                          {d.parties?.map((p, idx) => (
+                            <div key={idx} className="p-4 border border-slate-100 rounded-2xl bg-[#FCFDFF] shadow-sm">
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex flex-col">
+                                  <span className="font-extrabold text-slate-800 text-sm">{p.name}</span>
+                                  <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mt-0.5 truncate max-w-[150px]"><Mail size={10}/>{p.email}</span>
                                 </div>
-                                <span className="text-[11px] font-medium italic">{d.owner?.full_name}</span>
+                                <div className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${p.status === 'signed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                  {p.status}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-2 border-t border-slate-50">
+                                <div className="flex items-center gap-1.5 font-medium"><Globe size={11} className="text-slate-300"/>{p.ipAddress || '---'}</div>
+                                <div className="flex items-center gap-1.5 font-medium"><MapPin size={11} className="text-slate-300"/>{p.location || 'Unknown'}</div>
+                                <div className="col-span-2 flex items-center gap-1.5 font-medium truncate"><Laptop size={11} className="text-slate-300"/>{p.device || 'Mobile/PC'}</div>
+                                {p.signedAt && <div className="col-span-2 flex items-center gap-1.5 font-bold text-emerald-600 mt-1 bg-emerald-50/50 p-1 rounded-md"><Calendar size={11}/> {safeFormatDate(p.signedAt)}</div>}
                               </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="py-4">
-                            <Badge className={`px-3 py-1 rounded-full font-bold text-[10px] ${d.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
-                              {d.status?.toUpperCase()}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-4">
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                              {d.parties?.map((p, idx) => (
-                                <div key={idx} className="p-4 border border-slate-100 rounded-2xl bg-[#FCFDFF] hover:border-sky-200 transition-all shadow-sm">
-                                  <div className="flex justify-between items-start mb-3">
-                                    <div className="flex flex-col">
-                                      <span className="font-extrabold text-slate-800 text-sm">{p.name}</span>
-                                      <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mt-0.5"><Mail size={10}/>{p.email}</span>
-                                    </div>
-                                    <div className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${p.status === 'signed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                      {p.status}
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-2 border-t border-slate-50">
-                                    <div className="flex items-center gap-1.5 font-medium"><Globe size={11} className="text-slate-300"/>{p.ipAddress || '---'}</div>
-                                    <div className="flex items-center gap-1.5 font-medium"><MapPin size={11} className="text-slate-300"/>{p.location || 'Unknown'}</div>
-                                    <div className="col-span-2 flex items-center gap-1.5 font-medium truncate"><Laptop size={11} className="text-slate-300"/>{p.device || 'Mobile/PC'}</div>
-                                    {p.signedAt && <div className="col-span-2 flex items-center gap-1.5 font-bold text-emerald-600 mt-1 bg-emerald-50/50 p-1 rounded-md">
-                                      <Calendar size={11}/> {safeFormatDate(p.signedAt)}
-                                    </div>}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-xs text-slate-400 font-medium py-4">{safeFormatDate(d.createdAt, 'd MMM, yyyy')}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 {tab === 'logs' && (
-                  <>
-                    <Table>
-                      <TableHeader className="bg-slate-50/50"><TableRow><TableHead className="font-bold py-4">Actor</TableHead><TableHead className="font-bold">Action Taken</TableHead><TableHead className="font-bold">Document Title</TableHead><TableHead className="font-bold">Time Stamp</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {filteredLogs.map(log => (
-                          <TableRow key={log._id} className="hover:bg-slate-50/30">
-                            <TableCell><div className="flex flex-col"><span className="font-bold text-slate-900 text-sm">{log.performed_by?.name || 'System'}</span><span className="text-[10px] text-slate-400 font-medium tracking-tight">{log.performed_by?.email}</span></div></TableCell>
-                            <TableCell><Badge variant="outline" className="text-[9px] font-black border-slate-200 text-slate-600 uppercase tracking-tighter bg-slate-50">{log.action}</Badge></TableCell>
-                            <TableCell><span className="text-xs text-slate-600 font-bold max-w-[180px] truncate block">{log.document_id?.title || 'N/A'}</span></TableCell>
-                            <TableCell className="text-[10px] text-slate-500 font-bold italic">{safeFormatDate(log.timestamp, 'hh:mm aa, d MMM')}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    <div className="flex items-center justify-between p-6 border-t border-slate-50 bg-slate-50/20">
-                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Page {logPage}</p>
+                  <div className="grid grid-cols-1 divide-y divide-slate-100">
+                    {filteredLogs.map(log => (
+                      <div key={log._id} className="p-4 flex flex-col gap-2 hover:bg-slate-50/30">
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900 text-sm">{log.performed_by?.name || 'System'}</span>
+                            <span className="text-[10px] text-slate-400 font-medium truncate max-w-[200px]">{log.performed_by?.email}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-bold italic">{safeFormatDate(log.timestamp, 'hh:mm aa, d MMM')}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-[9px] font-black border-slate-200 text-slate-600 uppercase tracking-tighter bg-slate-50">{log.action}</Badge>
+                          <span className="text-xs text-slate-600 font-bold truncate">Doc: {log.document_id?.title || 'N/A'}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between p-6 bg-slate-50/20">
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Pg {logPage}</p>
                       <div className="flex gap-2">
                         <Button onClick={() => fetchLogs(logPage - 1)} disabled={logPage === 1 || loading.logs} variant="outline" size="sm" className="rounded-xl bg-white h-9 w-9 p-0 shadow-sm"><ChevronLeft size={18}/></Button>
                         <Button onClick={() => fetchLogs(logPage + 1)} disabled={!hasMoreLogs || loading.logs} variant="outline" size="sm" className="rounded-xl bg-white h-9 w-9 p-0 shadow-sm"><ChevronRight size={18}/></Button>
                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         </Card>
