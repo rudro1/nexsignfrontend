@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Moon, Sun, Menu, X, LogOut } from "lucide-react";
+import { Moon, Sun, Menu, X, LogOut,LayoutDashboard,ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Logo from "@/components/ui/Logo";
 
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, logout } = useAuth();
+const { isAuthenticated, user, logout } = useAuth();
+const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeLink, setActiveLink] = useState("");
 
@@ -100,7 +101,7 @@ export default function Navbar() {
               Pricing
             </Link>
 
-            {isAuthenticated && (
+            {/* {isAuthenticated && (
               <Link
                 to="/dashboard"
                 onClick={() => handleLinkClick("dashboard", "/dashboard")}
@@ -108,6 +109,27 @@ export default function Navbar() {
               >
                 Dashboard
               </Link>
+            )} */}
+
+
+            {isAuthenticated && (
+              isAdmin ? (
+                <Link
+                  to="/admin"
+                  onClick={() => handleLinkClick("admin", "/admin")}
+                  className={`flex items-center gap-1 hover:text-rose-500 text-rose-600 ${activeLink === "admin" ? "font-black" : ""}`}
+                >
+                  <ShieldCheck size={18}/> Admin Panel
+                </Link>
+              ) : (
+                <Link
+                  to="/dashboard"
+                  onClick={() => handleLinkClick("dashboard", "/dashboard")}
+                  className={`flex items-center gap-1 hover:text-sky-500 ${activeLink === "dashboard" ? "text-blue-600 font-bold" : ""}`}
+                >
+                  <LayoutDashboard size={18}/> Dashboard
+                </Link>
+              )
             )}
           </div>
 
@@ -191,7 +213,7 @@ export default function Navbar() {
               Pricing
             </Link>
 
-            {isAuthenticated && (
+            {/* {isAuthenticated && (
               <Link
                 to="/dashboard"
                 onClick={() => handleLinkClick("dashboard", "/dashboard")}
@@ -199,8 +221,26 @@ export default function Navbar() {
               >
                 Dashboard
               </Link>
+            )} */}
+{isAuthenticated && (
+              isAdmin ? (
+                <Link
+                  to="/admin"
+                  onClick={() => handleLinkClick("admin", "/admin")}
+                  className={`block text-rose-600 font-black ${activeLink === "admin" ? "underline" : ""}`}
+                >
+                  Admin Panel
+                </Link>
+              ) : (
+                <Link
+                  to="/dashboard"
+                  onClick={() => handleLinkClick("dashboard", "/dashboard")}
+                  className={`block ${activeLink === "dashboard" ? "text-blue-600 font-bold" : ""}`}
+                >
+                  Dashboard
+                </Link>
+              )
             )}
-
           </div>
         )}
       </div>
