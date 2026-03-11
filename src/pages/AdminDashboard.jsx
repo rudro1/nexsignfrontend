@@ -1033,7 +1033,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity } from 'lucide-react';
+import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, Laptop } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
 import { toast } from 'sonner';
@@ -1078,7 +1078,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm("আপনি কি নিশ্চিত? এই ইউজারকে চিরতরে ডিলিট করা হবে!")) return;
+    if (!window.confirm("আপনি কি নিশ্চিত?")) return;
     try {
       await api.delete(`/admin/users/${userId}`);
       setUsers(users.filter(u => u._id !== userId));
@@ -1088,7 +1088,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ ডেট ফরম্যাট করার নিরাপদ ফাংশন
   const safeFormatDate = (dateStr, formatStr = 'MMM d, yyyy') => {
     if (!dateStr) return 'N/A';
     const date = new Date(dateStr);
@@ -1141,22 +1140,22 @@ export default function AdminDashboard() {
         </TabsList>
       </Tabs>
 
-      <Card className="rounded-2xl overflow-hidden border-slate-200">
-        <div className="p-4 bg-white border-b flex justify-between items-center">
-          <div className="relative max-w-sm w-full">
+      <Card className="rounded-2xl overflow-hidden border-slate-200 shadow-sm">
+        <div className="p-4 bg-white border-b flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="relative w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
               placeholder={`Search in ${tab}...`} 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
-              className="pl-10" 
+              className="pl-10 w-full" 
             />
           </div>
-          <Button onClick={fetchAdminData} variant="outline" size="sm">Refresh Data</Button>
+          <Button onClick={fetchAdminData} variant="outline" size="sm" className="w-full sm:w-auto">Refresh Data</Button>
         </div>
 
-        {tab === 'users' && (
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto w-full">
+          {tab === 'users' && (
             <Table>
               <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
               <TableBody>
@@ -1175,77 +1174,87 @@ export default function AdminDashboard() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+          )}
 
-        {tab === 'logs' && (
-          <div className="overflow-x-auto">
+          {tab === 'logs' && (
             <Table>
               <TableHeader>
                 <TableRow className="bg-slate-50">
-                  <TableHead>User / Email</TableHead>
+                  <TableHead>User</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Document</TableHead>
-                  <TableHead>IP Address</TableHead>
+                  <TableHead>Device/IP</TableHead>
                   <TableHead>Time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-slate-400">No activity logs found</TableCell></TableRow>
-                ) : filteredLogs.map(log => (
+                {filteredLogs.map(log => (
                   <TableRow key={log._id}>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium text-slate-900">{log.performed_by?.name || 'System'}</span>
-                        <span className="text-[11px] text-slate-500">{log.performed_by?.email || 'N/A'}</span>
+                      <div className="flex flex-col min-w-[120px]">
+                        <span className="font-medium text-sm">{log.performed_by?.name || 'System'}</span>
+                        <span className="text-[10px] text-slate-500">{log.performed_by?.email || 'N/A'}</span>
                       </div>
                     </TableCell>
+                    <TableCell><Badge variant="outline" className="text-[10px]">{log.action}</Badge></TableCell>
+                    <TableCell><span className="text-sm truncate block max-w-[120px]">{log.document_id?.title || 'N/A'}</span></TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`capitalize font-normal ${
-                        log.action === 'signed' ? 'border-green-500 text-green-600 bg-green-50' : 
-                        log.action === 'opened' ? 'border-sky-500 text-sky-600 bg-sky-50' : ''
-                      }`}>
-                        {log.action}
-                      </Badge>
+                      <div className="flex flex-col max-w-[150px]">
+                        <span className="text-[10px] truncate text-sky-600 font-mono" title={log.user_agent}>{log.user_agent || 'N/A'}</span>
+                        <span className="text-[9px] text-slate-400">{log.ip_address}</span>
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-slate-600 max-w-[150px] truncate block">
-                        {log.document_id?.title || 'N/A'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <code className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-sky-600 font-mono">
-                        {log.ip_address || '127.0.0.1'}
-                      </code>
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-400">
-                      {safeFormatDate(log.timestamp, 'MMM d, HH:mm')}
-                    </TableCell>
+                    <TableCell className="text-[10px] text-slate-400 whitespace-nowrap">{safeFormatDate(log.timestamp, 'MMM d, HH:mm')}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+          )}
 
-        {tab === 'documents' && (
-          <div className="overflow-x-auto">
+          {tab === 'documents' && (
             <Table>
-              <TableHeader><TableRow className="bg-slate-50"><TableHead>Document Title</TableHead><TableHead>Owner</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+              <TableHeader>
+                <TableRow className="bg-slate-50">
+                  <TableHead>Title</TableHead>
+                  <TableHead>Owner</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Signers (Time/Device)</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {filteredDocs.map(d => (
-                  <TableRow key={d._id}>
-                    <TableCell className="font-medium">{d.title}</TableCell>
-                    <TableCell className="text-sm">{d.owner?.full_name || 'N/A'}</TableCell>
-                    <TableCell><Badge className={d.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-slate-100'}>{d.status}</Badge></TableCell>
-                    <TableCell className="text-sm text-slate-400">{safeFormatDate(d.createdAt)}</TableCell>
+                  <TableRow key={d._id} className="align-top">
+                    <TableCell className="font-medium text-sm">{d.title}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col min-w-[100px]">
+                        <span className="text-xs font-medium">{d.owner?.full_name || 'N/A'}</span>
+                        <span className="text-[9px] text-slate-500">{d.owner?.email}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge className="text-[10px]">{d.status}</Badge></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1.5 min-w-[180px]">
+                        {d.parties?.map((p, i) => (
+                          <div key={i} className="p-1.5 bg-slate-50 rounded border text-[10px]">
+                            <div className="font-bold">{p.name}</div>
+                            {p.status === 'signed' ? (
+                              <div className="text-slate-500">
+                                <div className="flex items-center gap-1"><Clock size={10}/> {safeFormatDate(p.signedAt, 'HH:mm, d MMM')}</div>
+                                <div className="flex items-center gap-1 truncate max-w-[160px]"><Laptop size={10}/> {p.device || 'N/A'}</div>
+                              </div>
+                            ) : <span className="text-amber-600">Pending</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[10px] text-slate-400 whitespace-nowrap">{safeFormatDate(d.createdAt)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+          )}
+        </div>
       </Card>
     </div>
   ); 
