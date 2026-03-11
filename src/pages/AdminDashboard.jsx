@@ -1033,7 +1033,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, Laptop } from 'lucide-react';
+import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, Laptop, Monitor } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
 import { toast } from 'sonner';
@@ -1070,7 +1070,6 @@ export default function AdminDashboard() {
       setDocuments(Array.isArray(docsRes.data) ? docsRes.data : []);
       setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
     } catch (error) {
-      console.error("Fetch error:", error);
       toast.error("ডাটা লোড করতে সমস্যা হয়েছে।");
     } finally {
       setLoading(false);
@@ -1122,7 +1121,7 @@ export default function AdminDashboard() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex items-center gap-3 mb-8">
         <Shield className="text-sky-500 w-8 h-8" />
-        <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Admin Dashboard</h1>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -1133,10 +1132,10 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="mb-6">
-        <TabsList className="bg-slate-100 p-1">
-          <TabsTrigger value="users" className="gap-2"><Users size={16}/> Users</TabsTrigger>
-          <TabsTrigger value="documents" className="gap-2"><FileText size={16}/> Documents</TabsTrigger>
-          <TabsTrigger value="logs" className="gap-2"><Activity size={16}/> Activity Logs</TabsTrigger>
+        <TabsList className="bg-slate-100 p-1 w-full sm:w-auto overflow-x-auto justify-start flex">
+          <TabsTrigger value="users" className="gap-2 flex-1 sm:flex-none"><Users size={16}/> Users</TabsTrigger>
+          <TabsTrigger value="documents" className="gap-2 flex-1 sm:flex-none"><FileText size={16}/> Documents</TabsTrigger>
+          <TabsTrigger value="logs" className="gap-2 flex-1 sm:flex-none"><Activity size={16}/> Logs</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -1148,28 +1147,85 @@ export default function AdminDashboard() {
               placeholder={`Search in ${tab}...`} 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
-              className="pl-10 w-full" 
+              className="pl-10 w-full rounded-xl" 
             />
           </div>
-          <Button onClick={fetchAdminData} variant="outline" size="sm" className="w-full sm:w-auto">Refresh Data</Button>
+          <Button onClick={fetchAdminData} variant="outline" size="sm" className="w-full sm:w-auto rounded-xl">Refresh</Button>
         </div>
 
-        <div className="overflow-x-auto w-full">
+        <div className="overflow-x-auto">
           {tab === 'users' && (
             <Table>
-              <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
               <TableBody>
                 {filteredUsers.map(u => (
                   <TableRow key={u._id}>
-                    <TableCell className="font-medium">{u.full_name}</TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell><Badge variant="secondary">{u.role}</Badge></TableCell>
-                    <TableCell className="text-sm text-slate-400">{safeFormatDate(u.createdAt)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">{u.full_name}</span>
+                        <span className="text-[10px] text-slate-500">{u.email}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge variant="secondary" className="text-[10px]">{u.role}</Badge></TableCell>
+                    <TableCell className="text-xs text-slate-400 whitespace-nowrap">{safeFormatDate(u.createdAt)}</TableCell>
                     <TableCell className="text-right">
                       {u.role !== 'super_admin' && (
                         <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u._id)} className="text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
                       )}
                     </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          {tab === 'documents' && (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50">
+                  <TableHead>Document Info</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Signers Activity</TableHead>
+                  <TableHead>Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredDocs.map(d => (
+                  <TableRow key={d._id} className="align-top">
+                    <TableCell>
+                      <div className="flex flex-col min-w-[150px]">
+                        <span className="font-bold text-sm text-slate-800">{d.title}</span>
+                        <span className="text-[10px] text-slate-500 mt-1">Owner: {d.owner?.full_name || 'N/A'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`text-[9px] ${d.status === 'completed' ? 'bg-green-500' : 'bg-sky-500'}`}>
+                        {d.status?.toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-2 min-w-[220px]">
+                        {d.parties?.map((p, i) => (
+                          <div key={i} className={`p-2 rounded-lg border flex flex-col gap-1 ${
+                            p.status === 'signed' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-slate-50 border-slate-100'
+                          }`}>
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-[11px] text-slate-700">{p.name}</span>
+                              <Badge variant="outline" className={`text-[8px] h-4 ${p.status === 'signed' ? 'text-emerald-600 border-emerald-200' : 'text-amber-600 border-amber-200'}`}>
+                                {p.status === 'signed' ? 'SIGNED' : 'PENDING'}
+                              </Badge>
+                            </div>
+                            {p.status === 'signed' && (
+                              <div className="flex flex-col text-[9px] text-slate-500">
+                                <span className="flex items-center gap-1"><Clock size={10}/> {safeFormatDate(p.signedAt, 'HH:mm, d MMM')}</span>
+                                <span className="flex items-center gap-1 truncate max-w-[180px]"><Laptop size={10}/> {p.device || 'N/A'}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[10px] text-slate-400 whitespace-nowrap">{safeFormatDate(d.createdAt)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1182,7 +1238,6 @@ export default function AdminDashboard() {
                 <TableRow className="bg-slate-50">
                   <TableHead>User</TableHead>
                   <TableHead>Action</TableHead>
-                  <TableHead>Document</TableHead>
                   <TableHead>Device/IP</TableHead>
                   <TableHead>Time</TableHead>
                 </TableRow>
@@ -1191,64 +1246,19 @@ export default function AdminDashboard() {
                 {filteredLogs.map(log => (
                   <TableRow key={log._id}>
                     <TableCell>
-                      <div className="flex flex-col min-w-[120px]">
-                        <span className="font-medium text-sm">{log.performed_by?.name || 'System'}</span>
-                        <span className="text-[10px] text-slate-500">{log.performed_by?.email || 'N/A'}</span>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-xs">{log.performed_by?.name || 'System'}</span>
+                        <span className="text-[9px] text-slate-500 truncate max-w-[100px]">{log.performed_by?.email}</span>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px]">{log.action}</Badge></TableCell>
-                    <TableCell><span className="text-sm truncate block max-w-[120px]">{log.document_id?.title || 'N/A'}</span></TableCell>
+                    <TableCell><Badge variant="outline" className="text-[9px]">{log.action}</Badge></TableCell>
                     <TableCell>
-                      <div className="flex flex-col max-w-[150px]">
-                        <span className="text-[10px] truncate text-sky-600 font-mono" title={log.user_agent}>{log.user_agent || 'N/A'}</span>
-                        <span className="text-[9px] text-slate-400">{log.ip_address}</span>
+                      <div className="flex flex-col text-[9px] text-slate-500">
+                        <span className="truncate max-w-[120px]" title={log.user_agent}>{log.user_agent}</span>
+                        <span className="text-sky-600">{log.ip_address}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-[10px] text-slate-400 whitespace-nowrap">{safeFormatDate(log.timestamp, 'MMM d, HH:mm')}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-
-          {tab === 'documents' && (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50">
-                  <TableHead>Title</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Signers (Time/Device)</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDocs.map(d => (
-                  <TableRow key={d._id} className="align-top">
-                    <TableCell className="font-medium text-sm">{d.title}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col min-w-[100px]">
-                        <span className="text-xs font-medium">{d.owner?.full_name || 'N/A'}</span>
-                        <span className="text-[9px] text-slate-500">{d.owner?.email}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell><Badge className="text-[10px]">{d.status}</Badge></TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1.5 min-w-[180px]">
-                        {d.parties?.map((p, i) => (
-                          <div key={i} className="p-1.5 bg-slate-50 rounded border text-[10px]">
-                            <div className="font-bold">{p.name}</div>
-                            {p.status === 'signed' ? (
-                              <div className="text-slate-500">
-                                <div className="flex items-center gap-1"><Clock size={10}/> {safeFormatDate(p.signedAt, 'HH:mm, d MMM')}</div>
-                                <div className="flex items-center gap-1 truncate max-w-[160px]"><Laptop size={10}/> {p.device || 'N/A'}</div>
-                              </div>
-                            ) : <span className="text-amber-600">Pending</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-[10px] text-slate-400 whitespace-nowrap">{safeFormatDate(d.createdAt)}</TableCell>
+                    <TableCell className="text-[10px] text-slate-400 whitespace-nowrap">{safeFormatDate(log.timestamp, 'HH:mm, d MMM')}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
