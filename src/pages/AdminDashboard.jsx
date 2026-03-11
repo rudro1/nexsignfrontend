@@ -2065,7 +2065,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Shield, Users, FileText, CheckCircle2, Clock, Search, 
   Trash2, Loader2, Activity, ChevronLeft, ChevronRight, 
-  MapPin, Globe, Laptop, Mail, Calendar, Plus 
+  MapPin, Globe, Laptop, Mail, Calendar, Plus, History 
 } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
@@ -2085,18 +2085,21 @@ export default function AdminDashboard() {
   const [logPage, setLogPage] = useState(1);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
 
+  // --- Data Fetching Functions ---
   const fetchUsers = useCallback(async () => {
+    setLoading(prev => ({ ...prev, users: true }));
     try {
       const res = await api.get('/admin/users');
-      setUsers(Array.isArray(res.data) ? res.data : []);
+      setUsers(Array.isArray(res.data) ? res.data : (res.data?.users || []));
     } catch (err) { toast.error("User list error"); }
     finally { setLoading(prev => ({ ...prev, users: false })); }
   }, []);
 
   const fetchDocs = useCallback(async () => {
+    setLoading(prev => ({ ...prev, docs: true }));
     try {
       const res = await api.get('/admin/documents');
-      setDocuments(Array.isArray(res.data) ? res.data : []);
+      setDocuments(Array.isArray(res.data) ? res.data : (res.data?.documents || []));
     } catch (err) { toast.error("Docs error"); }
     finally { setLoading(prev => ({ ...prev, docs: false })); }
   }, []);
@@ -2105,16 +2108,19 @@ export default function AdminDashboard() {
     setLoading(prev => ({ ...prev, logs: true }));
     try {
       const res = await api.get(`/admin/audit-logs?page=${pageNo}`);
-      const newData = Array.isArray(res.data) ? res.data : [];
-      setLogs(newData);
-      setHasMoreLogs(newData.length === 10);
+      // Audit log backend sometimes wraps data in 'logs' or 'data' property
+      const logData = res.data?.logs || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      setLogs(logData);
+      setHasMoreLogs(logData.length >= 10);
       setLogPage(pageNo);
-    } catch (err) { toast.error("Logs error"); }
+    } catch (err) { 
+      console.error("Log fetch error:", err);
+      toast.error("Audit logs could not be loaded"); 
+    }
     finally { setLoading(prev => ({ ...prev, logs: false })); }
   }, []);
 
   const refreshAll = () => {
-    setLoading({ users: true, docs: true, logs: true });
     fetchUsers();
     fetchDocs();
     fetchLogs(1);
@@ -2133,7 +2139,7 @@ export default function AdminDashboard() {
     try {
       await api.delete(`/admin/users/${userId}`);
       setUsers(users.filter(u => u._id !== userId));
-      toast.success("User deleted");
+      toast.success("User deleted successfully");
     } catch (error) { toast.error("Delete failed"); }
   };
 
@@ -2142,168 +2148,216 @@ export default function AdminDashboard() {
     return isValid(d) ? format(d, fStr) : 'N/A';
   };
 
+  // --- Filtering Logic ---
   const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
   const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
-  const filteredLogs = logs.filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()));
+  const filteredLogs = logs.filter(l => !search || l.action?.toLowerCase().includes(search.toLowerCase()) || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()));
 
-  if (authLoading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950"><Loader2 className="animate-spin text-sky-600 w-10 h-10" /></div>;
+  if (authLoading) return <div className="h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 gap-4"><Loader2 className="animate-spin text-sky-600 w-12 h-12" /><p className="text-xs font-black text-slate-400 uppercase tracking-widest">Authenticating...</p></div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 md:py-8 bg-[#F8FAFC] dark:bg-slate-950 min-h-screen font-sans transition-colors duration-300">
+    <div className="w-full mx-auto px-4 md:px-8 py-8 bg-[#F8FAFC] dark:bg-slate-950 min-h-screen font-sans transition-all">
       
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+      {/* Header Container */}
+      <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="text-sky-600 w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-sky-600">Admin Control Panel</span>
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="text-sky-600 w-5 h-5" />
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sky-600">Secure Admin Environment</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-             Hello, {user?.full_name?.split(' ')[0] || 'Admin'} 👋
-          </h1>
+          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Management Console</h1>
         </div>
         
-        <div className="flex items-center gap-3">
-          <Link to="/DocumentEditor" className="flex-1 md:flex-none">
-            <Button size="sm" className="w-full bg-sky-600 hover:bg-sky-700 text-white rounded-lg gap-2 shadow-md">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Document</span><span className="sm:hidden">New</span>
+        <div className="flex gap-3">
+          <Link to="/DocumentEditor">
+            <Button className="bg-sky-600 hover:bg-sky-700 text-white rounded-2xl px-8 h-12 font-black shadow-xl shadow-sky-200 dark:shadow-none transition-transform active:scale-95">
+              <Plus className="mr-2 w-5 h-5" /> NEW DOC
             </Button>
           </Link>
-          <Button onClick={refreshAll} size="sm" variant="outline" className="rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-            <Activity size={14} className="mr-2 text-emerald-500"/> <span className="hidden sm:inline">Sync</span>
+          <Button onClick={refreshAll} variant="outline" className="rounded-2xl h-12 px-6 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50">
+            <Activity size={18} className={`mr-2 text-emerald-500 ${(loading.users || loading.docs) ? 'animate-spin' : 'animate-pulse'}`}/> REFRESH
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-8">
-        <StatsCard label="Users" value={users.length} icon={Users} color="sky" />
-        <StatsCard label="Docs" value={documents.length} icon={FileText} color="violet" />
-        <StatsCard label="Signed" value={documents.filter(d => d.status === 'completed').length} icon={CheckCircle2} color="green" />
-        <StatsCard label="Pending" value={documents.filter(d => d.status === 'in_progress').length} icon={Clock} color="amber" />
-      </div>
-
-      <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="space-y-4">
-        <TabsList className="bg-slate-200/50 dark:bg-slate-900/50 p-1 rounded-xl flex w-full md:w-fit overflow-x-auto">
-          <TabsTrigger value="users" className="flex-1 md:px-8 text-xs font-bold">USERS</TabsTrigger>
-          <TabsTrigger value="documents" className="flex-1 md:px-8 text-xs font-bold">DOCUMENTS</TabsTrigger>
-          <TabsTrigger value="logs" className="flex-1 md:px-8 text-xs font-bold">AUDIT LOGS</TabsTrigger>
+      {/* Dynamic Tabs Section */}
+      <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="max-w-[1600px] mx-auto space-y-8">
+        <TabsList className="bg-slate-200/40 dark:bg-slate-900/50 p-1.5 rounded-[20px] w-full md:w-fit border border-slate-200/50 dark:border-slate-800">
+          <TabsTrigger value="users" className="px-12 py-3 text-[10px] font-black uppercase tracking-widest">Users</TabsTrigger>
+          <TabsTrigger value="documents" className="px-12 py-3 text-[10px] font-black uppercase tracking-widest">Documents</TabsTrigger>
+          <TabsTrigger value="logs" className="px-12 py-3 text-[10px] font-black uppercase tracking-widest">Audit Logs</TabsTrigger>
         </TabsList>
 
-        <Card className="rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
-          <div className="p-4 border-b border-slate-50 dark:border-slate-800 flex flex-col md:flex-row justify-between gap-4">
-            <div className="relative w-full md:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <Input 
-                placeholder={`Search...`} 
-                value={search} 
-                onChange={e => setSearch(e.target.value)} 
-                className="pl-9 rounded-xl border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 h-10 text-xs" 
-              />
-            </div>
+        {/* Global Search Bar */}
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
+            <Input 
+              placeholder={`Search across ${tab} records...`} 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
+              className="pl-14 border-none bg-transparent h-14 text-base focus-visible:ring-0 placeholder:text-slate-300 font-medium" 
+            />
           </div>
+          {loading[tab] && <Loader2 className="animate-spin text-sky-500 mr-4 w-5 h-5" />}
+        </div>
 
-          <div className="min-h-[400px]">
-            {loading[tab] ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <Loader2 className="animate-spin w-6 h-6 text-sky-500" />
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loading Data</p>
-              </div>
-            ) : (
-              <div className="w-full">
-                
-                {/* Documents View - Professional Fix */}
-                {tab === 'documents' && (
-                  <div className="divide-y divide-slate-50 dark:divide-slate-800">
-                    {filteredDocs.map(d => (
-                      <div key={d._id} className="p-4 md:p-6 hover:bg-slate-50/20 dark:hover:bg-slate-800/20 transition-all">
-                        <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-5">
-                          <div>
-                            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base md:text-lg mb-1">{d.title}</h3>
-                            <div className="flex items-center gap-2 text-slate-400 text-[10px] font-medium uppercase tracking-tighter">
-                                <span>Owner: {d.owner?.full_name}</span>
-                                <span className="text-slate-200 dark:text-slate-800">|</span>
-                                <span>{safeFormatDate(d.createdAt, 'd MMM, yyyy')}</span>
-                            </div>
+        {/* Main Content Area with Loading States */}
+        <div className="transition-all duration-500">
+          {loading[tab] ? (
+            <div className="flex flex-col items-center justify-center py-40 bg-white/50 dark:bg-slate-900/50 rounded-[3rem] border-2 border-dashed border-slate-100 dark:border-slate-800">
+               <div className="relative h-20 w-20 mb-6">
+                  <div className="absolute inset-0 rounded-full border-4 border-sky-100 dark:border-sky-900/30"></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-sky-500 border-t-transparent animate-spin"></div>
+               </div>
+               <p className="font-black text-slate-400 uppercase tracking-[0.3em] text-[10px]">Retrieving Secure Data...</p>
+            </div>
+          ) : (
+            <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
+              
+              {/* Documents View - Full Grid Logic */}
+              {tab === 'documents' && (
+                <div className="flex flex-col gap-10">
+                  {filteredDocs.length === 0 ? (
+                    <div className="text-center py-20 text-slate-400 font-bold uppercase text-xs tracking-widest">No Documents Found</div>
+                  ) : filteredDocs.map(d => (
+                    <Card key={d._id} className="rounded-[3rem] border-none bg-white dark:bg-slate-900 shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden">
+                      <div className="p-10 border-b border-slate-50 dark:border-slate-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                        <div className="space-y-3">
+                          <h2 className="text-3xl font-black text-slate-900 dark:text-white">{d.title}</h2>
+                          <div className="flex flex-wrap items-center gap-4 text-slate-400 text-[11px] font-black uppercase tracking-widest">
+                            <span className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-4 py-1.5 rounded-full"><Users size={14} className="text-sky-500"/> OWNER: {d.owner?.full_name}</span>
+                            <span className="flex items-center gap-2"><Calendar size={14} className="text-sky-500"/> {safeFormatDate(d.createdAt)}</span>
                           </div>
-                          <Badge className={`text-[9px] font-black px-3 py-1 rounded-md uppercase tracking-widest ${d.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600 border-none' : 'bg-sky-500/10 text-sky-600 border-none'}`}>
-                            {d.status}
-                          </Badge>
                         </div>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                          {d.parties?.map((p, idx) => (
-                            <div key={idx} className="p-3 border border-slate-100 dark:border-slate-800/60 rounded-xl bg-slate-50/30 dark:bg-slate-900/40">
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] truncate max-w-[120px]">{p.name}</span>
-                                <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase ${p.status === 'signed' ? 'text-emerald-500 bg-emerald-500/10' : 'text-amber-500 bg-amber-500/10'}`}>
+                        <Badge className={`px-10 py-4 rounded-3xl text-[10px] font-black uppercase tracking-[0.2em] ${d.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-sky-500 text-white'}`}>
+                          {d.status}
+                        </Badge>
+                      </div>
+                      
+                      <div className={`p-10 grid gap-8 ${d.parties?.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+                        {d.parties?.map((p, idx) => (
+                          <div key={idx} className="p-8 border-2 border-slate-50 dark:border-slate-800 rounded-[2.5rem] bg-[#FCFEFF] dark:bg-slate-950/40 hover:border-sky-100 transition-colors">
+                            <div className="flex justify-between items-start mb-8">
+                                <div className="space-y-1">
+                                    <h4 className="font-black text-slate-900 dark:text-slate-100 text-lg uppercase tracking-tight">{p.name}</h4>
+                                    <p className="text-[11px] font-bold text-slate-400">{p.email}</p>
+                                </div>
+                                <div className={`text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest ${p.status === 'signed' ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}`}>
                                   {p.status}
                                 </div>
-                              </div>
-
-                              <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/40">
-                                <div className="flex items-center justify-between text-[9px] text-slate-500">
-                                  <span className="flex items-center gap-1"><Globe size={10}/> IP:</span>
-                                  <span className="font-medium text-slate-700 dark:text-slate-400">{p.ipAddress || '---'}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-[9px] text-slate-500">
-                                  <span className="flex items-center gap-1"><MapPin size={10}/> Location:</span>
-                                  <span className="font-medium text-slate-700 dark:text-slate-400 truncate max-w-[100px]">{p.location || '---'}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-[9px] text-slate-500">
-                                  <span className="flex items-center gap-1"><Laptop size={10}/> Device:</span>
-                                  <span className="font-medium text-slate-700 dark:text-slate-400 truncate max-w-[100px]">{p.device || '---'}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-[9px] text-slate-500">
-                                  <span className="flex items-center gap-1"><Clock size={10}/> Signed At:</span>
-                                  <span className="font-medium text-slate-700 dark:text-slate-400">{p.signedAt ? safeFormatDate(p.signedAt, 'hh:mm aa') : '---'}</span>
-                                </div>
-                              </div>
                             </div>
-                          ))}
-                        </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-5 pt-8 border-t border-slate-50 dark:border-slate-800">
+                              <InfoLine icon={<Globe size={14}/>} label="IP" value={p.ipAddress}/>
+                              <InfoLine icon={<MapPin size={14}/>} label="LOC" value={p.location}/>
+                              <InfoLine icon={<Laptop size={14}/>} label="DEV" value={p.device}/>
+                              <InfoLine icon={<Clock size={14}/>} label="TIME" value={p.signedAt ? safeFormatDate(p.signedAt, 'hh:mm aa') : '---'} color="text-sky-600"/>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </Card>
+                  ))}
+                </div>
+              )}
 
-                {/* Users & Logs View - Simplified for speed */}
-                {tab === 'users' && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-slate-50/50 dark:bg-slate-950/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                        <tr>
-                          <th className="p-4">User</th>
-                          <th className="p-4">Role</th>
-                          <th className="p-4 hidden md:table-cell">Joined</th>
-                          <th className="p-4 text-right">Action</th>
+              {/* Audit Logs View - REPAIRED */}
+              {tab === 'logs' && (
+                <Card className="rounded-[3rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+                   <div className="p-10">
+                      <div className="flex items-center gap-3 mb-8">
+                        <History className="text-sky-500" size={24}/>
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">SYSTEM AUDIT TRAIL</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b-2 border-slate-50 dark:border-slate-800">
+                              <th className="pb-6 px-4">PERFORMED BY</th>
+                              <th className="pb-6 px-4">ACTION</th>
+                              <th className="pb-6 px-4">TIMESTAMP</th>
+                              <th className="pb-6 px-4 text-right">STATUS</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                            {filteredLogs.length === 0 ? (
+                              <tr><td colSpan="4" className="py-20 text-center text-slate-300 font-bold uppercase text-[10px] tracking-widest">No Activity Records Found</td></tr>
+                            ) : filteredLogs.map((log, i) => (
+                              <tr key={log._id || i} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
+                                <td className="py-6 px-4">
+                                  <div className="font-bold text-slate-900 dark:text-white text-sm">{log.performed_by?.name || log.performed_by?.full_name || 'System'}</div>
+                                  <div className="text-[10px] text-slate-400 font-medium">{log.performed_by?.email || 'automated@system.com'}</div>
+                                </td>
+                                <td className="py-6 px-4">
+                                  <Badge className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-none uppercase px-3 py-1">{log.action}</Badge>
+                                </td>
+                                <td className="py-6 px-4 text-[11px] font-bold text-slate-500 uppercase">{safeFormatDate(log.timestamp || log.createdAt)}</td>
+                                <td className="py-6 px-4 text-right"><div className="w-2 h-2 rounded-full bg-emerald-500 inline-block shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      {/* Pagination UI */}
+                      <div className="mt-10 pt-10 border-t border-slate-50 dark:border-slate-800 flex justify-between items-center">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Records Page {logPage}</p>
+                          <div className="flex gap-4">
+                            <Button onClick={() => fetchLogs(logPage - 1)} disabled={logPage === 1} variant="outline" className="rounded-xl h-12 w-12 p-0 border-slate-200"><ChevronLeft size={20}/></Button>
+                            <Button onClick={() => fetchLogs(logPage + 1)} disabled={!hasMoreLogs} variant="outline" className="rounded-xl h-12 w-12 p-0 border-slate-200"><ChevronRight size={20}/></Button>
+                          </div>
+                      </div>
+                   </div>
+                </Card>
+              )}
+
+              {/* Users View */}
+              {tab === 'users' && (
+                <Card className="rounded-[3rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-10">
+                   <table className="w-full text-left">
+                      <thead>
+                        <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b-2 border-slate-50 dark:border-slate-800">
+                          <th className="pb-6 px-4">USER PROFILE</th>
+                          <th className="pb-6 px-4">PERMISSION</th>
+                          <th className="pb-6 px-4">JOINED DATE</th>
+                          <th className="pb-6 px-4 text-right">OPERATIONS</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                         {filteredUsers.map(u => (
-                          <tr key={u._id} className="hover:bg-slate-50/20 dark:hover:bg-slate-800/20 transition-all">
-                            <td className="p-4">
-                              <div className="flex flex-col">
-                                <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">{u.full_name}</span>
-                                <span className="text-[10px] text-slate-400 font-medium">{u.email}</span>
-                              </div>
+                          <tr key={u._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
+                            <td className="py-6 px-4">
+                              <div className="font-bold text-slate-900 dark:text-white text-base">{u.full_name}</div>
+                              <div className="text-xs text-slate-400 font-medium">{u.email}</div>
                             </td>
-                            <td className="p-4"><Badge variant="outline" className="text-[9px] font-bold px-2">{u.role}</Badge></td>
-                            <td className="p-4 hidden md:table-cell text-[10px] text-slate-500">{safeFormatDate(u.createdAt, 'd MMM, yyyy')}</td>
-                            <td className="p-4 text-right">
-                              {u.role !== 'super_admin' && <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u._id)} className="text-slate-300 hover:text-red-500 rounded-full h-8 w-8 p-0"><Trash2 size={14}/></Button>}
+                            <td className="py-6 px-4"><Badge variant="outline" className="text-[9px] font-black uppercase px-4 py-1 border-slate-200">{u.role}</Badge></td>
+                            <td className="py-6 px-4 text-[11px] font-black text-slate-500 uppercase">{safeFormatDate(u.createdAt, 'd MMM, yyyy')}</td>
+                            <td className="py-6 px-4 text-right">
+                              {u.role !== 'super_admin' && <Button onClick={() => handleDeleteUser(u._id)} className="text-slate-300 hover:text-red-500 rounded-2xl h-12 w-12 p-0 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20"><Trash2 size={20}/></Button>}
                             </td>
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </Card>
+                   </table>
+                </Card>
+              )}
+
+            </div>
+          )}
+        </div>
       </Tabs>
+    </div>
+  );
+}
+
+// Helper Component for Documents
+function InfoLine({ icon, label, value, color = "text-slate-700 dark:text-slate-300" }) {
+  return (
+    <div className="flex justify-between items-center pr-4">
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+        {React.cloneElement(icon, { size: 12, className: "text-sky-400" })} {label}
+      </span>
+      <span className={`text-xs font-bold truncate max-w-[140px] ${color}`}>{value || '---'}</span>
     </div>
   );
 }
