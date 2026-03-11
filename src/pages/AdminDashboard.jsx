@@ -1023,7 +1023,7 @@
 //     </div>
 //   );
 // }
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -1033,7 +1033,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, Laptop, MapPin, Globe, Mail } from 'lucide-react';
+import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, Laptop, MapPin, Globe, Mail, ChevronDown } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
 import { toast } from 'sonner';
@@ -1043,193 +1043,220 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('users');
   const [search, setSearch] = useState('');
+  
+  // Data States
   const [users, setUsers] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [logs, setLogs] = useState([]); 
-  const [loading, setLoading] = useState(true);
+  
+  // Loading & Pagination States
+  const [loading, setLoading] = useState({ users: true, docs: true, logs: true });
+  const [logPage, setLogPage] = useState(1);
+  const [hasMoreLogs, setHasMoreLogs] = useState(true);
+  const [isMoreLoading, setIsMoreLoading] = useState(false);
+
+  // Fetch Logic
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/users');
+      setUsers(Array.isArray(res.data) ? res.data : []);
+    } catch (err) { toast.error("User list error"); }
+    finally { setLoading(prev => ({ ...prev, users: false })); }
+  }, []);
+
+  const fetchDocs = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/documents');
+      setDocuments(Array.isArray(res.data) ? res.data : []);
+    } catch (err) { toast.error("Docs error"); }
+    finally { setLoading(prev => ({ ...prev, docs: false })); }
+  }, []);
+
+  const fetchLogs = useCallback(async (pageNo = 1, append = false) => {
+    if (append) setIsMoreLoading(true);
+    try {
+      const res = await api.get(`/admin/audit-logs?page=${pageNo}`);
+      const newData = Array.isArray(res.data) ? res.data : [];
+      
+      if (newData.length < 10) setHasMoreLogs(false);
+      else setHasMoreLogs(true);
+
+      if (append) setLogs(prev => [...prev, ...newData]);
+      else setLogs(newData);
+    } catch (err) { toast.error("Logs error"); }
+    finally { 
+      setLoading(prev => ({ ...prev, logs: false })); 
+      setIsMoreLoading(false);
+    }
+  }, []);
+
+  const handleLoadMore = () => {
+    const nextPage = logPage + 1;
+    setLogPage(nextPage);
+    fetchLogs(nextPage, true);
+  };
+
+  const refreshAll = () => {
+    setLoading({ users: true, docs: true, logs: true });
+    setLogPage(1);
+    fetchUsers();
+    fetchDocs();
+    fetchLogs(1, false);
+  };
 
   useEffect(() => {
     if (authLoading) return;
-    const hasAccess = user?.role === 'super_admin' || user?.role === 'admin';
-    if (!user || !hasAccess) {
-      navigate('/dashboard');
-      return;
+    if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+      navigate('/dashboard'); return;
     }
-    fetchAdminData();
+    refreshAll();
   }, [user, authLoading]);
 
-  const fetchAdminData = async () => {
-    setLoading(true);
-    try {
-      const [usersRes, docsRes, logsRes] = await Promise.all([
-        api.get('/admin/users'),
-        api.get('/admin/documents'),
-        api.get('/admin/audit-logs') 
-      ]);
-      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
-      setDocuments(Array.isArray(docsRes.data) ? docsRes.data : []);
-      setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
-    } catch (error) {
-      toast.error("ডাটা লোড করতে সমস্যা হয়েছে।");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm("আপনি কি নিশ্চিত?")) return;
+    if (!window.confirm("Are you sure?")) return;
     try {
       await api.delete(`/admin/users/${userId}`);
       setUsers(users.filter(u => u._id !== userId));
-      toast.success("ইউজার ডিলিট হয়েছে।");
-    } catch (error) {
-      toast.error("ডিলিট করা সম্ভব হয়নি।");
-    }
+      toast.success("User deleted");
+    } catch (error) { toast.error("Delete failed"); }
   };
 
-  const safeFormatDate = (dateStr, formatStr = 'MMM d, yyyy') => {
-    if (!dateStr) return 'N/A';
-    const date = new Date(dateStr);
-    return isValid(date) ? format(date, formatStr) : 'N/A';
+  const safeFormatDate = (dateStr, fStr = 'MMM d, yyyy') => {
+    const d = new Date(dateStr);
+    return isValid(d) ? format(d, fStr) : 'N/A';
   };
 
-  const filteredUsers = users.filter(u => 
-    !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter Logic
+  const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+  const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
+  const filteredLogs = logs.filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()));
 
-  const filteredDocs = documents.filter(d =>
-    !search || d.title?.toLowerCase().includes(search.toLowerCase()) || 
-    d.parties?.some(p => p.email?.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const filteredLogs = logs.filter(l =>
-    !search || 
-    l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || 
-    l.action?.toLowerCase().includes(search.toLowerCase()) ||
-    l.ip_address?.includes(search)
-  );
-
-  if (authLoading || loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
+  if (authLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 bg-slate-50/30 min-h-screen">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 py-6 bg-slate-50/30 min-h-screen">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-sky-100 rounded-lg"><Shield className="text-sky-600 w-6 h-6" /></div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Admin Control Panel</h1>
         </div>
-        <Button onClick={fetchAdminData} variant="outline" className="rounded-xl shadow-sm bg-white"><Activity size={16} className="mr-2 text-emerald-500"/> Refresh Stats</Button>
+        <Button onClick={refreshAll} variant="outline" className="rounded-xl bg-white shadow-sm h-10">
+          <Activity size={16} className="mr-2 text-emerald-500"/> Refresh
+        </Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatsCard label="Total Users" value={users.length} icon={Users} color="sky" />
-        <StatsCard label="Total Docs" value={documents.length} icon={FileText} color="violet" />
-        <StatsCard label="Completed" value={documents.filter(d => d.status === 'completed').length} icon={CheckCircle2} color="green" />
-        <StatsCard label="In Progress" value={documents.filter(d => d.status === 'in_progress').length} icon={Clock} color="amber" />
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        <StatsCard label="Users" value={users.length} icon={Users} color="sky" />
+        <StatsCard label="Docs" value={documents.length} icon={FileText} color="violet" />
+        <StatsCard label="Done" value={documents.filter(d => d.status === 'completed').length} icon={CheckCircle2} color="green" />
+        <StatsCard label="Active" value={documents.filter(d => d.status === 'in_progress').length} icon={Clock} color="amber" />
       </div>
 
+      {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="mb-6">
-        <TabsList className="bg-white border p-1 w-full sm:w-auto overflow-x-auto justify-start flex rounded-xl shadow-sm">
-          <TabsTrigger value="users" className="gap-2 px-6"><Users size={16}/> Users</TabsTrigger>
-          <TabsTrigger value="documents" className="gap-2 px-6"><FileText size={16}/> Documents</TabsTrigger>
-          <TabsTrigger value="logs" className="gap-2 px-6"><Activity size={16}/> Logs</TabsTrigger>
+        <TabsList className="bg-white border p-1 w-full sm:w-auto overflow-x-auto justify-start rounded-xl shadow-sm">
+          <TabsTrigger value="users" className="px-4 sm:px-8">Users</TabsTrigger>
+          <TabsTrigger value="documents" className="px-4 sm:px-8">Documents</TabsTrigger>
+          <TabsTrigger value="logs" className="px-4 sm:px-8">Logs</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <Card className="rounded-2xl overflow-hidden border-slate-200 shadow-md bg-white">
-        <div className="p-4 bg-slate-50/50 border-b flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="relative w-full sm:max-w-md">
+      {/* Main Table Card */}
+      <Card className="rounded-2xl overflow-hidden border-slate-200 shadow-lg bg-white">
+        <div className="p-4 border-b bg-slate-50/50 flex flex-col sm:flex-row justify-between gap-4">
+          <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
-              placeholder={`Search in ${tab}...`} 
+              placeholder="Search..." 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
-              className="pl-10 w-full rounded-xl border-slate-200" 
+              className="pl-9 rounded-xl border-slate-200 h-10" 
             />
           </div>
-          <Badge variant="outline" className="bg-white px-3 py-1">Results: {tab === 'users' ? filteredUsers.length : tab === 'documents' ? filteredDocs.length : filteredLogs.length}</Badge>
+          <Badge variant="secondary" className="w-fit self-center">Showing {tab.toUpperCase()}</Badge>
         </div>
 
-        <div className="overflow-x-auto">
-          {tab === 'users' && (
-            <Table>
-              <TableHeader><TableRow className="bg-slate-50/80"><TableHead>User Information</TableHead><TableHead>Role</TableHead><TableHead>Join Date</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {filteredUsers.map(u => (
-                  <TableRow key={u._id}>
-                    <TableCell><div className="flex flex-col"><span className="font-bold text-sm">{u.full_name}</span><span className="text-xs text-slate-500">{u.email}</span></div></TableCell>
-                    <TableCell><Badge variant="secondary">{u.role?.toUpperCase()}</Badge></TableCell>
-                    <TableCell className="text-xs">{safeFormatDate(u.createdAt)}</TableCell>
-                    <TableCell className="text-right">{u.role !== 'super_admin' && <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u._id)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+        <div className="overflow-x-auto min-h-[300px]">
+          {loading[tab] ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+              <Loader2 className="animate-spin" /> <p className="text-sm">Loading data...</p>
+            </div>
+          ) : (
+            <>
+              {tab === 'users' && (
+                <Table className="min-w-[600px]">
+                  <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {filteredUsers.map(u => (
+                      <TableRow key={u._id} className="hover:bg-slate-50/50">
+                        <TableCell><div className="flex flex-col"><span className="font-semibold text-sm">{u.full_name}</span><span className="text-[11px] text-slate-500">{u.email}</span></div></TableCell>
+                        <TableCell><Badge variant="outline" className="text-[10px]">{u.role?.toUpperCase()}</Badge></TableCell>
+                        <TableCell className="text-xs text-slate-500">{safeFormatDate(u.createdAt)}</TableCell>
+                        <TableCell className="text-right">
+                          {u.role !== 'super_admin' && <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u._id)} className="text-red-500 hover:bg-red-50"><Trash2 size={16}/></Button>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
 
-          {tab === 'documents' && (
-            <Table>
-              <TableHeader><TableRow className="bg-slate-50/80"><TableHead>Document Details</TableHead><TableHead>Status</TableHead><TableHead className="min-w-[320px]">Signers Activity</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {filteredDocs.map(d => (
-                  <TableRow key={d._id} className="align-top border-b">
-                    <TableCell><div className="flex flex-col"><span className="font-bold text-sm text-slate-800">{d.title}</span><span className="text-[10px] text-slate-400">Owner: {d.owner?.full_name || 'N/A'}</span></div></TableCell>
-                    <TableCell><Badge className={d.status === 'completed' ? 'bg-emerald-500' : 'bg-sky-500'}>{d.status?.toUpperCase()}</Badge></TableCell>
-                    <TableCell>
-                      <div className="grid grid-cols-1 gap-2">
-                        {d.parties?.map((p, i) => (
-                          <div key={i} className={`p-2.5 rounded-xl border ${p.status === 'signed' ? 'bg-emerald-50/40 border-emerald-100' : 'bg-slate-50/50 border-slate-100'}`}>
-                            <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-[11px] text-slate-700">{p.name}</span>
-                                <Badge variant="outline" className="text-[8px]">{p.status?.toUpperCase()}</Badge>
+              {tab === 'documents' && (
+                <Table className="min-w-[800px]">
+                  <TableHeader><TableRow className="bg-slate-50"><TableHead>Title</TableHead><TableHead>Status</TableHead><TableHead>Signers Activity</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {filteredDocs.map(d => (
+                      <TableRow key={d._id} className="align-top hover:bg-slate-50/50">
+                        <TableCell className="max-w-[150px]"><div className="flex flex-col"><span className="font-semibold text-sm truncate">{d.title}</span><span className="text-[10px] text-slate-400">By: {d.owner?.full_name}</span></div></TableCell>
+                        <TableCell><Badge className={d.status === 'completed' ? 'bg-emerald-500' : 'bg-sky-500'}>{d.status}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1.5">
+                            {d.parties?.map((p, idx) => (
+                              <div key={idx} className="p-2 border rounded-lg bg-slate-50/30 text-[10px]">
+                                <div className="flex justify-between font-bold mb-0.5"><span>{p.name}</span><span className={p.status === 'signed' ? 'text-emerald-600' : 'text-slate-400'}>{p.status}</span></div>
+                                <div className="text-slate-400 truncate">{p.email}</div>
                               </div>
-                              <span className="text-[9px] text-slate-500 flex items-center gap-1"><Mail size={10} className="text-slate-400"/> {p.email}</span>
-                            </div>
-                            {p.status === 'signed' && (
-                              <div className="space-y-1 mt-2 border-t pt-2">
-                                <div className="flex items-center gap-2 text-[9px] text-slate-600"><Clock size={11} className="text-emerald-500"/> {safeFormatDate(p.signedAt, 'HH:mm, d MMM yyyy')}</div>
-                                <div className="flex items-center gap-2 text-[9px] text-sky-600 bg-sky-50/50 p-1 rounded">
-                                  <Globe size={11}/> <b>{p.ipAddress || 'N/A'}</b>
-                                  <span className="text-slate-300">|</span>
-                                  <MapPin size={11} className="text-rose-400"/> {p.location || 'Unknown Location'}
-                                </div>
-                                <div className="flex items-center gap-2 text-[9px] text-slate-400 italic"><Laptop size={11}/> {p.device || 'Unknown Device'}</div>
-                              </div>
-                            )}
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-[10px] text-slate-500">{safeFormatDate(d.createdAt)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-500">{safeFormatDate(d.createdAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
 
-          {tab === 'logs' && (
-            <Table>
-              <TableHeader><TableRow className="bg-slate-50/80"><TableHead>Performed By</TableHead><TableHead>Action</TableHead><TableHead>Audit Info</TableHead><TableHead>Timestamp</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {filteredLogs.map(log => (
-                  <TableRow key={log._id}>
-                    <TableCell><div className="flex flex-col"><span className="font-bold text-xs">{log.performed_by?.name || 'System'}</span><span className="text-[9px] text-slate-400">{log.performed_by?.email || 'N/A'}</span></div></TableCell>
-                    <TableCell><Badge variant="outline" className="text-[9px]">{log.action?.toUpperCase()}</Badge></TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-bold text-sky-600 flex items-center gap-1"><Globe size={10}/> {log.ip_address || 'N/A'}</span>
-                        <span className="text-[9px] text-slate-500 truncate max-w-[200px]" title={log.user_agent}>{log.user_agent}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-[10px] text-slate-500">{safeFormatDate(log.timestamp, 'HH:mm:ss, d MMM')}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              {tab === 'logs' && (
+                <>
+                  <Table className="min-w-[700px]">
+                    <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Action</TableHead><TableHead>Audit Details</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {filteredLogs.map(log => (
+                        <TableRow key={log._id} className="hover:bg-slate-50/50">
+                          <TableCell><div className="flex flex-col"><span className="font-semibold text-xs">{log.performed_by?.name || 'System'}</span><span className="text-[10px] text-slate-400">{log.performed_by?.email}</span></div></TableCell>
+                          <TableCell><Badge variant="outline" className="text-[9px]">{log.action}</Badge></TableCell>
+                          <TableCell><div className="flex flex-col gap-0.5"><span className="text-[10px] text-sky-600 font-bold flex items-center gap-1"><Globe size={10}/> {log.ip_address}</span><span className="text-[9px] text-slate-400 truncate max-w-[200px]">{log.user_agent}</span></div></TableCell>
+                          <TableCell className="text-[10px] text-slate-500">{safeFormatDate(log.timestamp, 'HH:mm:ss, d MMM')}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {hasMoreLogs && (
+                    <div className="p-6 text-center border-t bg-slate-50/20">
+                      <Button onClick={handleLoadMore} disabled={isMoreLoading} variant="outline" className="rounded-xl h-9 px-6 font-semibold">
+                        {isMoreLoading ? <Loader2 className="animate-spin mr-2" size={14}/> : <ChevronDown size={14} className="mr-2"/>} 
+                        Load Next 10 Data
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           )}
         </div>
       </Card>
     </div>
-  ); 
+  );
 }
