@@ -1033,7 +1033,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, Laptop, MapPin, Globe, Mail, ChevronDown } from 'lucide-react';
+import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
 import { toast } from 'sonner';
@@ -1044,18 +1044,14 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState('users');
   const [search, setSearch] = useState('');
   
-  // Data States
   const [users, setUsers] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [logs, setLogs] = useState([]); 
   
-  // Loading & Pagination States
   const [loading, setLoading] = useState({ users: true, docs: true, logs: true });
   const [logPage, setLogPage] = useState(1);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
-  const [isMoreLoading, setIsMoreLoading] = useState(false);
 
-  // Fetch Logic
   const fetchUsers = useCallback(async () => {
     try {
       const res = await api.get('/admin/users');
@@ -1072,36 +1068,23 @@ export default function AdminDashboard() {
     finally { setLoading(prev => ({ ...prev, docs: false })); }
   }, []);
 
-  const fetchLogs = useCallback(async (pageNo = 1, append = false) => {
-    if (append) setIsMoreLoading(true);
+  const fetchLogs = useCallback(async (pageNo = 1) => {
+    setLoading(prev => ({ ...prev, logs: true }));
     try {
       const res = await api.get(`/admin/audit-logs?page=${pageNo}`);
       const newData = Array.isArray(res.data) ? res.data : [];
-      
-      if (newData.length < 10) setHasMoreLogs(false);
-      else setHasMoreLogs(true);
-
-      if (append) setLogs(prev => [...prev, ...newData]);
-      else setLogs(newData);
+      setLogs(newData);
+      setHasMoreLogs(newData.length === 10);
+      setLogPage(pageNo);
     } catch (err) { toast.error("Logs error"); }
-    finally { 
-      setLoading(prev => ({ ...prev, logs: false })); 
-      setIsMoreLoading(false);
-    }
+    finally { setLoading(prev => ({ ...prev, logs: false })); }
   }, []);
-
-  const handleLoadMore = () => {
-    const nextPage = logPage + 1;
-    setLogPage(nextPage);
-    fetchLogs(nextPage, true);
-  };
 
   const refreshAll = () => {
     setLoading({ users: true, docs: true, logs: true });
-    setLogPage(1);
     fetchUsers();
     fetchDocs();
-    fetchLogs(1, false);
+    fetchLogs(1);
   };
 
   useEffect(() => {
@@ -1126,7 +1109,6 @@ export default function AdminDashboard() {
     return isValid(d) ? format(d, fStr) : 'N/A';
   };
 
-  // Filter Logic
   const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
   const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
   const filteredLogs = logs.filter(l => !search || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || l.action?.toLowerCase().includes(search.toLowerCase()));
@@ -1135,7 +1117,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 py-6 bg-slate-50/30 min-h-screen">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-sky-100 rounded-lg"><Shield className="text-sky-600 w-6 h-6" /></div>
@@ -1146,7 +1127,6 @@ export default function AdminDashboard() {
         </Button>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <StatsCard label="Users" value={users.length} icon={Users} color="sky" />
         <StatsCard label="Docs" value={documents.length} icon={FileText} color="violet" />
@@ -1154,7 +1134,6 @@ export default function AdminDashboard() {
         <StatsCard label="Active" value={documents.filter(d => d.status === 'in_progress').length} icon={Clock} color="amber" />
       </div>
 
-      {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="mb-6">
         <TabsList className="bg-white border p-1 w-full sm:w-auto overflow-x-auto justify-start rounded-xl shadow-sm">
           <TabsTrigger value="users" className="px-4 sm:px-8">Users</TabsTrigger>
@@ -1163,7 +1142,6 @@ export default function AdminDashboard() {
         </TabsList>
       </Tabs>
 
-      {/* Main Table Card */}
       <Card className="rounded-2xl overflow-hidden border-slate-200 shadow-lg bg-white">
         <div className="p-4 border-b bg-slate-50/50 flex flex-col sm:flex-row justify-between gap-4">
           <div className="relative w-full sm:max-w-xs">
@@ -1231,26 +1209,41 @@ export default function AdminDashboard() {
               {tab === 'logs' && (
                 <>
                   <Table className="min-w-[700px]">
-                    <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Action</TableHead><TableHead>Audit Details</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Action</TableHead><TableHead>Document</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {filteredLogs.map(log => (
                         <TableRow key={log._id} className="hover:bg-slate-50/50">
                           <TableCell><div className="flex flex-col"><span className="font-semibold text-xs">{log.performed_by?.name || 'System'}</span><span className="text-[10px] text-slate-400">{log.performed_by?.email}</span></div></TableCell>
                           <TableCell><Badge variant="outline" className="text-[9px]">{log.action}</Badge></TableCell>
-                          <TableCell><div className="flex flex-col gap-0.5"><span className="text-[10px] text-sky-600 font-bold flex items-center gap-1"><Globe size={10}/> {log.ip_address}</span><span className="text-[9px] text-slate-400 truncate max-w-[200px]">{log.user_agent}</span></div></TableCell>
+                          <TableCell><span className="text-xs text-slate-600 font-medium">{log.document_id?.title || 'N/A'}</span></TableCell>
                           <TableCell className="text-[10px] text-slate-500">{safeFormatDate(log.timestamp, 'HH:mm:ss, d MMM')}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  {hasMoreLogs && (
-                    <div className="p-6 text-center border-t bg-slate-50/20">
-                      <Button onClick={handleLoadMore} disabled={isMoreLoading} variant="outline" className="rounded-xl h-9 px-6 font-semibold">
-                        {isMoreLoading ? <Loader2 className="animate-spin mr-2" size={14}/> : <ChevronDown size={14} className="mr-2"/>} 
-                        Load Next 10 Data
-                      </Button>
-                    </div>
-                  )}
+                  
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-center gap-4 p-4 border-t bg-slate-50/20">
+                    <Button 
+                      onClick={() => fetchLogs(logPage - 1)} 
+                      disabled={logPage === 1 || loading.logs}
+                      variant="outline" 
+                      size="sm"
+                      className="rounded-xl"
+                    >
+                      <ChevronLeft size={16} className="mr-1"/> Prev
+                    </Button>
+                    <span className="text-sm font-medium text-slate-600">Page {logPage}</span>
+                    <Button 
+                      onClick={() => fetchLogs(logPage + 1)} 
+                      disabled={!hasMoreLogs || loading.logs}
+                      variant="outline" 
+                      size="sm"
+                      className="rounded-xl"
+                    >
+                      Next <ChevronRight size={16} className="ml-1"/>
+                    </Button>
+                  </div>
                 </>
               )}
             </>
