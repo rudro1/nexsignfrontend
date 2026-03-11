@@ -1033,7 +1033,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, Laptop, Monitor } from 'lucide-react';
+import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, Laptop, MapPin, Globe } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
 import { toast } from 'sonner';
@@ -1098,79 +1098,76 @@ export default function AdminDashboard() {
   );
 
   const filteredDocs = documents.filter(d =>
-    !search || d.title?.toLowerCase().includes(search.toLowerCase())
+    !search || d.title?.toLowerCase().includes(search.toLowerCase()) || 
+    d.parties?.some(p => p.email?.toLowerCase().includes(search.toLowerCase()))
   );
 
   const filteredLogs = logs.filter(l =>
     !search || 
     l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()) || 
-    l.performed_by?.name?.toLowerCase().includes(search.toLowerCase()) ||
-    l.action?.toLowerCase().includes(search.toLowerCase())
+    l.action?.toLowerCase().includes(search.toLowerCase()) ||
+    l.ip_address?.includes(search)
   );
-
-  const stats = {
-    totalUsers: users.length,
-    totalDocs: documents.length,
-    completedDocs: documents.filter(d => d.status === 'completed').length,
-    activeDocs: documents.filter(d => d.status === 'in_progress').length,
-  };
 
   if (authLoading || loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-8">
-        <Shield className="text-sky-500 w-8 h-8" />
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+    <div className="max-w-7xl mx-auto px-4 py-8 bg-slate-50/30 min-h-screen">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-sky-100 rounded-lg"><Shield className="text-sky-600 w-6 h-6" /></div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Admin Control Panel</h1>
+        </div>
+        <Button onClick={fetchAdminData} variant="outline" className="rounded-xl shadow-sm bg-white"><Activity size={16} className="mr-2 text-emerald-500"/> Refresh Stats</Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatsCard label="Total Users" value={stats.totalUsers} icon={Users} color="sky" />
-        <StatsCard label="Total Documents" value={stats.totalDocs} icon={FileText} color="violet" />
-        <StatsCard label="Completed" value={stats.completedDocs} icon={CheckCircle2} color="green" />
-        <StatsCard label="Active" value={stats.activeDocs} icon={Clock} color="amber" />
+        <StatsCard label="Total Users" value={users.length} icon={Users} color="sky" />
+        <StatsCard label="Total Docs" value={documents.length} icon={FileText} color="violet" />
+        <StatsCard label="Completed" value={documents.filter(d => d.status === 'completed').length} icon={CheckCircle2} color="green" />
+        <StatsCard label="In Progress" value={documents.filter(d => d.status === 'in_progress').length} icon={Clock} color="amber" />
       </div>
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="mb-6">
-        <TabsList className="bg-slate-100 p-1 w-full sm:w-auto overflow-x-auto justify-start flex">
-          <TabsTrigger value="users" className="gap-2 flex-1 sm:flex-none"><Users size={16}/> Users</TabsTrigger>
-          <TabsTrigger value="documents" className="gap-2 flex-1 sm:flex-none"><FileText size={16}/> Documents</TabsTrigger>
-          <TabsTrigger value="logs" className="gap-2 flex-1 sm:flex-none"><Activity size={16}/> Logs</TabsTrigger>
+        <TabsList className="bg-white border p-1 w-full sm:w-auto overflow-x-auto justify-start flex rounded-xl shadow-sm">
+          <TabsTrigger value="users" className="gap-2 px-6"><Users size={16}/> Users</TabsTrigger>
+          <TabsTrigger value="documents" className="gap-2 px-6"><FileText size={16}/> Documents</TabsTrigger>
+          <TabsTrigger value="logs" className="gap-2 px-6"><Activity size={16}/> Logs</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <Card className="rounded-2xl overflow-hidden border-slate-200 shadow-sm">
-        <div className="p-4 bg-white border-b flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="relative w-full sm:max-w-sm">
+      <Card className="rounded-2xl overflow-hidden border-slate-200 shadow-md bg-white">
+        <div className="p-4 bg-slate-50/50 border-b flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="relative w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
-              placeholder={`Search in ${tab}...`} 
+              placeholder={`Search by name, email or IP in ${tab}...`} 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
-              className="pl-10 w-full rounded-xl" 
+              className="pl-10 w-full rounded-xl border-slate-200 focus:ring-sky-500" 
             />
           </div>
-          <Button onClick={fetchAdminData} variant="outline" size="sm" className="w-full sm:w-auto rounded-xl">Refresh</Button>
+          <Badge variant="outline" className="bg-white px-3 py-1 text-slate-500 font-medium">Showing {tab === 'users' ? filteredUsers.length : tab === 'documents' ? filteredDocs.length : filteredLogs.length} results</Badge>
         </div>
 
         <div className="overflow-x-auto">
           {tab === 'users' && (
             <Table>
-              <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow className="bg-slate-50/80"><TableHead className="font-semibold">User Information</TableHead><TableHead className="font-semibold">Account Role</TableHead><TableHead className="font-semibold">Join Date</TableHead><TableHead className="text-right font-semibold">Action</TableHead></TableRow></TableHeader>
               <TableBody>
                 {filteredUsers.map(u => (
-                  <TableRow key={u._id}>
+                  <TableRow key={u._id} className="hover:bg-slate-50/50 transition-colors">
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium text-sm">{u.full_name}</span>
-                        <span className="text-[10px] text-slate-500">{u.email}</span>
+                        <span className="font-bold text-sm text-slate-700">{u.full_name}</span>
+                        <span className="text-xs text-slate-500">{u.email}</span>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="secondary" className="text-[10px]">{u.role}</Badge></TableCell>
-                    <TableCell className="text-xs text-slate-400 whitespace-nowrap">{safeFormatDate(u.createdAt)}</TableCell>
+                    <TableCell><Badge variant={u.role === 'super_admin' ? 'default' : 'secondary'} className="text-[10px] px-2">{u.role?.toUpperCase()}</Badge></TableCell>
+                    <TableCell className="text-xs text-slate-500 whitespace-nowrap">{safeFormatDate(u.createdAt)}</TableCell>
                     <TableCell className="text-right">
                       {u.role !== 'super_admin' && (
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u._id)} className="text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u._id)} className="text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></Button>
                       )}
                     </TableCell>
                   </TableRow>
@@ -1182,50 +1179,59 @@ export default function AdminDashboard() {
           {tab === 'documents' && (
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50">
-                  <TableHead>Document Info</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Signers Activity</TableHead>
-                  <TableHead>Created</TableHead>
+                <TableRow className="bg-slate-50/80">
+                  <TableHead className="font-semibold">Document Details</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold min-w-[300px]">Signers Activity & Digital Audit</TableHead>
+                  <TableHead className="font-semibold">Created</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDocs.map(d => (
-                  <TableRow key={d._id} className="align-top">
+                  <TableRow key={d._id} className="align-top hover:bg-slate-50/30 transition-colors border-b">
                     <TableCell>
-                      <div className="flex flex-col min-w-[150px]">
-                        <span className="font-bold text-sm text-slate-800">{d.title}</span>
-                        <span className="text-[10px] text-slate-500 mt-1">Owner: {d.owner?.full_name || 'N/A'}</span>
+                      <div className="flex flex-col min-w-[180px]">
+                        <span className="font-bold text-sm text-slate-800 leading-tight mb-1">{d.title}</span>
+                        <span className="text-[10px] text-slate-400 flex items-center gap-1"><Users size={10}/> Owner: {d.owner?.full_name || 'N/A'}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={`text-[9px] ${d.status === 'completed' ? 'bg-green-500' : 'bg-sky-500'}`}>
+                      <Badge className={`text-[9px] font-bold px-2 py-0.5 ${d.status === 'completed' ? 'bg-emerald-500' : 'bg-sky-500'}`}>
                         {d.status?.toUpperCase()}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-2 min-w-[220px]">
+                      <div className="grid grid-cols-1 gap-2 py-1">
                         {d.parties?.map((p, i) => (
-                          <div key={i} className={`p-2 rounded-lg border flex flex-col gap-1 ${
-                            p.status === 'signed' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-slate-50 border-slate-100'
+                          <div key={i} className={`p-2.5 rounded-xl border transition-all ${
+                            p.status === 'signed' ? 'bg-emerald-50/40 border-emerald-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'
                           }`}>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-1.5">
                               <span className="font-bold text-[11px] text-slate-700">{p.name}</span>
-                              <Badge variant="outline" className={`text-[8px] h-4 ${p.status === 'signed' ? 'text-emerald-600 border-emerald-200' : 'text-amber-600 border-amber-200'}`}>
-                                {p.status === 'signed' ? 'SIGNED' : 'PENDING'}
+                              <Badge variant="outline" className={`text-[8px] h-4 font-bold ${p.status === 'signed' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-amber-600 bg-amber-50 border-amber-200'}`}>
+                                {p.status?.toUpperCase()}
                               </Badge>
                             </div>
                             {p.status === 'signed' && (
-                              <div className="flex flex-col text-[9px] text-slate-500">
-                                <span className="flex items-center gap-1"><Clock size={10}/> {safeFormatDate(p.signedAt, 'HH:mm, d MMM')}</span>
-                                <span className="flex items-center gap-1 truncate max-w-[180px]"><Laptop size={10}/> {p.device || 'N/A'}</span>
+                              <div className="space-y-1 mt-2 border-t border-emerald-100/50 pt-2">
+                                <div className="flex items-center gap-2 text-[9px] text-slate-600">
+                                  <Clock size={11} className="text-emerald-500"/> <span className="font-medium">{safeFormatDate(p.signedAt, 'HH:mm, d MMM yyyy')}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[9px] text-sky-600 bg-sky-50/50 p-1 rounded">
+                                  <Globe size={11}/> <span className="font-bold">{p.ipAddress || '0.0.0.0'}</span>
+                                  <span className="text-slate-400 font-normal">|</span>
+                                  <MapPin size={11} className="text-rose-400"/> <span className="font-medium text-slate-700">{p.location || 'Unknown Location'}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[9px] text-slate-500 italic">
+                                  <Laptop size={11}/> <span className="truncate max-w-[220px]" title={p.device}>{p.device || 'N/A'}</span>
+                                </div>
                               </div>
                             )}
                           </div>
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-[10px] text-slate-400 whitespace-nowrap">{safeFormatDate(d.createdAt)}</TableCell>
+                    <TableCell className="text-[10px] text-slate-500 whitespace-nowrap">{safeFormatDate(d.createdAt)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1235,30 +1241,39 @@ export default function AdminDashboard() {
           {tab === 'logs' && (
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50">
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Device/IP</TableHead>
-                  <TableHead>Time</TableHead>
+                <TableRow className="bg-slate-50/80">
+                  <TableHead className="font-semibold">Performed By</TableHead>
+                  <TableHead className="font-semibold">Action</TableHead>
+                  <TableHead className="font-semibold">Digital Footprint (IP & Location)</TableHead>
+                  <TableHead className="font-semibold">Timestamp</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredLogs.map(log => (
-                  <TableRow key={log._id}>
+                  <TableRow key={log._id} className="hover:bg-slate-50/50 transition-colors">
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium text-xs">{log.performed_by?.name || 'System'}</span>
-                        <span className="text-[9px] text-slate-500 truncate max-w-[100px]">{log.performed_by?.email}</span>
+                        <span className="font-bold text-xs text-slate-700">{log.performed_by?.name || 'System'}</span>
+                        <span className="text-[9px] text-slate-400">{log.performed_by?.email || 'system@nexsign'}</span>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="outline" className="text-[9px]">{log.action}</Badge></TableCell>
                     <TableCell>
-                      <div className="flex flex-col text-[9px] text-slate-500">
-                        <span className="truncate max-w-[120px]" title={log.user_agent}>{log.user_agent}</span>
-                        <span className="text-sky-600">{log.ip_address}</span>
+                      <Badge variant="outline" className={`text-[9px] font-bold ${log.action === 'signed' ? 'border-emerald-200 text-emerald-600' : 'border-slate-200 text-slate-500'}`}>
+                        {log.action?.toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-sky-600">{log.ip_address || 'N/A'}</span>
+                          {log.details?.includes('from') && (
+                            <span className="text-[9px] text-rose-500 font-medium px-1 bg-rose-50 rounded italic">{log.details.split('from ')[1].split(' using')[0]}</span>
+                          )}
+                        </div>
+                        <span className="text-[8px] text-slate-400 truncate max-w-[250px]" title={log.user_agent}>{log.user_agent}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-[10px] text-slate-400 whitespace-nowrap">{safeFormatDate(log.timestamp, 'HH:mm, d MMM')}</TableCell>
+                    <TableCell className="text-[10px] text-slate-500 whitespace-nowrap font-medium">{safeFormatDate(log.timestamp, 'HH:mm:ss, d MMM')}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
