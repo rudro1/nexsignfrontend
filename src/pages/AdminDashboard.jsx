@@ -1023,7 +1023,6 @@
 //     </div>
 //   );
 // }
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
@@ -1035,7 +1034,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
 import { toast } from 'sonner';
 
@@ -1089,7 +1088,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ ফিল্টারিং লজিক ফিক্সড (performed_by অবজেক্ট চেক করা হচ্ছে)
+  // ✅ ডেট ফরম্যাট করার নিরাপদ ফাংশন
+  const safeFormatDate = (dateStr, formatStr = 'MMM d, yyyy') => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return isValid(date) ? format(date, formatStr) : 'N/A';
+  };
+
   const filteredUsers = users.filter(u => 
     !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
   );
@@ -1151,92 +1156,97 @@ export default function AdminDashboard() {
         </div>
 
         {tab === 'users' && (
-          <Table>
-            <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {filteredUsers.map(u => (
-                <TableRow key={u._id}>
-                  <TableCell className="font-medium">{u.full_name}</TableCell>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell><Badge variant="secondary">{u.role}</Badge></TableCell>
-                  <TableCell className="text-sm text-slate-400">{format(new Date(u.createdAt), 'MMM d, yyyy')}</TableCell>
-                  <TableCell className="text-right">
-                    {u.role !== 'super_admin' && (
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u._id)} className="text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {filteredUsers.map(u => (
+                  <TableRow key={u._id}>
+                    <TableCell className="font-medium">{u.full_name}</TableCell>
+                    <TableCell>{u.email}</TableCell>
+                    <TableCell><Badge variant="secondary">{u.role}</Badge></TableCell>
+                    <TableCell className="text-sm text-slate-400">{safeFormatDate(u.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      {u.role !== 'super_admin' && (
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u._id)} className="text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
 
-        {/* ✅ ফিক্সড অ্যাক্টিভিটি লগ টেবিল */}
         {tab === 'logs' && (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50">
-                <TableHead>User / Email</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Document</TableHead>
-                <TableHead>IP Address</TableHead>
-                <TableHead>Time</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLogs.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-slate-400">No activity logs found</TableCell></TableRow>
-              ) : filteredLogs.map(log => (
-                <TableRow key={log._id}>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-slate-900">{log.performed_by?.name || 'System'}</span>
-                      <span className="text-[11px] text-slate-500">{log.performed_by?.email || 'N/A'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={`capitalize font-normal ${
-                      log.action === 'signed' ? 'border-green-500 text-green-600 bg-green-50' : 
-                      log.action === 'opened' ? 'border-sky-500 text-sky-600 bg-sky-50' : ''
-                    }`}>
-                      {log.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-slate-600 max-w-[150px] truncate block">
-                      {log.document_id?.title || 'N/A'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <code className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-sky-600 font-mono">
-                      {log.ip_address || '127.0.0.1'}
-                    </code>
-                  </TableCell>
-                  <TableCell className="text-xs text-slate-400">
-                    {log.timestamp ? format(new Date(log.timestamp), 'MMM d, HH:mm') : 'N/A'}
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50">
+                  <TableHead>User / Email</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Document</TableHead>
+                  <TableHead>IP Address</TableHead>
+                  <TableHead>Time</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredLogs.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-slate-400">No activity logs found</TableCell></TableRow>
+                ) : filteredLogs.map(log => (
+                  <TableRow key={log._id}>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-slate-900">{log.performed_by?.name || 'System'}</span>
+                        <span className="text-[11px] text-slate-500">{log.performed_by?.email || 'N/A'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={`capitalize font-normal ${
+                        log.action === 'signed' ? 'border-green-500 text-green-600 bg-green-50' : 
+                        log.action === 'opened' ? 'border-sky-500 text-sky-600 bg-sky-50' : ''
+                      }`}>
+                        {log.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-slate-600 max-w-[150px] truncate block">
+                        {log.document_id?.title || 'N/A'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-sky-600 font-mono">
+                        {log.ip_address || '127.0.0.1'}
+                      </code>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-400">
+                      {safeFormatDate(log.timestamp, 'MMM d, HH:mm')}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
 
         {tab === 'documents' && (
-          <Table>
-            <TableHeader><TableRow className="bg-slate-50"><TableHead>Document Title</TableHead><TableHead>Owner</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {filteredDocs.map(d => (
-                <TableRow key={d._id}>
-                  <TableCell className="font-medium">{d.title}</TableCell>
-                  <TableCell className="text-sm">{d.owner?.full_name}</TableCell>
-                  <TableCell><Badge className={d.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-slate-100'}>{d.status}</Badge></TableCell>
-                  <TableCell className="text-sm text-slate-400">{format(new Date(d.createdAt), 'MMM d, yyyy')}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow className="bg-slate-50"><TableHead>Document Title</TableHead><TableHead>Owner</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {filteredDocs.map(d => (
+                  <TableRow key={d._id}>
+                    <TableCell className="font-medium">{d.title}</TableCell>
+                    <TableCell className="text-sm">{d.owner?.full_name || 'N/A'}</TableCell>
+                    <TableCell><Badge className={d.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-slate-100'}>{d.status}</Badge></TableCell>
+                    <TableCell className="text-sm text-slate-400">{safeFormatDate(d.createdAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </Card>
     </div>
-  );
+  ); 
 }
