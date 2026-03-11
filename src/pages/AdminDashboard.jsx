@@ -1033,7 +1033,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Shield, Users, FileText, CheckCircle2, Clock, Search, Trash2, Loader2, Activity, ChevronLeft, ChevronRight, MapPin, Globe, Laptop, Mail } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import StatsCard from '../components/dashboard/StatsCard';
 import { toast } from 'sonner';
@@ -1052,6 +1052,7 @@ export default function AdminDashboard() {
   const [logPage, setLogPage] = useState(1);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
 
+  // ১. ইউজার ডাটা ফেচ
   const fetchUsers = useCallback(async () => {
     try {
       const res = await api.get('/admin/users');
@@ -1060,6 +1061,7 @@ export default function AdminDashboard() {
     finally { setLoading(prev => ({ ...prev, users: false })); }
   }, []);
 
+  // ২. ডকুমেন্ট ডাটা ফেচ
   const fetchDocs = useCallback(async () => {
     try {
       const res = await api.get('/admin/documents');
@@ -1068,6 +1070,7 @@ export default function AdminDashboard() {
     finally { setLoading(prev => ({ ...prev, docs: false })); }
   }, []);
 
+  // ৩. অডিট লগ ফেচ (Pagination সহ)
   const fetchLogs = useCallback(async (pageNo = 1) => {
     setLoading(prev => ({ ...prev, logs: true }));
     try {
@@ -1104,7 +1107,8 @@ export default function AdminDashboard() {
     } catch (error) { toast.error("Delete failed"); }
   };
 
-  const safeFormatDate = (dateStr, fStr = 'MMM d, yyyy') => {
+  // তারিখ এবং AM/PM ফরম্যাট করার ফাংশন
+  const safeFormatDate = (dateStr, fStr = 'hh:mm aa, d MMM yyyy') => {
     const d = new Date(dateStr);
     return isValid(d) ? format(d, fStr) : 'N/A';
   };
@@ -1117,6 +1121,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 py-6 bg-slate-50/30 min-h-screen">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-sky-100 rounded-lg"><Shield className="text-sky-600 w-6 h-6" /></div>
@@ -1127,6 +1132,7 @@ export default function AdminDashboard() {
         </Button>
       </div>
 
+      {/* Stats Section */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <StatsCard label="Users" value={users.length} icon={Users} color="sky" />
         <StatsCard label="Docs" value={documents.length} icon={FileText} color="violet" />
@@ -1163,6 +1169,7 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
+              {/* Users Tab */}
               {tab === 'users' && (
                 <Table className="min-w-[600px]">
                   <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
@@ -1171,7 +1178,7 @@ export default function AdminDashboard() {
                       <TableRow key={u._id} className="hover:bg-slate-50/50">
                         <TableCell><div className="flex flex-col"><span className="font-semibold text-sm">{u.full_name}</span><span className="text-[11px] text-slate-500">{u.email}</span></div></TableCell>
                         <TableCell><Badge variant="outline" className="text-[10px]">{u.role?.toUpperCase()}</Badge></TableCell>
-                        <TableCell className="text-xs text-slate-500">{safeFormatDate(u.createdAt)}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{safeFormatDate(u.createdAt, 'd MMM yyyy')}</TableCell>
                         <TableCell className="text-right">
                           {u.role !== 'super_admin' && <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u._id)} className="text-red-500 hover:bg-red-50"><Trash2 size={16}/></Button>}
                         </TableCell>
@@ -1181,68 +1188,74 @@ export default function AdminDashboard() {
                 </Table>
               )}
 
+              {/* Documents Tab - UPDATED with Security Info & AM/PM */}
               {tab === 'documents' && (
-                <Table className="min-w-[800px]">
-                  <TableHeader><TableRow className="bg-slate-50"><TableHead>Title</TableHead><TableHead>Status</TableHead><TableHead>Signers Activity</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+                <Table className="min-w-[1000px]">
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead>Document & Owner</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Signers Activity (IP, Device, Location)</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {filteredDocs.map(d => (
                       <TableRow key={d._id} className="align-top hover:bg-slate-50/50">
-                        <TableCell className="max-w-[150px]"><div className="flex flex-col"><span className="font-semibold text-sm truncate">{d.title}</span><span className="text-[10px] text-slate-400">By: {d.owner?.full_name}</span></div></TableCell>
+                        <TableCell className="max-w-[200px]">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm truncate">{d.title}</span>
+                            <span className="text-[10px] text-slate-500">By: {d.owner?.full_name || 'N/A'}</span>
+                          </div>
+                        </TableCell>
                         <TableCell><Badge className={d.status === 'completed' ? 'bg-emerald-500' : 'bg-sky-500'}>{d.status}</Badge></TableCell>
                         <TableCell>
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-col gap-2">
                             {d.parties?.map((p, idx) => (
-                              <div key={idx} className="p-2 border rounded-lg bg-slate-50/30 text-[10px]">
-                                <div className="flex justify-between font-bold mb-0.5"><span>{p.name}</span><span className={p.status === 'signed' ? 'text-emerald-600' : 'text-slate-400'}>{p.status}</span></div>
-                                <div className="text-slate-400 truncate">{p.email}</div>
+                              <div key={idx} className="p-3 border border-slate-100 rounded-xl bg-slate-50/40 text-[11px] space-y-1">
+                                <div className="flex justify-between font-bold text-sky-700">
+                                  <span>{p.name} ({p.status})</span>
+                                  <span className="text-slate-400 font-normal">{p.email}</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-slate-500">
+                                  <span className="flex items-center gap-1 text-[10px]"><Globe size={12}/> IP: {p.ipAddress || 'N/A'}</span>
+                                  <span className="flex items-center gap-1 text-[10px]"><MapPin size={12}/> {p.location || 'N/A'}</span>
+                                  <span className="col-span-2 flex items-center gap-1 text-[10px]"><Laptop size={12}/> {p.device || 'Unknown Device'}</span>
+                                  {p.signedAt && <span className="col-span-2 text-emerald-600 font-semibold italic">✅ Signed: {safeFormatDate(p.signedAt)}</span>}
+                                </div>
                               </div>
                             ))}
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500">{safeFormatDate(d.createdAt)}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{safeFormatDate(d.createdAt, 'd MMM yyyy')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               )}
 
+              {/* Logs Tab */}
               {tab === 'logs' && (
                 <>
                   <Table className="min-w-[700px]">
-                    <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Action</TableHead><TableHead>Document</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow className="bg-slate-50"><TableHead>User</TableHead><TableHead>Action</TableHead><TableHead>Document</TableHead><TableHead>Time (AM/PM)</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {filteredLogs.map(log => (
                         <TableRow key={log._id} className="hover:bg-slate-50/50">
                           <TableCell><div className="flex flex-col"><span className="font-semibold text-xs">{log.performed_by?.name || 'System'}</span><span className="text-[10px] text-slate-400">{log.performed_by?.email}</span></div></TableCell>
                           <TableCell><Badge variant="outline" className="text-[9px]">{log.action}</Badge></TableCell>
                           <TableCell><span className="text-xs text-slate-600 font-medium">{log.document_id?.title || 'N/A'}</span></TableCell>
-                          <TableCell className="text-[10px] text-slate-500">{safeFormatDate(log.timestamp, 'HH:mm:ss, d MMM')}</TableCell>
+                          <TableCell className="text-[10px] text-slate-500">{safeFormatDate(log.timestamp, 'hh:mm aa, d MMM')}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                   
-                  {/* Pagination Controls */}
-                  <div className="flex items-center justify-center gap-4 p-4 border-t bg-slate-50/20">
-                    <Button 
-                      onClick={() => fetchLogs(logPage - 1)} 
-                      disabled={logPage === 1 || loading.logs}
-                      variant="outline" 
-                      size="sm"
-                      className="rounded-xl"
-                    >
-                      <ChevronLeft size={16} className="mr-1"/> Prev
-                    </Button>
-                    <span className="text-sm font-medium text-slate-600">Page {logPage}</span>
-                    <Button 
-                      onClick={() => fetchLogs(logPage + 1)} 
-                      disabled={!hasMoreLogs || loading.logs}
-                      variant="outline" 
-                      size="sm"
-                      className="rounded-xl"
-                    >
-                      Next <ChevronRight size={16} className="ml-1"/>
-                    </Button>
+                  {/* Pagination */}
+                  <div className="flex items-center justify-center gap-4 p-4 border-t">
+                    <Button onClick={() => fetchLogs(logPage - 1)} disabled={logPage === 1 || loading.logs} variant="outline" size="sm" className="rounded-xl"><ChevronLeft size={16}/></Button>
+                    <span className="text-sm font-medium">Page {logPage}</span>
+                    <Button onClick={() => fetchLogs(logPage + 1)} disabled={!hasMoreLogs || loading.logs} variant="outline" size="sm" className="rounded-xl"><ChevronRight size={16}/></Button>
                   </div>
                 </>
               )}
