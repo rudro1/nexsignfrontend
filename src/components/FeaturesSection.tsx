@@ -36,7 +36,7 @@ export function FeaturesSection() {
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
             Everything You Need for Seamless Signing
           </h2>
-          <p className="text-lg text-slate-600">
+          <p className="text-lg text-slate-600 dark:text-gray-400">
             Powerful features designed to make document signing faster, safer,
             and easier for everyone involved.
           </p>
@@ -72,7 +72,7 @@ export function FeaturesSection() {
                   <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">
                     {feature.title}
                   </h3>
-                  <p className="text-slate-600 leading-relaxed">
+                  <p className="text-slate-600 leading-relaxed dark:text-gray-400">
                     {feature.description}
                   </p>
                 </CardContent>

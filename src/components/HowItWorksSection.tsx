@@ -36,7 +36,7 @@ export function HowItWorksSection() {
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 dark:text-white">
             How It Works
           </h2>
-          <p className="text-lg text-slate-600">
+          <p className="text-lg text-slate-600 dark:text-gray-400">
             Get your documents signed in four simple steps. No technical skills
             required.
           </p>
@@ -75,7 +75,7 @@ export function HowItWorksSection() {
                 <h3 className="text-xl font-bold text-slate-900 mb-3 dark:text-white">
                   {step.title}
                 </h3>
-                <p className="text-slate-600">{step.description}</p>
+                <p className="text-slate-600 dark:text-gray-400">{step.description}</p>
 
                 {/* Connecting Line (Mobile/Tablet vertical) */}
                 {index < steps.length - 1 &&

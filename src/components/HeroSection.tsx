@@ -65,7 +65,7 @@ const handleGetStarted = () => {
               </span>
             </h1>
 
-            <p className="text-lg md:text-xl text-slate-600 mb-8 leading-relaxed">
+            <p className="text-lg md:text-xl text-slate-600 mb-8 leading-relaxed dark:text-gray-400">
               Simplify your document workflow with automated signing, secure
               links, and instant delivery. No more printing, scanning, or
               chasing signatures.

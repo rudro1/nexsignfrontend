@@ -5,12 +5,12 @@ import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, FileText, Clock, CheckCircle2, Send, AlertCircle } from 'lucide-react';
+import { Plus, Search, FileText, Clock, CheckCircle2, Send} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import StatsCard from '../components/dashboard/StatsCard';
 import DocumentCard from '../components/dashboard/DocumentCard';
 import { useAuth } from '@/lib/AuthContext';
-import { toast } from 'sonner';
+//import { toast } from 'sonner';
 
 export default function Dashboard() {
 
@@ -70,7 +70,7 @@ export default function Dashboard() {
 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             Welcome, {user?.full_name || 'User'} 👋
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">সব ডকুমেন্ট এবং সাইনিং প্রসেস ম্যানেজ করুন</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Manage all documents and the signing process.</p>
         </div>
         <Link to="/DocumentEditor">
           <Button className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl gap-2 shadow-lg px-6">
@@ -89,7 +89,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center">
         <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input placeholder="টাইটেল দিয়ে খুঁজুন..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl" />
+          <Input placeholder="Search by title…" value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl" />
         </div>
         <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
           <TabsList className="bg-slate-100 dark:bg-slate-900 rounded-xl p-1 border">
