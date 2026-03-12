@@ -32,16 +32,22 @@ export default function Navbar() {
   const toggleTheme = () => setIsDark(!isDark);
 
   // Scroll to section
-  const scrollToSection = (id) => {
-    if (location.pathname !== "/") {
-      navigate("/", { state: { scrollTo: id } });
-    } else {
+const scrollToSection = (id) => {
+  if (location.pathname !== "/") {
+    navigate("/", { state: { scrollTo: id } });
+
+    // wait for navigation then scroll
+    setTimeout(() => {
       const el = document.getElementById(id);
       el?.scrollIntoView({ behavior: "smooth" });
-      setActiveLink(id);
-    }
-  };
+    }, 200);
+  } else {
+    const el = document.getElementById(id);
+    el?.scrollIntoView({ behavior: "smooth" });
+  }
 
+  setActiveLink(id);
+};
   // Update active link
   useEffect(() => {
     const path = location.pathname;
@@ -80,14 +86,14 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-8 font-semibold text-slate-500 dark:text-blue-600">
             <button
               onClick={() => scrollToSection("features")}
-              className={`hover:text-sky-500 ${activeLink === "features" ? "text-blue-600 font-bold" : ""}`}
+              className={`hover:text-sky-500 ${activeLink === "features" ? "text-sky-500 font-bold border-0" : ""}`}
             >
               Features
             </button>
 
             <button
               onClick={() => scrollToSection("how-it-works")}
-              className={`hover:text-sky-500 ${activeLink === "how-it-works" ? "text-blue-600 font-bold" : ""}`}
+              className={`hover:text-sky-500 ${activeLink === "how-it-works" ? "text-sky-500 font-bold" : ""}`}
             >
               How It Works
             </button>
@@ -95,7 +101,7 @@ export default function Navbar() {
             <Link
               to="/pricing"
               onClick={() => handleLinkClick("pricing", "/pricing")}
-              className={`hover:text-sky-500 ${activeLink === "pricing" ? "text-blue-600 font-bold" : ""}`}
+              className={`hover:text-sky-500 ${activeLink === "pricing" ? "text-sky-500 font-bold" : ""}`}
             >
               Pricing
             </Link>
@@ -104,7 +110,7 @@ export default function Navbar() {
               <Link
                 to="/dashboard"
                 onClick={() => handleLinkClick("dashboard", "/dashboard")}
-                className={`hover:text-sky-500 ${activeLink === "dashboard" ? "text-blue-600 font-bold" : ""}`}
+                className={`hover:text-sky-500 ${activeLink === "dashboard" ? "text-sky-500 font-bold" : ""}`}
               >
                 Dashboard
               </Link>
