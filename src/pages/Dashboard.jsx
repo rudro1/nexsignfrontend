@@ -9,9 +9,12 @@ import { Plus, Search, FileText, Clock, CheckCircle2, Send, AlertCircle } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import StatsCard from '../components/dashboard/StatsCard';
 import DocumentCard from '../components/dashboard/DocumentCard';
+import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
+
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [documents, setDocuments] = useState([]);
@@ -62,7 +65,11 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">NexSign Dashboard</h1>
+          {/* <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">NexSign Dashboard</h1> */}
+
+<h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Welcome, {user?.full_name || 'User'} 👋
+          </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">সব ডকুমেন্ট এবং সাইনিং প্রসেস ম্যানেজ করুন</p>
         </div>
         <Link to="/DocumentEditor">

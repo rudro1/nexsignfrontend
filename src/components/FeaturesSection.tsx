@@ -62,12 +62,14 @@ export function FeaturesSection() {
               delay: index * 0.3
             }}>
 
-              <Card className="h-full border-none shadow-lg shadow-slate-100 dark:shadow-[#0e3b51] dark:rounded hover:shadow-xl transition-shadow duration-300">
-                <CardContent className="pt-8 flex flex-col items-center text-center h-full dark:bg-[#0A9ADE]">
+              <Card className="h-full border-none shadow-lg shadow-slate-100 dark:shadow-none hover:shadow-xl transition-shadow duration-300">
+                <CardContent className="pt-8 flex flex-col items-center text-center h-full hover:border-white/80 rounded-2xl
+                dark:bg-white/5 dark:backdrop-blur-xl dark:border dark:border-white/20 transition-all duration-300 dark:hover:border-white">
+                
                   <div className="w-14 h-14 rounded-full bg-sky-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                     <feature.icon className="h-7 w-7 text-sky-500" />
                   </div>
-                  <h3 className="text-xl font-semibold text-slate-900 mb-3">
+                  <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">
                     {feature.title}
                   </h3>
                   <p className="text-slate-600 leading-relaxed">

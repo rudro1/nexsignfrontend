@@ -32,13 +32,13 @@ const Pricing = () => {
     ];
 
     return (
-        <section className="bg-white py-24 px-6">
+        <section className="bg-white py-24 px-6 dark:bg-[#020617]">
 
             <Navbar></Navbar>
             <div className="container mx-auto max-w-7xl">
                 {/* Section Header */}
                 <div className="text-center mb-16">
-                    <h2 className="text-4xl font-extrabold text-[#0F172A] mb-4">
+                    <h2 className="text-4xl font-extrabold text-[#0F172A] mb-4 dark:text-white">
                         Simple, Transparent Pricing
                     </h2>
                     <p className="text-slate-500 text-lg max-w-2xl mx-auto">
@@ -47,7 +47,7 @@ const Pricing = () => {
                 </div>
 
                 {/* Pricing Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center ">
                     {plans.map((plan, index) => (
                         <motion.div
                             key={index}
@@ -56,9 +56,11 @@ const Pricing = () => {
                             viewport={{ once: true }}
                             transition={{ delay: index * 0.2, duration: 0.5 }}
                             whileHover={{ y: -10 }}
-                            className={`relative p-8 rounded-3xl border ${
+                            className={`relative p-8 rounded-3xl
+                dark:bg-[#101829]/40 dark:backdrop-blur-xl dark:border dark:border-white/40 transition-all duration-300 dark:hover:border-white">
+                                 ${
                                 plan.highlight 
-                                ? "border-sky-500 shadow-2xl shadow-blue-100 bg-white scale-105 z-10" 
+                                ? "border-sky-500 shadow-2xl shadow-blue-100 dark:shadow-lg bg-white scale-105 z-10" 
                                 : "border-slate-100 shadow-sm bg-white"
                             }`}
                         >
@@ -68,9 +70,9 @@ const Pricing = () => {
                                 </span>
                             )}
 
-                            <h3 className="text-xl font-bold text-slate-900 mb-2">{plan.name}</h3>
+                            <h3 className="text-xl font-bold text-slate-900 mb-2 dark:text-white">{plan.name}</h3>
                             <div className="mb-4">
-                                <span className="text-5xl font-extrabold text-slate-900">${plan.price}</span>
+                                <span className="text-5xl font-extrabold text-slate-900 dark:text-white">${plan.price}</span>
                                 <span className="text-slate-500 font-medium">/month</span>
                             </div>
                             <p className="text-slate-500 text-sm mb-8">{plan.desc}</p>
@@ -86,7 +88,7 @@ const Pricing = () => {
 
                             <button className={`w-full py-4 rounded-xl font-bold transition-all ${
                                 plan.highlight 
-                                ? "bg-sky-500 text-white hover:bg-sky-600 shadow-lg shadow-blue-200" 
+                                ? "bg-sky-500 text-white hover:bg-sky-600 shadow-lg shadow-blue-200 dark:shadow-sm" 
                                 : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
                             }`}>
                                 {plan.buttonText}

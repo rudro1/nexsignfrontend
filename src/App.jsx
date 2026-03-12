@@ -58,27 +58,86 @@ const LayoutWrapper = ({ children, currentPageName }) => {
   return Layout ? <Layout currentPageName={currentPageName}>{children}</Layout> : <>{children}</>;
 };
 
+// const AuthenticatedApp = () => {
+//   const { loading } = useAuth();
+//   const publicRoutes =['landing', 'login', 'register', 'sign'];
+
+//   if (loading) {
+//     return (
+//       <div className="h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-950">
+//         <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+//         <p className="text-slate-500 font-medium animate-pulse">NexSign লোড হচ্ছে...</p>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <Routes>
+//       <Route path="/" element={<Landing />} />
+//       <Route path="/login" element={<Login />} />
+//       <Route path="/register" element={<Register />} />
+//       <Route path="/sign" element={<SignerView />} />
+//       <Route path="/pricing" element={<Pricing/> }/>
+
+//       {Object.entries(Pages).map(([path, PageComponent]) => {
+//         if (publicRoutes.includes(path)) return null;
+
+//         const isAdminPage = path.toLowerCase().includes('admin');
+
+//         return (
+//           <Route
+//             key={path}
+//             path={`/${path}`}
+//             element={
+//               <ProtectedRoute requiredRole={isAdminPage ? 'admin' : null}>
+//                 <LayoutWrapper currentPageName={path}>
+//                   <PageComponent />
+//                 </LayoutWrapper>
+//               </ProtectedRoute>
+//             }
+//           />
+//         );
+//       })}
+      
+//       <Route path="*" element={<PageNotFound />} />
+//     </Routes>
+//   );
+// };
+
+// 🌟 IMPORTANT: এই এক্সপোর্ট ডিফল্ট অংশটি যেন মিস না হয়!
 const AuthenticatedApp = () => {
-  const { loading } = useAuth();
-  const publicRoutes =['landing', 'login', 'register', 'sign'];
+  // 1. IMPORTANT: Destructure 'user' and 'isAuthenticated'
+  const { loading, user, isAuthenticated } = useAuth();
+  const publicRoutes = ['landing', 'login', 'register', 'sign'];
 
   if (loading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-950">
         <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-slate-500 font-medium animate-pulse">NexSign লোড হচ্ছে...</p>
+        <p className="text-slate-500 font-medium animate-pulse">NexSign is loading...</p>
       </div>
     );
   }
 
   return (
     <Routes>
+      {/* 2. ALWAYS PUBLIC: Home Page */}
       <Route path="/" element={<Landing />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/sign" element={<SignerView />} />
-      <Route path="/pricing" element={<Pricing/> }/>
 
+      {/* 3. REDIRECT LOGIC: Prevent logged-in users from seeing Login/Register */}
+      <Route 
+        path="/login" 
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} 
+      />
+      <Route 
+        path="/register" 
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} 
+      />
+      
+      <Route path="/sign" element={<SignerView />} />
+      <Route path="/pricing" element={<Pricing />} />
+
+      {/* 4. PROTECTED ROUTES: Handles Admin vs User logic */}
       {Object.entries(Pages).map(([path, PageComponent]) => {
         if (publicRoutes.includes(path)) return null;
 
@@ -104,7 +163,7 @@ const AuthenticatedApp = () => {
   );
 };
 
-// 🌟 IMPORTANT: এই এক্সপোর্ট ডিফল্ট অংশটি যেন মিস না হয়!
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -117,5 +176,5 @@ export default function App() {
         </QueryClientProvider>
       </AuthProvider>
     </ThemeProvider>
-  );
+  )
 }
