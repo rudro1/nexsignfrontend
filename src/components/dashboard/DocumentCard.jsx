@@ -8,9 +8,9 @@ import { FileText, Users, ArrowRight, Clock, CheckCircle2, AlertCircle, Pencil }
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300', icon: Pencil },
-  pending: { label: 'Pending', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
-  in_progress: { label: 'In Progress', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
+  pending: { label: 'Pending', color: 'bg-amber-100 hover:bg-blue text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
+  in_progress: { label: 'In Progress', color: 'bg-sky-100 hover:bg-blue text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
+  completed: { label: 'Completed', color: 'bg-green-100 hover:bg-blue text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle },
 };
 
@@ -64,7 +64,7 @@ export default function DocumentCard({ doc }) {
 
   return (
 
-<Card className="p-4 bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-sky-300 dark:hover:border-sky-600 transition-all group w-full overflow-hidden">
+<Card className="p-4 bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700  dark:hover:border-sky-600 transition-all group w-full overflow-hidden">
 
 {/* Header */}
 
@@ -124,7 +124,7 @@ export default function DocumentCard({ doc }) {
                     </span>
 
     <Button variant="ghost" size="sm" onClick={handleViewAction} 
-    className="text-sky-500 hover:text-sky-600 gap-1 font-semibold">
+    className="text-sky-500 hover:text-blue-500 hover:bg-blue-200 hover:dark-text-blue-500 dark:hover:bg-sky-600 gap-1 font-semibold">
 
        {doc.status === 'completed'? 'View Final': doc.status === 'draft'? 'Edit': 'View'}
 
