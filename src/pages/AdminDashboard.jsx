@@ -94,6 +94,16 @@ export default function AdminDashboard() {
     return isValid(d) ? format(d, fStr) : 'N/A';
   };
 
+  const handleDeleteDoc = async (docId) => {
+  if (!window.confirm("Are you sure? This will remove access for all parties!")) return;
+  try {
+    await api.delete(`/admin/documents/${docId}`);
+    setDocuments(documents.filter(d => d._id !== docId));
+    toast.success("Document removed successfully");
+  } catch {
+    toast.error("Failed to delete document");
+  }
+};
   // --- Filtering Logic ---
   const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
   const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
@@ -187,9 +197,8 @@ export default function AdminDashboard() {
               {/* Documents View - Full Grid Logic */}
              
 
-                   {tab === 'documents' && (
+{tab === 'documents' && (
   <div className="flex flex-col gap-6 md:gap-10">
-
     {filteredDocs.length === 0 ? (
       <div className="text-center py-16 md:py-20 text-slate-400 font-bold uppercase text-xs tracking-widest">
         No Documents Found
@@ -198,94 +207,89 @@ export default function AdminDashboard() {
       filteredDocs.map(d => (
         <Card
           key={d._id}
-          className="rounded-[2rem] md:rounded-[3rem] border-none bg-white dark:bg-slate-900 shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden"
+          className="rounded-[1.5rem] md:rounded-[3rem] border-none bg-white dark:bg-slate-900 shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden"
         >
-
-          {/* HEADER */}
-          <div className="p-4 sm:p-6 md:p-10 border-b border-slate-50 dark:border-slate-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 md:gap-6">
+          {/* HEADER - Responsive Layout */}
+          <div className="p-5 md:p-10 border-b border-slate-50 dark:border-slate-800 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             
-            <div className="space-y-2 md:space-y-3 flex-1 min-w-0">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-tight break-words line-clamp-2 md:line-clamp-none">
+            <div className="space-y-3 flex-1 min-w-0">
+              <h2 className="text-lg md:text-2xl font-black text-slate-900 dark:text-white leading-tight break-words">
                 {d.title}
               </h2>
 
-              <div className="flex flex-wrap items-center gap-2 md:gap-4 text-slate-400 text-[10px] md:text-[11px] font-black uppercase tracking-widest">
-                <span className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 md:px-4 py-1 rounded-full">
-                  <Users size={14} className="text-sky-500" />
-                  OWNER: {d.owner?.full_name}
+              <div className="flex flex-wrap items-center gap-3 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                <span className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-full">
+                  <Users size={12} className="text-sky-500" />
+                  {d.owner?.full_name}
                 </span>
-
                 <span className="flex items-center gap-2">
-                  <Calendar size={14} className="text-sky-500" />
+                  <Calendar size={12} className="text-sky-500" />
                   {safeFormatDate(d.createdAt)}
                 </span>
               </div>
             </div>
 
-            <Badge
-              className={`px-4 sm:px-6 md:px-10 py-2 md:py-4 rounded-2xl md:rounded-3xl text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em]
-                ${d.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-sky-500 text-white'}
-              `}
-            >
-              {d.status}
-            </Badge>
+            {/* Actions: View, Status, and Delete (Auto-stacks on mobile) */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 border-t lg:border-none pt-4 lg:pt-0">
+              
+              {/* VIEW FINAL - Completed Only */}
+              {d.status === 'completed' && d.fileUrl && (
+                <Button
+                  onClick={() => window.open(d.fileUrl, '_blank')}
+                  className="flex-1 sm:flex-initial bg-white dark:bg-slate-800 text-sky-600 border border-sky-100 hover:bg-sky-50 px-4 h-11 md:h-14 rounded-xl md:rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-sm"
+                >
+                  <FileText size={16} className="mr-2" />
+                  VIEW
+                </Button>
+              )}
 
+              <Badge
+                className={`flex-1 sm:flex-initial justify-center px-4 h-11 md:h-14 md:px-10 rounded-xl md:rounded-3xl text-[10px] font-black uppercase tracking-[0.2em]
+                  ${d.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-sky-500 text-white'}
+                `}
+              >
+                {d.status}
+              </Badge>
+
+              <Button
+                onClick={() => handleDeleteDoc(d._id)}
+                className="text-slate-300 hover:text-red-500 rounded-xl md:rounded-2xl h-11 w-11 md:h-14 md:w-14 p-0 bg-transparent hover:bg-red-50"
+              >
+                <Trash2 size={20} />
+              </Button>
+            </div>
           </div>
 
-          {/* PARTIES */}
-          <div
-            className={`p-4 sm:p-6 md:p-10 grid gap-4 md:gap-8
-              ${d.parties?.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}
-            `}
-          >
+          {/* PARTIES - Responsive Grid */}
+          <div className="p-5 md:p-10 grid gap-4 md:gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-2">
             {d.parties?.map((p, idx) => (
-              <div
-                key={idx}
-                className="p-4 sm:p-6 md:p-8 border-2 border-slate-50 dark:border-slate-800 rounded-2xl md:rounded-[2.5rem] bg-[#FCFEFF] dark:bg-slate-950/40 hover:border-sky-100 transition-colors"
-              >
-
-                {/* PARTY HEADER */}
-                <div className="flex justify-between items-start mb-4 md:mb-8 gap-3">
-                  <div className="space-y-1 min-w-0">
-                    <h4 className="font-black text-slate-900 dark:text-slate-100 text-sm sm:text-base md:text-lg uppercase tracking-tight break-words">
-                      {p.name}
-                    </h4>
-
-                    <p className="text-[10px] md:text-[11px] font-bold text-slate-400 break-all">
-                      {p.email}
-                    </p>
+              <div key={idx} className="p-5 md:p-8 border-2 border-slate-50 dark:border-slate-800 rounded-2xl md:rounded-[2.5rem] bg-[#FCFEFF] dark:bg-slate-950/40">
+                <div className="flex justify-between items-start mb-6 gap-2">
+                  <div className="min-w-0">
+                    <h4 className="font-black text-slate-900 dark:text-slate-100 text-sm md:text-base uppercase truncate">{p.name}</h4>
+                    <p className="text-[10px] font-bold text-slate-400 truncate">{p.email}</p>
                   </div>
-
-                  <div
-                    className={`text-[9px] font-black px-3 md:px-4 py-1 rounded-full uppercase tracking-widest
-                      ${p.status === 'signed' ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}
-                    `}
-                  >
+                  <Badge variant="outline" className={`text-[9px] font-black px-2 py-0.5 rounded-full ${p.status === 'signed' ? 'text-emerald-600 border-emerald-100' : 'text-amber-600 border-amber-100'}`}>
                     {p.status}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-black text-slate-300 uppercase">IP Address</span>
+                    <span className="text-[11px] font-bold truncate">{p.ipAddress || '---'}</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-black text-slate-300 uppercase">Location</span>
+                    <span className="text-[11px] font-bold truncate">{p.location || '---'}</span>
                   </div>
                 </div>
-
-                {/* INFO GRID */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 md:gap-y-5 pt-4 md:pt-8 border-t border-slate-50 dark:border-slate-800">
-                  <InfoLine icon={<Globe size={14} />} label="IP" value={p.ipAddress} />
-                  <InfoLine icon={<MapPin size={14} />} label="LOC" value={p.location} />
-                  <InfoLine icon={<Laptop size={14} />} label="DEV" value={p.device} />
-                  <InfoLine
-                    icon={<Clock size={14} />}
-                    label="TIME"
-                    value={p.signedAt ? safeFormatDate(p.signedAt, 'hh:mm aa') : '---'}
-                    color="text-sky-600"
-                  />
-                </div>
-
               </div>
             ))}
           </div>
-
         </Card>
       ))
     )}
-
   </div>
 )}
 
