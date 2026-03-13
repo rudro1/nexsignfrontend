@@ -229,7 +229,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-<<<<<<< HEAD
             {/* Actions: View, Status, and Delete (Auto-stacks on mobile) */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 border-t lg:border-none pt-4 lg:pt-0">
               
@@ -243,15 +242,6 @@ export default function AdminDashboard() {
                   VIEW
                 </Button>
               )}
-=======
-            <Badge
-              className={`px-4 sm:px-6 md:px-10 py-2 md:py-4 rounded-2xl md:rounded-3xl text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#10c78a]
-                ${d.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-sky-500 text-white'}
-              `}
-            >
-              {d.status}
-            </Badge>
->>>>>>> ac6cf03a67ffe929b178f8de32e094fe2a7a2b00
 
               <Badge
                 className={`flex-1 sm:flex-initial justify-center px-4 h-11 md:h-14 md:px-10 rounded-xl md:rounded-3xl text-[10px] font-black uppercase tracking-[0.2em]
