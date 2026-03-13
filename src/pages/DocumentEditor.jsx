@@ -1929,7 +1929,7 @@ export default function DocumentEditor() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 const [generatedSignLink, setGeneratedSignLink] = useState('');
-const [ccEmail, setCcEmail] = useState('');
+const [ccEmails, setCcEmails] = useState([]);
   useEffect(() => {
     const init = async () => {
       if (docId) {
@@ -1942,7 +1942,7 @@ const [ccEmail, setCcEmail] = useState('');
             setFileUrl(d.fileUrl || '');
             setFileId(d.fileId || ''); 
             setParties(d.parties || []);
-            
+            setCcEmails(d.ccEmails || []);
             // ✅ ডেটা লোড করার সময় স্ট্রিং থাকলে সেটিকে অবজেক্টে রূপান্তর
             if (d.fields && Array.isArray(d.fields)) {
               const parsedFields = d.fields.map(f => {
@@ -1982,10 +1982,10 @@ const getCleanPayload = () => {
     parties,
     fields: fields, 
     totalPages,
-    // সিসি ইমেইল খালি থাকলে যেন null না যায়, তাই "" দেওয়া ভালো
-    ccEmail: ccEmail || "", 
+    // 🌟 ব্যাকএন্ডের জন্য ccEmails-কে অ্যারে হিসেবে পাঠানো হচ্ছে
+    ccEmails: Array.isArray(ccEmails) ? ccEmails : [], 
     senderMeta: {
-      // ✅ এখানে full_name-কে প্রায়োরিটি দিন
+      // ✅ full_name-কে প্রায়োরিটি দেওয়া হয়েছে
       name: user?.full_name || user?.name || 'Document Owner',
       email: user?.email || '',
       time: new Date().toLocaleString('en-US', { 
@@ -1995,7 +1995,6 @@ const getCleanPayload = () => {
     }
   };
 };
-
 
 //  const handleUpload = async (e) => {
 //   const file = e.target.files[0];
@@ -2176,13 +2175,21 @@ const handleSave = async () => {
           <Button variant="outline" onClick={handleSave} disabled={saving || uploading} className="rounded-xl flex-1 sm:flex-none">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save
           </Button>
-          <Button onClick={handleSend} disabled={sending || uploading} className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl flex-1 sm:flex-none">
+          {/* <Button onClick={handleSend} disabled={sending || uploading} className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl flex-1 sm:flex-none">
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
-          </Button>
+          </Button> */} workable
+
+          <Button 
+  onClick={handleSend} 
+  disabled={sending || uploading} 
+  className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl flex-1 sm:flex-none"
+>
+  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
+</Button>
         </div>
       </div>
 {/* ✅ ঠিক এখানে বসবে আপনার সাইনার লিঙ্ক কার্ডটি */}
-  {generatedSignLink && (
+  {/* {generatedSignLink && (
     <Card className="mb-8 p-4 bg-sky-50 border-sky-200 border-2 animate-in fade-in slide-in-from-top-4 duration-500 rounded-2xl">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 overflow-hidden">
@@ -2217,7 +2224,46 @@ const handleSave = async () => {
         </div>
       </div>
     </Card>
-  )}
+  )} */}
+
+  {generatedSignLink && (
+  <Card className="mb-8 p-4 bg-[#28ABDF]/5 border-[#28ABDF] border-2 animate-in fade-in slide-in-from-top-4 duration-500 rounded-2xl">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="flex items-center gap-3 overflow-hidden">
+        {/* ব্র্যান্ড কালার ব্যাকগ্রাউন্ডসহ আইকন */}
+        <div className="p-2 bg-[#28ABDF] rounded-lg text-white">
+          <Send className="w-5 h-5" />
+        </div>
+        <div className="overflow-hidden">
+          <p className="text-sm font-bold text-slate-900">Signer Link Ready!</p>
+          <p className="text-xs text-[#28ABDF] truncate font-mono bg-white/80 p-1.5 rounded-md border border-[#28ABDF]/20">
+            {generatedSignLink}
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2 w-full sm:w-auto">
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="border-[#28ABDF] text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white transition-colors"
+          onClick={() => {
+            navigator.clipboard.writeText(generatedSignLink);
+            toast.success("Link copied!");
+          }}
+        >
+          Copy Link
+        </Button>
+        <Button 
+          size="sm" 
+          className="bg-slate-900 text-white hover:bg-slate-800"
+          onClick={() => navigate('/dashboard')}
+        >
+          Done
+        </Button>
+      </div>
+    </div>
+  </Card>
+)}
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Left Sidebar */}
         <div className="w-full lg:w-80 space-y-6">
@@ -2234,7 +2280,7 @@ const handleSave = async () => {
           <Card className="p-5 shadow-sm"> 
             <PartyManager parties={parties} onChange={setParties} /> 
          {/* ✅ সিসি ইমেইল ইনপুট যোগ করা হলো */}
-  <CCInput value={ccEmail} onChange={setCcEmail} />
+<CCInput value={ccEmails} onChange={setCcEmails} />
           </Card>
           {fileId && (
             <Card className="p-5 shadow-sm">
