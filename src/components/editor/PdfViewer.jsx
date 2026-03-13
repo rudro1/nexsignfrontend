@@ -1989,7 +1989,7 @@ const handleContainerClick = (e) => {
   };
   return (
     <div ref={containerRef} className="flex-1 w-full overflow-hidden">
-      {totalPages > 1 && (
+      {/* {totalPages > 1 && (
         <div className="flex items-center justify-center gap-4 mb-4 select-none">
           <Button variant="outline" size="icon" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
             <ChevronLeft className="w-4 h-4" />
@@ -1999,7 +1999,36 @@ const handleContainerClick = (e) => {
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
-      )}
+      )} */}
+
+      {/* সরাসরি pdfDoc থেকে পেজ সংখ্যা চেক করা হচ্ছে */}
+{pdfDoc && pdfDoc.numPages > 1 && (
+  <div className="flex items-center justify-center gap-4 mb-4 select-none">
+    <Button 
+      variant="outline" 
+      size="icon" 
+      disabled={currentPage <= 1} 
+      onClick={() => onPageChange(currentPage - 1)}
+      className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] hover:bg-[#28ABDF]/5"
+    >
+      <ChevronLeft className="w-4 h-4" />
+    </Button>
+
+    <span className="text-sm font-bold bg-[#28ABDF]/10 text-[#28ABDF] px-4 py-1.5 rounded-full border border-[#28ABDF]/20">
+      Page {currentPage} of {pdfDoc.numPages}
+    </span>
+
+    <Button 
+      variant="outline" 
+      size="icon" 
+      disabled={currentPage >= pdfDoc.numPages} 
+      onClick={() => onPageChange(currentPage + 1)}
+      className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] hover:bg-[#28ABDF]/5"
+    >
+      <ChevronRight className="w-4 h-4" />
+    </Button>
+  </div>
+)}
 
       <div className="canvas-container relative mx-auto shadow-2xl border bg-white rounded-lg overflow-hidden"
         style={{ width: canvasSize.width || '100%', height: canvasSize.height || '600px', cursor: pendingFieldType ? 'crosshair' : 'default' }}
@@ -2046,14 +2075,23 @@ const handleContainerClick = (e) => {
     y: (field.y / 100) * canvasSize.height 
   }}
   // ড্র্যাগ (নাড়াচাড়া) করার পর পজিশন সেভ করা
-  onDragStop={(e, d) => {
-    const updated = fields.map(f => f.id === field.id ? { 
-      ...f, 
-      x: (d.x / canvasSize.width) * 100, 
-      y: (d.y / canvasSize.height) * 100 
-    } : f);
-    onFieldsChange(updated);
-  }}
+  // onDragStop={(e, d) => {
+  //   const updated = fields.map(f => f.id === field.id ? { 
+  //     ...f, 
+  //     x: (d.x / canvasSize.width) * 100, 
+  //     y: (d.y / canvasSize.height) * 100 
+  //   } : f);
+  //   onFieldsChange(updated);
+  // }}
+onDragStop={(e, d) => {
+  const updated = fields.map(f => f.id === field.id ? { 
+    ...f, 
+    x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
+    y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
+  } : f);
+  onFieldsChange(updated);
+}}
+
   // রিসাইজ (বড়/ছোট) করার পর নতুন সাইজ সেভ করা (এটিই আপনার সমস্যা সমাধান করবে)
   onResizeStop={(e, direction, ref, delta, position) => {
     const updated = fields.map(f => f.id === field.id ? {

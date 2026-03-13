@@ -2153,6 +2153,11 @@ const handleSave = async () => {
     setSending(false); 
   }
 };
+const onPageChange = (newPage) => {
+  if (newPage >= 1 && newPage <= totalPages) {
+    setCurrentPage(newPage);
+  }
+};
   const isEditable = !doc || doc.status === 'draft';
 
   return (
@@ -2177,8 +2182,8 @@ const handleSave = async () => {
           </Button>
           {/* <Button onClick={handleSend} disabled={sending || uploading} className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl flex-1 sm:flex-none">
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
-          </Button> */} workable
-
+          // </Button> */} 
+{/* workable */}
           <Button 
   onClick={handleSend} 
   disabled={sending || uploading} 
@@ -2302,7 +2307,7 @@ const handleSave = async () => {
               fields={fields} 
               onFieldsChange={setFields} 
               currentPage={currentPage} 
-              onPageChange={setCurrentPage} 
+            onPageChange={onPageChange}
               totalPages={totalPages} 
               onTotalPagesChange={setTotalPages} 
               pendingFieldType={pendingFieldType} 
