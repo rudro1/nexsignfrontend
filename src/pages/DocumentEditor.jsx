@@ -1905,7 +1905,9 @@ import { Upload, Save, Send, ArrowLeft, FileText, Loader2 } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer from '@/components/editor/PdfViewer';
+import CCInput from '@/components/editor/CCInput';
 import axios from 'axios'; // এটি না থাকলে যোগ করুন
+
 export default function DocumentEditor() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -1927,6 +1929,7 @@ export default function DocumentEditor() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 const [generatedSignLink, setGeneratedSignLink] = useState('');
+const [ccEmail, setCcEmail] = useState('');
   useEffect(() => {
     const init = async () => {
       if (docId) {
@@ -1959,26 +1962,40 @@ const [generatedSignLink, setGeneratedSignLink] = useState('');
   }, [docId]);
 
   // ✅ ব্যাকএন্ডের Cast to [string] এরর ফিক্স করতে স্ট্রিং অ্যারে তৈরি
-  // const getCleanPayload = () => {
-  //   return {
-  //     title,
-  //     fileUrl,
-  //     fileId,
-  //     parties,
-  //     fields: fields.map(f => JSON.stringify(f)), 
-  //     totalPages
-  //   };
-  // };
+ 
+// const getCleanPayload = () => {
+//   return {
+//     title,
+//     fileUrl,
+//     fileId,
+//     parties,
+//     fields: fields, // সরাসরি অবজেক্ট পাঠান
+//     totalPages
+//   };
+// };
+
 const getCleanPayload = () => {
   return {
     title,
     fileUrl,
     fileId,
     parties,
-    fields: fields, // সরাসরি অবজেক্ট পাঠান
-    totalPages
+    fields: fields, 
+    totalPages,
+    // নতুন এই দুটি ফিল্ড যোগ করুন
+    ccEmail: ccEmail, 
+    senderMeta: {
+      name: user?.name || 'Owner',
+      email: user?.email,
+      time: new Date().toLocaleString('en-US', { 
+        dateStyle: 'medium', 
+        timeStyle: 'short' 
+      })
+    }
   };
 };
+
+
 //  const handleUpload = async (e) => {
 //   const file = e.target.files[0];
   
@@ -2205,6 +2222,8 @@ const handleSave = async () => {
           )}
           <Card className="p-5 shadow-sm"> 
             <PartyManager parties={parties} onChange={setParties} /> 
+         {/* ✅ সিসি ইমেইল ইনপুট যোগ করা হলো */}
+  <CCInput value={ccEmail} onChange={setCcEmail} />
           </Card>
           {fileId && (
             <Card className="p-5 shadow-sm">
