@@ -1975,6 +1975,11 @@ const [ccEmails, setCcEmails] = useState([]);
 // };
 
 const getCleanPayload = () => {
+  // ১. ইনপুট যদি স্ট্রিং হয় তবে কমা দিয়ে ভাগ করে ক্লিন অ্যারে তৈরি করা
+  const formattedCCs = typeof ccEmails === 'string' 
+    ? ccEmails.split(',').map(e => e.trim()).filter(e => e !== "")
+    : ccEmails;
+
   return {
     title,
     fileUrl,
@@ -1982,10 +1987,9 @@ const getCleanPayload = () => {
     parties,
     fields: fields, 
     totalPages,
-    // 🌟 ব্যাকএন্ডের জন্য ccEmails-কে অ্যারে হিসেবে পাঠানো হচ্ছে
-    ccEmails: Array.isArray(ccEmails) ? ccEmails : [], 
+    // ২. নিশ্চিত করা হচ্ছে যে এটি সবসময় একটি অ্যারে হিসেবে যাবে
+    ccEmails: Array.isArray(formattedCCs) ? formattedCCs : [], 
     senderMeta: {
-      // ✅ full_name-কে প্রায়োরিটি দেওয়া হয়েছে
       name: user?.full_name || user?.name || 'Document Owner',
       email: user?.email || '',
       time: new Date().toLocaleString('en-US', { 
