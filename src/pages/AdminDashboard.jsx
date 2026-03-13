@@ -139,13 +139,13 @@ export default function AdminDashboard() {
       {/* Dynamic Tabs Section */}
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="max-w-[1600px] mx-auto space-y-8">
        
-       <TabsList className="bg-slate-200/40 dark:bg-slate-900/50 p-1.5 rounded-[20px] w-full md:w-fit border border-slate-200/50 dark:border-slate-800">
+       <TabsList className="bg-slate-200/40 dark:bg-slate-900/50 p-1.5 rounded-[20px] w-full md:w-fit border">
 
                 <TabsTrigger
                     value="users"
                       className="px-6 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest
                      
-                     data-[state=active]:bg-transparent data-[state=active]:text-sky-600">
+                     data-[state=active]:bg-transparent data-[state=active]:text-sky-600 boder-0">
                       Users
                     </TabsTrigger>
 
@@ -229,6 +229,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+<<<<<<< HEAD
             {/* Actions: View, Status, and Delete (Auto-stacks on mobile) */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 border-t lg:border-none pt-4 lg:pt-0">
               
@@ -242,6 +243,15 @@ export default function AdminDashboard() {
                   VIEW
                 </Button>
               )}
+=======
+            <Badge
+              className={`px-4 sm:px-6 md:px-10 py-2 md:py-4 rounded-2xl md:rounded-3xl text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#10c78a]
+                ${d.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-sky-500 text-white'}
+              `}
+            >
+              {d.status}
+            </Badge>
+>>>>>>> ac6cf03a67ffe929b178f8de32e094fe2a7a2b00
 
               <Badge
                 className={`flex-1 sm:flex-initial justify-center px-4 h-11 md:h-14 md:px-10 rounded-xl md:rounded-3xl text-[10px] font-black uppercase tracking-[0.2em]
