@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Shield, Users,  Clock, Search, 
+  Shield, Users, Clock, Search, 
   Trash2, Loader2, Activity, ChevronLeft, ChevronRight, 
-  MapPin, Globe, Laptop, Calendar, Plus, History 
+  MapPin, Globe, Laptop, Calendar, Plus, History,
+  FileText 
 } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 //import StatsCard from '../components/dashboard/StatsCard';
