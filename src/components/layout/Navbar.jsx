@@ -123,7 +123,7 @@ const scrollToSection = (id) => {
                 <Link
                   to="/admin"
                   onClick={() => handleLinkClick("admin", "/admin")}
-                  className={`flex items-center gap-1 hover:text-rose-500 text-rose-600 ${activeLink === "admin" ? "font-black" : ""}`}
+                  className={`flex items-center gap-1 hover:text-rose-700 text-rose-600 ${activeLink === "admin" ? "" : ""}`}
                 >
                   <ShieldCheck size={18}/> Admin Panel
                 </Link>
