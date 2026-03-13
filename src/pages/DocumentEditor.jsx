@@ -1982,11 +1982,12 @@ const getCleanPayload = () => {
     parties,
     fields: fields, 
     totalPages,
-    // নতুন এই দুটি ফিল্ড যোগ করুন
-    ccEmail: ccEmail, 
+    // সিসি ইমেইল খালি থাকলে যেন null না যায়, তাই "" দেওয়া ভালো
+    ccEmail: ccEmail || "", 
     senderMeta: {
-      name: user?.name || 'Owner',
-      email: user?.email,
+      // ✅ এখানে full_name-কে প্রায়োরিটি দিন
+      name: user?.full_name || user?.name || 'Document Owner',
+      email: user?.email || '',
       time: new Date().toLocaleString('en-US', { 
         dateStyle: 'medium', 
         timeStyle: 'short' 
@@ -2119,30 +2120,40 @@ const handleSave = async () => {
   // };
 
 //link ashbe ui te
-  const handleSend = async () => {
-    if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
-      return toast.error('Please add parties and fields first');
-    }
-    setSending(true);
-    setGeneratedSignLink(''); 
-    try {
-      await api.put(`/documents/${docId}`, getCleanPayload());
-      const res = await api.post('/documents/send', { id: docId });
-      
-      if (res.data.success) {
-        // ব্যাকএন্ড থেকে লিঙ্ক আসলে সেটি স্টেটে সেভ করবে
-        if (res.data.signLink) {
-          setGeneratedSignLink(res.data.signLink);
-          toast.success(res.data.message || 'Link generated!');
-        } else {
-          toast.success('Document sent!');
-          navigate('/dashboard');
-        }
+ const handleSend = async () => {
+  // ১. ভ্যালিডেশন চেক
+  if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
+    return toast.error('Please add parties and fields first');
+  }
+
+  setSending(true);
+  setGeneratedSignLink(''); 
+  
+  try {
+    // ২. বর্তমান ড্রাফট সেভ করা (যাতে লেটেস্ট ফিল্ডগুলো যায়)
+    await api.put(`/documents/${docId}`, getCleanPayload());
+    
+    // ৩. সেন্ড রিকোয়েস্ট পাঠানো
+    const res = await api.post('/documents/send', { id: docId });
+    
+    if (res.data.success) {
+      if (res.data.signLink) {
+        setGeneratedSignLink(res.data.signLink);
+        // ✅ আরও ইউজার ফ্রেন্ডলি মেসেজ
+        toast.success('Document ready! Link generated & email sent.');
+      } else {
+        toast.success('Document successfully sent to all signers!');
+        // ৫ সেকেন্ড পর ড্যাশবোর্ডে পাঠানো (যাতে ইউজার মেসেজটি পড়তে পারে)
+        setTimeout(() => navigate('/dashboard'), 2000);
       }
-    } catch (error) { 
-      toast.error(error.response?.data?.error || 'Failed to send'); 
-    } finally { setSending(false); }
-  };
+    }
+  } catch (error) { 
+    console.error("Sending Error:", error);
+    toast.error(error.response?.data?.error || 'Could not send the document. Please try again.'); 
+  } finally { 
+    setSending(false); 
+  }
+};
   const isEditable = !doc || doc.status === 'draft';
 
   return (
