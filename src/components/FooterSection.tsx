@@ -66,10 +66,10 @@ const handleSubmit = async (e) => {
       });
 
       // ✅ সফল হলে shadcn টোস্ট
-      toast({
-        title: "Feedback Sent! 🌟",
-        description: "Thank you! A professional confirmation is on its way to your inbox.",
-      });
+     toast({
+  title: "Feedback Submitted Successfully",
+  description: "Thank you for your contribution. A formal acknowledgment has been sent to your email.",
+});
       
       // ফর্ম রিসেট
       setEmail('');
