@@ -70,7 +70,7 @@ export default function Login() {
     const user = result.user;
 
     // সার্ভারে ডেটা পাঠানো
-    const response = await fetch("http://localhost:5001/api/auth/google", {
+    const response = await fetch(`${VITE_API_BASE_URL}/auth/google`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
