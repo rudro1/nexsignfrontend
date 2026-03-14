@@ -131,7 +131,7 @@ const scrollToSection = (id) => {
                 <Link
                   to="/dashboard"
                   onClick={() => handleLinkClick("dashboard", "/dashboard")}
-                  className={`flex items-center gap-1 hover:text-sky-500 ${activeLink === "dashboard" ? "text-blue-600 font-bold" : ""}`}
+                  className={`flex items-center gap-1 hover:text-sky-500 ${activeLink === "dashboard" ? "text-sky-500 font-bold" : ""}`}
                 >
                   <LayoutDashboard size={18}/> Dashboard
                 </Link>
@@ -158,14 +158,14 @@ const scrollToSection = (id) => {
               <>
                 <button
                   onClick={() => handleLinkClick("login", "/login")}
-                  className={`px-4 py-2 rounded-lg font-bold border text-sky-400 hover:text-[#2AAAE0] ${activeLink === "login" ? "text-sky-600 font-bold" : ""}`}
+                  className={`px-1 py-1 md:px-4 md:py-2 rounded-lg font-bold border text-sky-400 hover:text-[#2AAAE0] ${activeLink === "login" ? "text-sky-600 font-bold" : ""}`}
                 >
                   Sign In
                 </button>
 
                 <button
                   onClick={() => handleLinkClick("register", "/register")}
-                  className={`px-4 py-2 rounded-lg bg-sky-500 text-white font-bold hover:bg-sky-600 ${activeLink === "register" ? "text-blue-600 font-bold" : ""}`}
+                  className={`px-1 py-1 md:px-4 md:py-2 rounded-lg bg-sky-500 text-white font-bold hover:bg-sky-600 ${activeLink === "register" ? "text-blue-600 font-bold" : ""}`}
                 >
                   Get Started
                 </button>

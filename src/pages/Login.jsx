@@ -10,10 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/Card';
 import { toast } from 'sonner';
 import { LogIn, Loader2, Eye, EyeOff } from 'lucide-react';
+import { FcGoogle } from "react-icons/fc";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth(); 
+  const { login,googleLogin } = useAuth(); 
   
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -58,6 +59,50 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+
+
+    //  GOOGLE LOGIN 
+  const handleGoogleLogin = async () => {
+  try {
+    setLoading(true);
+    const result = await googleLogin();
+    const user = result.user;
+
+    // সার্ভারে ডেটা পাঠানো
+    const response = await fetch("http://localhost:5001/api/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // এটিই গুরুত্বপূর্ণ: Context আপডেট করা
+      login(data.user, data.token); 
+      toast.success("Google Login Successful!");
+      
+      // রোল অনুযায়ী নেভিগেট
+      if (data.user.role === 'super_admin' || data.user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      throw new Error(data.message);
+    }
+  } catch (error) {
+    console.error(error);
+    toast.error("Google Login Failed!");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
@@ -121,6 +166,14 @@ export default function Login() {
             ) : 'Sign In'}
           </Button>
         </form>
+
+          <Button
+            onClick={handleGoogleLogin}
+            className="w-full flex mt-5 items-center justify-center gap-3 bg-white text-black py-3 rounded-lg hover:bg-gray-200"
+          >
+            <FcGoogle size={22} />
+            Continue with Google
+          </Button>
 
         <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
           <p className="text-slate-500 text-sm">
