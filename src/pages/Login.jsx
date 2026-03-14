@@ -69,7 +69,6 @@ export default function Login() {
 //     const result = await googleLogin();
 //     const user = result.user;
 
-<<<<<<< HEAD
     // সার্ভারে ডেটা পাঠানো
     const response = await fetch(`${VITE_API_BASE_URL}/auth/google`, {
       method: "POST",
@@ -80,7 +79,6 @@ export default function Login() {
         photoURL: user.photoURL,
       }),
     });
-=======
 //     // সার্ভারে ডেটা পাঠানো
 //     const response = await fetch("http://localhost:5001/api/auth/google", {
 //       method: "POST",
@@ -91,7 +89,6 @@ export default function Login() {
 //         photoURL: user.photoURL,
 //       }),
 //     });
->>>>>>> f8b549447ce00737cdd58bf8476d0c863c25d74b
 
 //     const data = await response.json();
 
