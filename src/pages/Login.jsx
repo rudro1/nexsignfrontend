@@ -62,13 +62,14 @@ export default function Login() {
 
 
 
-    //  GOOGLE LOGIN 
-  const handleGoogleLogin = async () => {
-  try {
-    setLoading(true);
-    const result = await googleLogin();
-    const user = result.user;
+//     //  GOOGLE LOGIN 
+//   const handleGoogleLogin = async () => {
+//   try {
+//     setLoading(true);
+//     const result = await googleLogin();
+//     const user = result.user;
 
+<<<<<<< HEAD
     // সার্ভারে ডেটা পাঠানো
     const response = await fetch(`${VITE_API_BASE_URL}/auth/google`, {
       method: "POST",
@@ -79,30 +80,42 @@ export default function Login() {
         photoURL: user.photoURL,
       }),
     });
+=======
+//     // সার্ভারে ডেটা পাঠানো
+//     const response = await fetch("http://localhost:5001/api/auth/google", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify({
+//         name: user.displayName,
+//         email: user.email,
+//         photoURL: user.photoURL,
+//       }),
+//     });
+>>>>>>> f8b549447ce00737cdd58bf8476d0c863c25d74b
 
-    const data = await response.json();
+//     const data = await response.json();
 
-    if (response.ok) {
-      // এটিই গুরুত্বপূর্ণ: Context আপডেট করা
-      login(data.user, data.token); 
-      toast.success("Google Login Successful!");
+//     if (response.ok) {
+//       // এটিই গুরুত্বপূর্ণ: Context আপডেট করা
+//       login(data.user, data.token); 
+//       toast.success("Google Login Successful!");
       
-      // রোল অনুযায়ী নেভিগেট
-      if (data.user.role === 'super_admin' || data.user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
-    } else {
-      throw new Error(data.message);
-    }
-  } catch (error) {
-    console.error(error);
-    toast.error("Google Login Failed!");
-  } finally {
-    setLoading(false);
-  }
-};
+//       // রোল অনুযায়ী নেভিগেট
+//       if (data.user.role === 'super_admin' || data.user.role === 'admin') {
+//         navigate('/admin');
+//       } else {
+//         navigate('/dashboard');
+//       }
+//     } else {
+//       throw new Error(data.message);
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     toast.error("Google Login Failed!");
+//   } finally {
+//     setLoading(false);
+//   }
+// };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
