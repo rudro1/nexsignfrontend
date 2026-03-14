@@ -536,36 +536,67 @@ export default function SignaturePad({ onSignatureComplete }) {
     setHasDrawn(false);
   };
 
+  // const handleConfirm = () => {
+  //   let finalValue = "";
+  //   if (mode === 'draw') {
+  //     if (!hasDrawn) return;
+  //     finalValue = canvasRef.current.toDataURL('image/png');
+  //   } else {
+  //     if (!typedSig.trim()) return;
+      
+  //     // হাই-রেজোলিউশন ইমেজ তৈরির জন্য বড় ক্যানভাস
+  //     const canvas = document.createElement('canvas');
+  //     canvas.width = 1000; 
+  //     canvas.height = 250;
+  //     const ctx = canvas.getContext('2d');
+      
+  //     // ব্যাকগ্রাউন্ড সাদা করা ক্লিয়ারিটির জন্য
+  //     ctx.fillStyle = 'white';
+  //     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  //     ctx.fillStyle = '#000000';
+  //     // ফন্ট সেট করা (Times New Roman, Normal, No Italic)
+  //     ctx.font = '500 80px "Times New Roman", serif';
+  //     ctx.textAlign = 'center';
+  //     ctx.textBaseline = 'middle';
+  //     ctx.fillText(typedSig, 500, 125);
+      
+  //     finalValue = canvas.toDataURL('image/png');
+  //   }
+  //   onSignatureComplete(finalValue);
+  // };
+
+  //solving snap error problem 
+
   const handleConfirm = () => {
     let finalValue = "";
     if (mode === 'draw') {
       if (!hasDrawn) return;
-      finalValue = canvasRef.current.toDataURL('image/png');
+      // ✅ পজিশন ঠিক রেখে শুধু মেমোরি কমানোর জন্য JPEG (0.5)
+      finalValue = canvasRef.current.toDataURL('image/jpeg', 0.5);
     } else {
       if (!typedSig.trim()) return;
       
-      // হাই-রেজোলিউশন ইমেজ তৈরির জন্য বড় ক্যানভাস
       const canvas = document.createElement('canvas');
       canvas.width = 1000; 
       canvas.height = 250;
       const ctx = canvas.getContext('2d');
       
-      // ব্যাকগ্রাউন্ড সাদা করা ক্লিয়ারিটির জন্য
+      // ✅ JPEG এর জন্য ব্যাকগ্রাউন্ড সাদা করা হয়েছে যাতে পজিশন ক্লিয়ার থাকে
       ctx.fillStyle = 'white';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = '#000000';
-      // ফন্ট সেট করা (Times New Roman, Normal, No Italic)
       ctx.font = '500 80px "Times New Roman", serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(typedSig, 500, 125);
       
-      finalValue = canvas.toDataURL('image/png');
+      // ✅ ডাটা সাইজ ছোট করার জন্য JPEG (0.5)
+      finalValue = canvas.toDataURL('image/jpeg', 0.5);
     }
     onSignatureComplete(finalValue);
   };
-
   return (
     <div className="space-y-5">
       <Tabs value={mode} onValueChange={setMode} className="w-full">
