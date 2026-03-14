@@ -2,20 +2,39 @@ import React, { useState } from 'react';
 import { Twitter, Linkedin, Github, Facebook, Instagram, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from './ui/Logo';
-
+import { api } from '@/api/apiClient'; 
+import { useAuth } from '@/lib/AuthContext'; 
+import { toast } from 'sonner'; 
 export function FooterSection() {
+  const { user } = useAuth();
   const [rating, setRating] = useState(0);
   const [email, setEmail] = useState('');
   const [review, setReview] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault(); // prevent page reload
-    if (!email || !review) return; // validation
-    alert('Feedback sent!'); // replace with API call
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!email || !rating) return toast.error("Please provide email and rating!");
+
+  try {
+    // 🚀 ব্যাকএন্ড এপিআই কল
+    await api.post('/feedback/send-feedback', {
+      email,
+      name: user?.full_name || 'Valued User',
+      stars: rating,
+      review: review // আপনি চাইলে এটিও পাঠাতে পারেন
+    });
+
+    toast.success("Thanks! Check your email for a surprise. 📩");
+    
+    // ফর্ম ক্লিয়ার করা
     setEmail('');
     setReview('');
     setRating(0);
-  };
+  } catch (error) {
+    console.error("Feedback error:", error);
+    toast.error("Failed to send feedback. Try again!");
+  }
+};
 
   return (
     <footer className="bg-slate-900 text-slate-300 py-12">
@@ -107,7 +126,7 @@ export function FooterSection() {
                 <button
                   type="submit"
                   className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600 transition-colors font-semibold disabled:opacity-50"
-                  disabled={!email || !review}
+                  disabled={!email || !rating}
                 >
                   Send
                 </button>
