@@ -1910,7 +1910,7 @@ import axios from 'axios'; // এটি না থাকলে যোগ কর�
 
 export default function DocumentEditor() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user,isAdmin } = useAuth();
   const urlParams = new URLSearchParams(window.location.search);
   const initialDocId = urlParams.get('id');
 
@@ -2169,9 +2169,18 @@ const onPageChange = (newPage) => {
       {/* Header UI */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
+          {/* <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
             <ArrowLeft className="w-5 h-5" />
-          </Button>
+          </Button> */}
+
+          <Button 
+  variant="ghost" 
+  size="icon" 
+  onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')} // ✅ ফিক্সড লজিক
+  className="rounded-full"
+>
+  <ArrowLeft className="w-5 h-5" />
+</Button>
           <Input 
             value={title} 
             onChange={e => setTitle(e.target.value)} 
@@ -2272,14 +2281,7 @@ const onPageChange = (newPage) => {
         <Button 
   size="sm" 
   className="bg-slate-900 text-white hover:bg-slate-800"
-  onClick={() => {
-    // 🛡️ অ্যাডমিন হলে অ্যাডমিন ড্যাশবোর্ডে, নাহলে ইউজার ড্যাশবোর্ডে যাবে
-    if (user?.role === 'admin' || user?.role === 'super_admin') {
-      navigate('/admin'); 
-    } else {
-      navigate('/dashboard');
-    }
-  }}
+onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
 >
   Done
 </Button>

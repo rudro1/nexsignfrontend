@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import {useNavigate, Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,16 +14,29 @@ import { useAuth } from '@/lib/AuthContext';
 
 export default function Dashboard() {
 
-  const { user } = useAuth();
+const navigate = useNavigate();
+const { user, isAdmin, loading: authLoading } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
+  // useEffect(() => {
+  //   fetchDocuments();
+  // }, []);
+
+useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      fetchDocuments();
+    }
+    // 🌟 অ্যাডমিন হলে অটোমেটিক এডমিন প্যানেলে পাঠিয়ে দাও
+    if (!authLoading && isAdmin) {
+      navigate('/admin', { replace: true });
+    }
+  }, [isAdmin, authLoading, navigate]);
+
+if (authLoading || isAdmin) return null;
 
   const fetchDocuments = async () => {
     setIsLoading(true);
