@@ -161,7 +161,7 @@ const handleGetStarted = () => {
               </div>
 
               {/* Floating Badge */}
-              <div className="absolute -right-6 top-20 bg-white p-4 rounded-xl shadow-xl border border-slate-100 flex items-center gap-3 animate-bounce duration-[3000ms]">
+              <div className="absolute hidden -right-6 top-20 bg-white p-4 rounded-xl shadow-xl border border-slate-100 md:flex items-center gap-3 animate-bounce duration-[3000ms]">
                 <div className="bg-green-100 p-2 rounded-full">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                 </div>

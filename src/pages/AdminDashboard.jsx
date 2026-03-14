@@ -127,11 +127,11 @@ export default function AdminDashboard() {
         
         <div className="flex gap-3">
           <Link to="/DocumentEditor">
-            <Button className="bg-sky-600 hover:bg-sky-700 text-white rounded-2xl px-8 h-12 font-black shadow-xl shadow-sky-200 dark:shadow-none transition-transform active:scale-95">
-              <Plus className="mr-2 w-5 h-5" /> NEW DOC
+            <Button className="bg-sky-600 hover:bg-sky-700 text-white rounded-2xl px-2 py-4 md:px-8 md:h-12 font-black shadow-xl shadow-sky-200 dark:shadow-none transition-transform active:scale-95">
+              <Plus className="mr-0 md:mr-2 w-5 h-5" /> NEW DOC
             </Button>
           </Link>
-          <Button onClick={refreshAll} variant="outline" className="rounded-2xl h-12 px-6 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50">
+          <Button onClick={refreshAll} variant="outline" className="rounded-2xl px-2 py-4 md:px-8  md:h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50">
             <Activity size={18} className={`mr-2 text-emerald-500 ${(loading.users || loading.docs) ? 'animate-spin' : 'animate-pulse'}`}/> REFRESH
           </Button>
         </div>
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
 
                 <TabsTrigger
                     value="users"
-                      className="px-6 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest
+                      className="px-1 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest
                      
                      data-[state=active]:bg-transparent data-[state=active]:text-sky-600 boder-0">
                       Users
@@ -152,7 +152,7 @@ export default function AdminDashboard() {
 
                    <TabsTrigger
                      value="documents"
-                        className="px-6 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest
+                        className="px-1 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest
                          
                           data-[state=active]:bg-transparent data-[state=active]:text-sky-600">
                            Documents
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
 
                       <TabsTrigger
                          value="logs"
-                         className="px-6 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest
+                         className="px-1 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest
                           
                           data-[state=active]:bg-transparent data-[state=active]:text-sky-600">
                              Audit Logs
@@ -296,7 +296,7 @@ export default function AdminDashboard() {
 
               {/* Audit Logs View - REPAIRED */}
          {tab === 'logs' && (
-  <Card className="rounded-[3rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+  <Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
     <div className="p-6 md:p-10">
 
       {/* Header */}
@@ -401,40 +401,10 @@ export default function AdminDashboard() {
     </div>
   </Card>
 )}
-              {/* Users View */}
-              {/* {tab === 'users' && (
-                <Card className="rounded-[3rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-10">
-                   <table className="w-full text-left">
-                      <thead>
-                        <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b-2 border-slate-50 dark:border-slate-800">
-                          <th className="pb-6 px-4">USER PROFILE</th>
-                          <th className="pb-6 px-4">PERMISSION</th>
-                          <th className="pb-6 px-4">JOINED DATE</th>
-                          <th className="pb-6 px-4 text-right">OPERATIONS</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                        {filteredUsers.map(u => (
-                          <tr key={u._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
-                            <td className="py-6 px-4">
-                              <div className="font-bold text-slate-900 dark:text-white text-base">{u.full_name}</div>
-                              <div className="text-xs text-slate-400 font-medium">{u.email}</div>
-                            </td>
-                            <td className="py-6 px-4"><Badge variant="outline" className="text-[9px] font-black uppercase px-4 py-1 border-slate-200">{u.role}</Badge></td>
-                            <td className="py-6 px-4 text-[11px] font-black text-slate-500 uppercase">{safeFormatDate(u.createdAt, 'd MMM, yyyy')}</td>
-                            <td className="py-6 px-4 text-right">
-                              {u.role !== 'super_admin' && <Button onClick={() => handleDeleteUser(u._id)} className="text-slate-300 hover:text-red-500 rounded-2xl h-12 w-12 p-0 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20"><Trash2 size={20}/></Button>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                   </table>
-                </Card>
-              )} */}
 
               {tab === 'users' && (
 
-<Card className="rounded-[3rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-4 md:p-10">
+<Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-4 md:p-10">
 
 {/* Desktop Table */}
 

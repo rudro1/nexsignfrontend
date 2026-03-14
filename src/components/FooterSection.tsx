@@ -144,7 +144,7 @@ return (
           </div>
 
           {/* Right: Email + Review */}
-          <div className="flex flex-col gap-3 max-w-xs w-full">
+          <div className="flex flex-col gap-1 max-w-xs w-full">
             <h3 className="text-white font-semibold text-lg">Give Feedback</h3>
             <p className="text-slate-400 text-sm md:text-base">
               Submit your email and a quick review.
