@@ -11,31 +11,37 @@ export function FooterSection() {
   const [email, setEmail] = useState('');
   const [review, setReview] = useState('');
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!email || !rating) return toast.error("Please provide email and rating!");
+const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email || !rating) return toast.error("Please provide email and rating!");
 
-  try {
-    // 🚀 ব্যাকএন্ড এপিআই কল
-    await api.post('/feedback/send-feedback', {
-      email,
-      name: user?.full_name || 'Valued User',
-      stars: rating,
-      review: review // আপনি চাইলে এটিও পাঠাতে পারেন
-    });
+    // লোডিং টোস্ট দেখানো
+    const loadingToast = toast.loading("Sending your feedback to our team...");
 
-    toast.success("Thanks! Check your email for a surprise. 📩");
-    
-    // ফর্ম ক্লিয়ার করা
-    setEmail('');
-    setReview('');
-    setRating(0);
-  } catch (error) {
-    console.error("Feedback error:", error);
-    toast.error("Failed to send feedback. Try again!");
-  }
-};
+    try {
+      await api.post('/feedback/send-feedback', {
+        email,
+        name: user?.full_name || 'Valued User',
+        stars: rating,
+        review: review 
+      });
 
+      // সাকসেস টোস্ট
+      toast.success("Thank you for your feedback! A confirmation email is on its way. 📩", {
+        id: loadingToast,
+        duration: 5000,
+      });
+      
+      setEmail('');
+      setReview('');
+      setRating(0);
+    } catch (error) {
+      console.error("Feedback error:", error);
+      toast.error("We couldn't send your feedback. Please try again later.", {
+        id: loadingToast,
+      });
+    }
+  };
   return (
     <footer className="bg-slate-900 text-slate-300 py-12">
       <div className="container mx-auto px-4 md:px-6 space-y-2">
