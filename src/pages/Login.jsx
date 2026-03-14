@@ -62,11 +62,7 @@ export default function Login() {
 
 
 
-<<<<<<< HEAD
 //     //  GOOGLE LOGIN 
-=======
-    //  GOOGLE LOGIN 
->>>>>>> e50e7acc94f5476e1ed3ae026026f32f74a1cc5b
   const handleGoogleLogin = async () => {
   try {
     setLoading(true);
@@ -107,10 +103,7 @@ export default function Login() {
     setLoading(false);
   }
 };
-<<<<<<< HEAD
-=======
 
->>>>>>> e50e7acc94f5476e1ed3ae026026f32f74a1cc5b
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
       <Card className="w-full max-w-md p-8 shadow-2xl border-none rounded-3xl bg-white dark:bg-slate-900">
