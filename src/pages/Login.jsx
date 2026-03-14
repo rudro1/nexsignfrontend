@@ -63,42 +63,80 @@ export default function Login() {
 
 
 //     //  GOOGLE LOGIN 
-  const handleGoogleLogin = async () => {
+//   const handleGoogleLogin = async () => {
+//   try {
+//     setLoading(true);
+//     const result = await googleLogin();
+//     const user = result.user;
+
+//     // সার্ভারে ডেটা পাঠানো
+//     const response = await fetch("http://localhost:5001/api/auth/google", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify({
+//         name: user.displayName,
+//         email: user.email,
+//         photoURL: user.photoURL,
+//       }),
+//     });
+
+//     const data = await response.json();
+
+//     if (response.ok) {
+//       // এটিই গুরুত্বপূর্ণ: Context আপডেট করা
+//       login(data.user, data.token); 
+//       toast.success("Google Login Successful!");
+      
+//       // রোল অনুযায়ী নেভিগেট
+//       if (data.user.role === 'super_admin' || data.user.role === 'admin') {
+//         navigate('/admin');
+//       } else {
+//         navigate('/dashboard');
+//       }
+//     } else {
+//       throw new Error(data.message);
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     toast.error("Google Login Failed!");
+//   } finally {
+//     setLoading(false);
+//   }
+// };
+
+const handleGoogleLogin = async () => {
   try {
     setLoading(true);
+    // ১. ফায়ারবেস/পপআপ থেকে ইউজার ডাটা আনা
     const result = await googleLogin();
     const user = result.user;
 
-    // সার্ভারে ডেটা পাঠানো
-    const response = await fetch("http://localhost:5001/api/auth/google", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL,
-      }),
+    // ২. সার্ভারে ডেটা পাঠানো (apiClient ব্যবহার করে)
+    // এটি ভালো কারণ এটি অটোমেটিক প্রোডাকশন ইউআরএল হ্যান্ডেল করবে
+    const res = await api.post("/auth/google", {
+      name: user.displayName,
+      email: user.email,
+      photoURL: user.photoURL,
     });
 
-    const data = await response.json();
+    if (res.status === 200 || res.status === 201) {
+      const { user: userData, token } = res.data;
 
-    if (response.ok) {
-      // এটিই গুরুত্বপূর্ণ: Context আপডেট করা
-      login(data.user, data.token); 
+      // ৩. Context আপডেট এবং নেভিগেশন
+      login(userData, token); 
       toast.success("Google Login Successful!");
       
-      // রোল অনুযায়ী নেভিগেট
-      if (data.user.role === 'super_admin' || data.user.role === 'admin') {
+      // রোল অনুযায়ী রিডাইরেক্ট (অ্যাডমিন চেক)
+      if (userData.role === 'super_admin' || userData.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
-    } else {
-      throw new Error(data.message);
     }
   } catch (error) {
-    console.error(error);
-    toast.error("Google Login Failed!");
+    console.error("Google Auth Client Error:", error);
+    const errorMsg = error.response?.data?.message || "Google Login Failed!";
+    toast.error(errorMsg);
   } finally {
     setLoading(false);
   }
