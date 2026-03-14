@@ -3405,36 +3405,93 @@ export default function SignerView() {
     }
   };
 
+  // const handleSignature = (sigValue) => {
+  //   if (!sigValue) return;
+  //   setFields(prev => prev.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f));
+  //   setShowSigPad(false);
+  //   setActiveFieldId(null);
+  // };
+
   const handleSignature = (sigValue) => {
-    if (!sigValue) return;
-    setFields(prev => prev.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f));
-    setShowSigPad(false);
-    setActiveFieldId(null);
-  };
+  // 1. Safety Check: If sigValue is empty or just a blank canvas
+  if (!sigValue || sigValue.length < 200) { 
+    toast.error("Signature is too short or empty. Please sign properly.");
+    return;
+  }
+
+  // 2. State Update: Mapping through fields to find the active one
+  setFields(prev => 
+    prev.map(f => 
+      f.id === activeFieldId 
+        ? { ...f, value: sigValue, filled: true } 
+        : f
+    )
+  );
+
+  // 3. UI Cleanup
+  setShowSigPad(false);
+  setActiveFieldId(null);
+  
+  // Optional: Feedback to user
+  toast.success("Signature captured!");
+};
+
+  // const handleSubmit = async () => {
+  //   if (mySigningStatus.remaining > 0) {
+  //     toast.error(`অসম্পূর্ণ! আপনার আরও ${mySigningStatus.remaining}টি জায়গায় স্বাক্ষর বাকি।`);
+  //     return;
+  //   }
+
+  //   setSubmitting(true);
+  //   try {
+  //     // 🌟 API Path Fixed to match server.js mounting
+  //     const res = await api.post(`/documents/sign/submit`, { token, fields });
+  //     setCompleted(true);
+  //     if (res.data.completed) {
+  //       toast.success('সবাই স্বাক্ষর করেছেন! ফাইনাল পিডিএফ মেইলে পাঠানো হয়েছে।');
+  //     } else {
+  //       toast.success('আপনার স্বাক্ষর জমা হয়েছে।');
+  //     }
+  //   } catch (err) { 
+  //     const msg = err.response?.data?.error || 'সাবমিট করা সম্ভব হয়নি।';
+  //     toast.error(msg); 
+  //   } finally { 
+  //     setSubmitting(false); 
+  //   }
+  // };
 
   const handleSubmit = async () => {
-    if (mySigningStatus.remaining > 0) {
-      toast.error(`অসম্পূর্ণ! আপনার আরও ${mySigningStatus.remaining}টি জায়গায় স্বাক্ষর বাকি।`);
-      return;
-    }
+  // 1. Validation Check
+  if (mySigningStatus.remaining > 0) {
+    toast.error(`Incomplete! You have ${mySigningStatus.remaining} signature(s) remaining.`);
+    return;
+  }
 
-    setSubmitting(true);
-    try {
-      // 🌟 API Path Fixed to match server.js mounting
-      const res = await api.post(`/documents/sign/submit`, { token, fields });
-      setCompleted(true);
-      if (res.data.completed) {
-        toast.success('সবাই স্বাক্ষর করেছেন! ফাইনাল পিডিএফ মেইলে পাঠানো হয়েছে।');
-      } else {
-        toast.success('আপনার স্বাক্ষর জমা হয়েছে।');
-      }
-    } catch (err) { 
-      const msg = err.response?.data?.error || 'সাবমিট করা সম্ভব হয়নি।';
-      toast.error(msg); 
-    } finally { 
-      setSubmitting(false); 
+  setSubmitting(true);
+  try {
+    // 2. API Call with fixed path
+    const res = await api.post(`/documents/sign/submit`, { token, fields });
+    
+    setCompleted(true);
+    
+    // 3. Success Handling
+    if (res.data.completed) {
+      toast.success('Success! Everyone has signed. The final PDF has been sent to your email.', {
+        duration: 6000,
+        icon: '🎉',
+      });
+    } else {
+      toast.success('Your signature has been submitted successfully!');
     }
-  };
+  } catch (err) { 
+    // 4. Error Handling
+    const msg = err.response?.data?.error || 'Failed to submit signature. Please try again.';
+    toast.error(msg);
+    console.error("Submission error:", err);
+  } finally { 
+    setSubmitting(false); 
+  }
+};
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
   
