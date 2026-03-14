@@ -4,45 +4,91 @@ import { Link } from 'react-router-dom';
 import Logo from './ui/Logo';
 import { api } from '@/api/apiClient'; 
 import { useAuth } from '@/lib/AuthContext'; 
-import { toast } from 'sonner'; 
+import { useToast } from "@/components/ui/use-toast";
 export function FooterSection() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [rating, setRating] = useState(0);
   const [email, setEmail] = useState('');
   const [review, setReview] = useState('');
+const [isSubmitting, setIsSubmitting] = useState(false);
+// const handleSubmit = async (e) => {
+//     e.preventDefault();
+//     if (!email || !rating) return toast.error("Please provide email and rating!");
 
+//     // লোডিং টোস্ট দেখানো
+//     const loadingToast = toast.loading("Sending your feedback to our team...");
+
+//     try {
+//       await api.post('/feedback/send-feedback', {
+//         email,
+//         name: user?.full_name || 'Valued User',
+//         stars: rating,
+//         review: review 
+//       });
+
+//       // সাকসেস টোস্ট
+//       toast.success("Thank you for your feedback! A confirmation email is on its way. 📩", {
+//         id: loadingToast,
+//         duration: 5000,
+//       });
+      
+//       setEmail('');
+//       setReview('');
+//       setRating(0);
+//     } catch (error) {
+//       console.error("Feedback error:", error);
+//       toast.error("We couldn't send your feedback. Please try again later.", {
+//         id: loadingToast,
+//       });
+//     }
+//   };
+ 
 const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !rating) return toast.error("Please provide email and rating!");
+    
+    if (!email || !rating) {
+      return toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please provide both your email and a star rating.",
+      });
+    }
 
-    // লোডিং টোস্ট দেখানো
-    const loadingToast = toast.loading("Sending your feedback to our team...");
+    setIsSubmitting(true);
 
     try {
       await api.post('/feedback/send-feedback', {
         email,
         name: user?.full_name || 'Valued User',
         stars: rating,
-        review: review 
+        review: review
       });
 
-      // সাকসেস টোস্ট
-      toast.success("Thank you for your feedback! A confirmation email is on its way. 📩", {
-        id: loadingToast,
-        duration: 5000,
+      // ✅ সফল হলে shadcn টোস্ট
+      toast({
+        title: "Feedback Sent! 🌟",
+        description: "Thank you! A professional confirmation is on its way to your inbox.",
       });
       
+      // ফর্ম রিসেট
       setEmail('');
       setReview('');
       setRating(0);
     } catch (error) {
       console.error("Feedback error:", error);
-      toast.error("We couldn't send your feedback. Please try again later.", {
-        id: loadingToast,
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: "We couldn't process your feedback. Please try again later.",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
-  return (
+
+
+return (
     <footer className="bg-slate-900 text-slate-300 py-12">
       <div className="container mx-auto px-4 md:px-6 space-y-2">
 
