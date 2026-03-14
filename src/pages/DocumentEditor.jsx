@@ -2262,13 +2262,27 @@ const onPageChange = (newPage) => {
         >
           Copy Link
         </Button>
-        <Button 
+        {/* <Button 
           size="sm" 
           className="bg-slate-900 text-white hover:bg-slate-800"
           onClick={() => navigate('/dashboard')}
         >
           Done
-        </Button>
+        </Button> */}
+        <Button 
+  size="sm" 
+  className="bg-slate-900 text-white hover:bg-slate-800"
+  onClick={() => {
+    // 🛡️ অ্যাডমিন হলে অ্যাডমিন ড্যাশবোর্ডে, নাহলে ইউজার ড্যাশবোর্ডে যাবে
+    if (user?.role === 'admin' || user?.role === 'super_admin') {
+      navigate('/admin'); 
+    } else {
+      navigate('/dashboard');
+    }
+  }}
+>
+  Done
+</Button>
       </div>
     </div>
   </Card>
