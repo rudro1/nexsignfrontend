@@ -3359,7 +3359,7 @@ export default function SignerView() {
       setFields(cleaned);
       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') setCompleted(true);
     } catch (err) { 
-      toast.error('লিঙ্কটি কাজ করছে না বা মেয়াদ শেষ হয়েছে।'); 
+      toast.error('This link is invalid or has expired.'); 
     } finally { 
       setLoading(false); 
     }
@@ -3391,7 +3391,7 @@ export default function SignerView() {
   const handleFieldClick = (e, field) => {
     e.preventDefault();
     if (Number(field.partyIndex) !== myPartyIndex) { 
-      toast.error("এটি আপনার স্বাক্ষরের জায়গা নয়।"); 
+      toast.error("This is not your signing area."); 
       return; 
     }
     if (field.type === 'text') {
@@ -3498,8 +3498,8 @@ export default function SignerView() {
   if (completed) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
       <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
-      <h2 className="text-3xl font-bold">স্বাক্ষর সম্পন্ন!</h2>
-      <p className="text-slate-500 max-w-md">সবাই স্বাক্ষর শেষ করলে আপনি ইমেইলে কপি পেয়ে যাবেন। ধন্যবাদ!</p>
+      <h2 className="text-3xl font-bold">Signing completed!</h2>
+      <p className="text-slate-500 max-w-md">After all parties have completed their signatures, you will receive a copy via email. Thank you!</p>
     </div>
   );
 
@@ -3566,7 +3566,7 @@ export default function SignerView() {
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
         <DialogContent className="max-w-lg p-6 bg-white rounded-2xl">
-          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">আপনার স্বাক্ষর দিন</DialogTitle>
+          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Please sign here.</DialogTitle>
           <SignaturePad onSignatureComplete={handleSignature} />
         </DialogContent>
       </Dialog>

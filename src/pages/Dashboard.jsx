@@ -101,15 +101,16 @@ if (authLoading || isAdmin) return null;
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center">
         <div className="relative flex-1 w-full sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input placeholder="Search by title…" value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 " />
+          <Input placeholder="Search by title…" value={search} onChange={e => setSearch(e.target.value)}
+           className="pl-10 rounded-xl  focus:outline-none " />
         </div>
         <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
           <TabsList className="bg-slate-100 dark:bg-slate-900 rounded-xl p-1 border">
-            <TabsTrigger value="all" className="rounded-lg">All</TabsTrigger>
-            <TabsTrigger value="draft" className="rounded-lg">Drafts</TabsTrigger>
-            <TabsTrigger value="in_progress" className="rounded-lg">Active</TabsTrigger>
-            <TabsTrigger value="completed" className="rounded-lg">Done</TabsTrigger>
+            <TabsTrigger value="all" className="rounded-lg data-[state=active]:text-sky-600">All</TabsTrigger>
+            <TabsTrigger value="draft" className="rounded-lg  data-[state=active]:text-sky-600">Drafts</TabsTrigger>
+            <TabsTrigger value="in_progress" className="rounded-lg  data-[state=active]:text-sky-600">Active</TabsTrigger>
+            <TabsTrigger value="completed" className="rounded-lg  data-[state=active]:text-sky-600">Done</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
