@@ -4237,7 +4237,7 @@ export default function SignerView() {
     const newFields = fields.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f);
     setFields(newFields);
     setShowSigPad(false);
-    toast.success("Signature added!");
+    //toast.success("Signature added!");
     setTimeout(() => scrollToNextField(newFields), 300);
   };
 

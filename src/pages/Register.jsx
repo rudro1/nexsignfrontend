@@ -209,66 +209,56 @@ export default function Register({ toggle }) {
 const handleSubmit = async (e) => {
   e.preventDefault();
 
-  // ১. ইমেইল ভ্যালিডেশন (Regex দিয়ে চেক)
+  // ১. বেসিক ভ্যালিডেশন
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(formData.email)) {
-    return toast.error("Email is not valid! Please use a correct email format.");
-  }
+  if (!emailRegex.test(formData.email)) return toast.error("Invalid email format!");
+  if (formData.password !== formData.confirm_password) return toast.error('Passwords do not match!');
+  if (formData.password.length < 6) return toast.error('Password too short!');
 
-  // ২. পাসওয়ার্ড ম্যাচ চেক
-  if (formData.password !== formData.confirm_password) {
-    return toast.error('Passwords do not match!');
-  }
-
-  // ৩. পাসওয়ার্ডের মিনিমাম লেন্থ চেক (নিরাপত্তার জন্য)
-  if (formData.password.length < 6) {
-    return toast.error('Password must be at least 6 characters long.');
-  }
-  
   setLoading(true);
-  try {
-    // ১. Firebase Registration
-    const result = await registerWithEmail(formData.email, formData.password);
-    const firebaseUser = result.user;
+  let firebaseUser = null;
 
-    // ২. Backend Registration
-    const payload = { 
-      full_name: formData.full_name, 
-      email: formData.email.toLowerCase().trim(),
-      password: formData.password 
-    };
-    const res = await api.post('/auth/register', payload);
+  try {
+    // ২. Firebase Registration (অ্যাকাউন্ট তৈরি ও মেইল পাঠানো)
+    const result = await registerWithEmail(formData.email, formData.password);
+    firebaseUser = result.user;
 
     setIsWaiting(true); 
-    toast.info("Verification email sent! Please check your inbox.", { duration: 10000 });
+    toast.info("Verification email sent! Check your inbox.");
 
-    // ৩. Polling: ইমেইল ভেরিফাই হলো কি না চেক
+    // ৩. পোলিং শুরু (ইমেইল ভেরিফাই হওয়া পর্যন্ত অপেক্ষা)
     const interval = setInterval(async () => {
       const isVerified = await checkEmailVerified(firebaseUser); 
       
       if (isVerified) {
         clearInterval(interval);
-        login(res.data.user, res.data.token); 
-        toast.success("Email verified! Welcome to dashboard.");
-        navigate('/dashboard');
+        
+        try {
+          // ৪. ইমেইল ভেরিফাই হওয়ার পরেই কেবল ব্যাকএন্ডে ডাটা সেভ হবে
+          const payload = { 
+            full_name: formData.full_name, 
+            email: formData.email.toLowerCase().trim(),
+            password: formData.password 
+          };
+          const res = await api.post('/auth/register', payload);
+
+          // সেশন সেট এবং ড্যাশবোর্ডে পাঠানো
+          login(res.data.user, res.data.token); 
+          toast.success("Registration Complete!");
+          navigate('/dashboard');
+        } catch (backendErr) {
+          toast.error("Verified but failed to save in database.");
+        }
       }
     }, 3000);
 
+    // ১০ মিনিট পর পোলিং বন্ধ
     setTimeout(() => clearInterval(interval), 600000);
 
   } catch (err) {
-    console.error("Error Detail:", err);
-    
-    // নেটওয়ার্ক এরর বা ইনভ্যালিড ডাটা হ্যান্ডলিং
-    const errorMessage = err.response?.data?.message || err.message;
-    
-    if (errorMessage.includes("Network Error")) {
-      toast.error("Network Error: Could not connect to server.");
-    } else {
-      toast.error(errorMessage || "Registration failed.");
-    }
-    
     setLoading(false);
+    console.error("Error:", err);
+    toast.error(err.message || "Registration failed.");
   }
 };
 

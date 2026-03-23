@@ -156,7 +156,7 @@ const logout = async () => {
     localStorage.removeItem("nexsign_user");
     localStorage.removeItem("token");
 
-    toast.success("Logged out successfully!"); 
+   // toast.success("Logged out successfully!"); 
   } catch (err) {
     console.error("Firebase logout error:", err);
     toast.error("Logout failed. Please try again."); 
@@ -165,27 +165,35 @@ const logout = async () => {
 
 
 const registerWithEmail = async (email, password) => {
-    setLoading(true);
-    try {
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(result.user);
-      setLoading(false);
-      return result;
-    } catch (error) {
-      setLoading(false);
-      throw error;
+  setLoading(true);
+  try {
+   
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    
+   
+    await sendEmailVerification(result.user);
+    
+    setLoading(false);
+    return result;
+  } catch (error) {
+    setLoading(false);
+    // যদি ইমেইল আগে থেকেই থেকে থাকে, তবে সেই ইউজার অবজেক্টটি রিটার্ন করবে যাতে পোলিং করা যায়
+    if (error.code === 'auth/email-already-in-use') {
+      throw new Error("This email is already registered. Please log in or verify your email.");
     }
-  };
+    throw error;
+  }
+};
 
-
-const checkEmailVerified = async () => {
-  const user = auth.currentUser;
-  if (user) {
-    await user.reload(); 
-    return user.emailVerified;
+const checkEmailVerified = async (firebaseUser) => {
+  if (firebaseUser) {
+    await firebaseUser.reload(); // এটিই মেইন কাজ করে, স্ট্যাটাস রিফ্রেশ করে
+    return firebaseUser.emailVerified;
   }
   return false;
 };
+
+
 
   return (
     <AuthContext.Provider
