@@ -4241,18 +4241,22 @@ export default function SignerView() {
     setTimeout(() => scrollToNextField(newFields), 300);
   };
 
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
+    // ১. ভ্যালিডেশন চেক
     if (stats.remaining > 0) {
       toast.error(`Please complete all ${stats.remaining} required fields.`);
       scrollToNextField(fields); 
       return;
     }
+
+    // ২. বাটনে লোডিং স্টেট দেখানো
     setSubmitting(true);
     
-    // 🌟 ব্যাকএন্ড অডিট লগের জন্য লোকেশন ডাটা সংগ্রহ
-    const geo = await getGeoData();
-
     try {
+      // ৩. লোকেশন ডাটা (এটি দ্রুত করার জন্য handleSubmit এর বাইরেও রাখা যায়)
+      const geo = await getGeoData();
+
+      // ৪. এপিআই কল (ব্যাকএন্ড এখন দ্রুত রেসপন্স দিবে)
       await api.post(`/documents/sign/submit`, { 
         token, 
         fields,
@@ -4261,11 +4265,16 @@ export default function SignerView() {
             postalCode: geo.postalCode
         }
       }); 
+
+      // ৫. সাকসেস স্টেট আপডেট
       setCompleted(true);
       toast.success('Document signed successfully!');
+
     } catch (err) { 
-      toast.error(err.response?.data?.error || 'Failed to submit. Please check your connection.'); 
+      console.error("Submission error:", err);
+      toast.error(err.response?.data?.error || 'Failed to submit. Please try again.'); 
     } finally {
+      // ৬. লোডিং বন্ধ করা
       setSubmitting(false);
     }
   };
@@ -4316,10 +4325,20 @@ export default function SignerView() {
              <span className="text-[10px] font-bold text-sky-600 uppercase tracking-tight">{stats.done}/{stats.total} Fields Done</span>
           </div>
         </div>
-        <Button onClick={handleSubmit} disabled={submitting} className="rounded-full bg-sky-600 px-8 font-bold h-10 hover:bg-sky-700 shadow-lg shadow-sky-200 active:scale-95 transition-all">
-          {submitting ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
-          {submitting ? 'Processing...' : 'Finish'}
-        </Button>
+      <Button 
+  onClick={handleSubmit} 
+  disabled={submitting} 
+  className="rounded-full bg-sky-600 px-8 font-bold h-10 hover:bg-sky-700 shadow-lg shadow-sky-200 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+>
+  {submitting ? (
+    <>
+      <Loader2 className="animate-spin mr-2" size={18} />
+      Submitting...
+    </>
+  ) : (
+    'Finish'
+  )}
+</Button>
       </header>
 
       <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-4 flex flex-col items-center">
