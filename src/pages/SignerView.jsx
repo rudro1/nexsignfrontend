@@ -3878,9 +3878,9 @@
 //   );
 // }
 
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { api } from '@/api/api apiClient';
+// ১. ফিক্সড ইমপোর্ট: স্পেস রিমুভ করা হয়েছে এবং সঠিক পাথ দেওয়া হয়েছে
+import { api } from '@/api/apiClient'; 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -3888,6 +3888,7 @@ import { Loader2, CheckCircle2, Lock, PenTool } from 'lucide-react';
 import SignaturePad from '../components/signing/SignaturePad';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
+// ২. PDF Worker কনফিগারেশন (Legacy Support সহ)
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
 export default function SignerView() {
@@ -3905,12 +3906,13 @@ export default function SignerView() {
   const [pagesData, setPagesData] = useState([]);
   const containerRef = useRef(null);
 
-  // 1. Index Check: Backend-e index thakle seta use kora safe
+  // সাইনার ইনডেক্স ডিটেকশন
   const myPartyIndex = useMemo(() => {
     if (!session?.party) return null;
     return session.party.index !== undefined ? Number(session.party.index) : null;
   }, [session]);
 
+  // ফিল্ড স্ট্যাটাস ট্র্যাকিং
   const mySigningStatus = useMemo(() => {
     const myFields = fields.filter(f => Number(f.partyIndex) === myPartyIndex);
     const completedFields = myFields.filter(f => f.filled).length;
@@ -3918,7 +3920,7 @@ export default function SignerView() {
     return { completedFields, totalFields, remaining: totalFields - completedFields };
   }, [fields, myPartyIndex]);
 
-  // 2. Sorting Logic: Smooth sequential scroll (Page -> Top -> Bottom)
+  // অটো-স্ক্রল লজিক (পরবর্তী খালি ফিল্ডে নিয়ে যাওয়া)
   const scrollToNextField = useCallback((currentFields) => {
     const nextField = [...currentFields]
       .filter(f => Number(f.partyIndex) === myPartyIndex && !f.filled)
@@ -3933,10 +3935,11 @@ export default function SignerView() {
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 600); 
+      }, 500); 
     }
   }, [myPartyIndex]);
 
+  // সেশন এবং ডকুমেন্ট লোড করা
   const loadSession = useCallback(async () => {
     if (!token) { setLoading(false); return; }
     try {
@@ -3956,23 +3959,17 @@ export default function SignerView() {
       });
       setFields(cleaned);
 
-      // 3. Status check: Backend schema-r enum-er sathe mil rekhe status check
       if (['completed', 'signed'].includes(res.data.document.status) || res.data.party.status === 'signed') {
         setCompleted(true);
       }
     } catch (err) { 
-      toast.error('Invalid link or session.'); 
+      toast.error('Session expired or invalid link.'); 
     } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
 
-  useEffect(() => {
-    if (pagesData.length > 0 && !loading && fields.length > 0) {
-      scrollToNextField(fields);
-    }
-  }, [pagesData.length, loading, scrollToNextField]);
-
+  // পিডিএফ রেন্ডারিং (Proxy URL এর মাধ্যমে)
   useEffect(() => {
     if (!docData?.fileId) return;
     const loadPdf = async () => {
@@ -3987,23 +3984,27 @@ export default function SignerView() {
           pages.push({ num: i, viewport, pageObj: page });
         }
         setPagesData(pages);
-      } catch (err) { console.error("PDF Load Error:", err); }
+      } catch (err) { 
+        console.error("PDF Load Error:", err);
+        toast.error("Failed to load PDF document.");
+      }
     };
     loadPdf();
   }, [docData]);
 
+  // ফিল্ডে ক্লিক করলে সিগনেচার প্যাড ওপেন বা টেক্সট ইনপুট
   const handleFieldClick = (e, field) => {
     e.preventDefault();
     if (Number(field.partyIndex) !== myPartyIndex) { 
-      toast.error("Not your turn to sign here."); 
+      toast.error("It's not your turn to sign this field."); 
       return; 
     }
-    if (field.type === 'text') {
-      const val = prompt("Enter text:", field.value || "");
+    if (field.type === 'text' || field.type === 'date') {
+      const val = prompt(`Enter ${field.type}:`, field.value || "");
       if (val !== null) {
         const newFields = fields.map(f => f.id === field.id ? { ...f, value: val, filled: true } : f);
         setFields(newFields);
-        scrollToNextField(newFields); 
+        setTimeout(() => scrollToNextField(newFields), 300);
       }
     } else {
       setActiveFieldId(field.id);
@@ -4013,66 +4014,72 @@ export default function SignerView() {
 
   const handleSignature = (sigValue) => {
     if (!sigValue || sigValue.length < 200) { 
-      toast.error("Signature invalid.");
+      toast.error("Please provide a valid signature.");
       return;
     }
     const newFields = fields.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f);
     setFields(newFields);
     setShowSigPad(false);
     setActiveFieldId(null);
-    toast.success("Signed!");
-    scrollToNextField(newFields); 
+    toast.success("Signature captured!");
+    setTimeout(() => scrollToNextField(newFields), 300);
   };
 
+  // ফাইনাল সাবমিশন
   const handleSubmit = async () => {
     if (mySigningStatus.remaining > 0) {
-      toast.error("Please fill all fields.");
+      toast.error(`Please complete all ${mySigningStatus.remaining} fields before finishing.`);
       scrollToNextField(fields); 
       return;
     }
     setSubmitting(true);
     try {
-      // 4. Data Payload: Backend-e pathabar somoy data structure clean kora
       await api.post(`/documents/sign/submit`, { 
         token, 
         fields,
-        // Optional: meta information for auditing
         meta: {
           userAgent: navigator.userAgent,
-          platform: navigator.platform
+          timestamp: new Date().toISOString()
         }
       });
       setCompleted(true);
-      toast.success('Submitted!');
+      toast.success('Document signed successfully!');
     } catch (err) { 
         toast.error(err.response?.data?.error || 'Submission failed.'); 
     } finally { setSubmitting(false); }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
+  if (loading) return <div className="h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-sky-500" size={40} /></div>;
+
   if (completed) return (
-    <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
-      <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
-      <h2 className="text-3xl font-bold">Successfully Signed!</h2>
-      <p className="text-slate-500">Thank you for completing the document.</p>
+    <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4 bg-slate-50">
+      <div className="bg-white p-10 rounded-3xl shadow-xl flex flex-col items-center">
+        <CheckCircle2 size={100} className="text-green-500 mb-4" />
+        <h2 className="text-3xl font-bold text-slate-800">Done!</h2>
+        <p className="text-slate-500 max-w-xs">You have successfully signed the document. You can now close this tab.</p>
+      </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-[100] bg-white border-b p-4 flex justify-between items-center shadow-sm">
+    <div className="min-h-screen bg-slate-100 pb-10">
+      <header className="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b p-4 flex justify-between items-center shadow-sm">
         <div className="flex flex-col">
-          <span className="text-[10px] text-sky-500 font-black">DOCUMENT</span>
-          <h1 className="font-bold text-slate-800 truncate max-w-[200px]">{docData?.title}</h1>
+          <span className="text-[10px] text-sky-600 font-bold uppercase tracking-wider">Signing Document</span>
+          <h1 className="font-bold text-slate-800 truncate max-w-[180px] sm:max-w-md">{docData?.title}</h1>
         </div>
-        <Button onClick={handleSubmit} disabled={submitting} className={`font-bold ${mySigningStatus.remaining === 0 ? 'bg-green-600' : 'bg-sky-600'}`}>
-          {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Finish'}
+        <Button 
+          onClick={handleSubmit} 
+          disabled={submitting} 
+          className={`px-8 rounded-full font-bold shadow-lg transition-all ${mySigningStatus.remaining === 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+        >
+          {submitting ? <Loader2 className="animate-spin mr-2" size={18} /> : 'Finish'}
         </Button>
       </header>
 
-      <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-2 flex flex-col items-center">
+      <main ref={containerRef} className="w-full max-w-5xl mx-auto mt-6 px-2 flex flex-col items-center">
         {pagesData.map((page) => (
-          <div key={page.num} className="relative mb-6 bg-white shadow-xl border" style={{ width: page.viewport.width, height: page.viewport.height }}>
+          <div key={page.num} className="relative mb-8 bg-white shadow-2xl border-slate-200 border rounded-sm overflow-hidden" style={{ width: page.viewport.width, height: page.viewport.height }}>
             <canvas ref={el => {
               if (el && !el.dataset.rendered) {
                 const ctx = el.getContext('2d');
@@ -4086,18 +4093,18 @@ export default function SignerView() {
               const isMine = Number(field.partyIndex) === myPartyIndex;
               return (
                 <div key={field.id} id={`field-${field.id}`} onClick={(e) => handleFieldClick(e, field)}
-                  className={`absolute border-2 transition-all flex items-center justify-center 
-                    ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/10 cursor-pointer animate-pulse' : 'border-slate-300'}`}
+                  className={`absolute border-2 transition-all flex items-center justify-center rounded-md
+                    ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/10 cursor-pointer ring-4 ring-sky-500/20' : 'border-slate-300 bg-slate-50/50'}`}
                   style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
                   
                   {field.filled ? (
                     field.value.startsWith('data:image') ? 
-                    <img src={field.value} className="w-full h-full object-contain p-1 mix-blend-multiply" alt="Sig" /> :
-                    <span className="font-serif text-[12px] font-bold text-black break-all px-1">{field.value}</span>
+                    <img src={field.value} className="w-[90%] h-[90%] object-contain mix-blend-multiply" alt="Signature" /> :
+                    <span className="font-serif text-[13px] font-bold text-black break-all px-2 leading-tight">{field.value}</span>
                   ) : (
-                    <div className="flex flex-col items-center text-[9px] font-bold text-slate-500">
-                       {isMine ? <PenTool size={14} className="text-sky-600" /> : <Lock size={10} />}
-                       <span className={isMine ? 'text-sky-600' : ''}>{isMine ? 'SIGN' : `P${Number(field.partyIndex) + 1}`}</span>
+                    <div className="flex flex-col items-center text-[10px] font-bold">
+                       {isMine ? <PenTool size={16} className="text-sky-600 mb-1" /> : <Lock size={12} className="text-slate-400" />}
+                       <span className={isMine ? 'text-sky-600' : 'text-slate-400'}>{isMine ? 'SIGN HERE' : `Signer ${Number(field.partyIndex) + 1}`}</span>
                     </div>
                   )}
                 </div>
@@ -4108,8 +4115,8 @@ export default function SignerView() {
       </main>
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
-        <DialogContent className="max-w-lg p-6 bg-white">
-          <DialogTitle className="mb-4 font-bold text-xl">Draw Signature</DialogTitle>
+        <DialogContent className="max-w-lg p-6 bg-white rounded-3xl border-none shadow-2xl">
+          <DialogTitle className="mb-4 font-bold text-2xl text-slate-800">Add Your Signature</DialogTitle>
           <SignaturePad onSignatureComplete={handleSignature} />
         </DialogContent>
       </Dialog>
