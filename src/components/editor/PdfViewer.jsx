@@ -2144,6 +2144,7 @@ export default function PdfViewer({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
 
+  // PDF Loading
   useEffect(() => {
     if (!fileUrl && !fileId) return;
     const loadPdfDoc = async () => {
@@ -2163,10 +2164,16 @@ export default function PdfViewer({
     loadPdfDoc();
   }, [fileUrl, fileId]);
 
+  // High-Quality Rendering with Pagination Fix
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;
+    
     const renderPage = async () => {
-      if (renderTaskRef.current) renderTaskRef.current.cancel();
+      // আগের রেন্ডার টাস্ক ক্যানসেল করা জরুরি যেন নতুন পেজ রেন্ডারে বাধা না দেয়
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+      }
+
       try {
         const page = await pdfDoc.getPage(currentPage);
         const containerWidth = containerRef.current?.clientWidth || 700;
@@ -2180,7 +2187,8 @@ export default function PdfViewer({
         canvas.height = scaledViewport.height;
         setCanvasSize({ width: scaledViewport.width, height: scaledViewport.height });
 
-        renderTaskRef.current = page.render({ canvasContext: context, viewport: scaledViewport });
+        const renderContext = { canvasContext: context, viewport: scaledViewport };
+        renderTaskRef.current = page.render(renderContext);
         await renderTaskRef.current.promise;
       } catch (err) {
         if (err.name !== 'RenderingCancelledException') console.error("Render Error:", err);
@@ -2188,6 +2196,14 @@ export default function PdfViewer({
     };
     renderPage();
   }, [pdfDoc, currentPage]);
+
+  // Delete Function with Propagation Stop
+  const removeField = (id, e) => {
+    e.preventDefault();
+    e.stopPropagation(); // ক্লিকটি যেন ক্যানভাসে না যায়
+    const updatedFields = fields.filter(f => f.id !== id);
+    onFieldsChange(updatedFields);
+  };
 
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading || !e.target.classList.contains('pdf-canvas')) return;
@@ -2209,37 +2225,42 @@ export default function PdfViewer({
     onFieldsChange([...fields, newField]);
   };
 
-  const removeField = (id, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onFieldsChange(fields.filter(f => f.id !== id));
-  };
-
   return (
     <div ref={containerRef} className="flex-1 w-full overflow-hidden p-4">
-      {/* Pagination UI remains same */}
+      {/* Pagination Fix: Button click ensures state update */}
       {pdfDoc && pdfDoc.numPages > 1 && (
         <div className="flex items-center justify-center gap-4 mb-6">
-          <Button variant="outline" size="icon" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)} className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF]">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            disabled={currentPage <= 1} 
+            onClick={(e) => { e.stopPropagation(); onPageChange(currentPage - 1); }} 
+            className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] z-50"
+          >
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <span className="text-xs font-black bg-[#28ABDF]/10 text-[#28ABDF] px-5 py-2 rounded-full border border-[#28ABDF]/20 uppercase tracking-widest">
             Page {currentPage} of {pdfDoc.numPages}
           </span>
-          <Button variant="outline" size="icon" disabled={currentPage >= pdfDoc.numPages} onClick={() => onPageChange(currentPage + 1)} className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF]">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            disabled={currentPage >= pdfDoc.numPages} 
+            onClick={(e) => { e.stopPropagation(); onPageChange(currentPage + 1); }} 
+            className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] z-50"
+          >
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
       )}
 
-      <div className="canvas-container relative mx-auto shadow-2xl border bg-white rounded-xl overflow-hidden"
+      <div className="canvas-container relative mx-auto shadow-2xl border bg-white rounded-xl"
         style={{ width: canvasSize.width || '100%', height: canvasSize.height || '600px', cursor: pendingFieldType ? 'crosshair' : 'default' }}
         onClick={handleContainerClick}
       >
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-50">
             <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF]" />
-            <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Processing PDF Layout...</p>
           </div>
         )}
         
@@ -2252,55 +2273,33 @@ export default function PdfViewer({
           return (
             <Rnd
               key={field.id}
-              // FIX: পিক্সেল ভ্যালু ব্যবহার করা হয়েছে যাতে ড্র্যাগিং এবং রিসাইজিং স্মুথ হয়
-              size={{ 
-                width: (field.width / 100) * canvasSize.width, 
-                height: (field.height / 100) * canvasSize.height 
-              }}
-              position={{ 
-                x: (field.x / 100) * canvasSize.width, 
-                y: (field.y / 100) * canvasSize.height 
-              }}
+              size={{ width: (field.width / 100) * canvasSize.width, height: (field.height / 100) * canvasSize.height }}
+              position={{ x: (field.x / 100) * canvasSize.width, y: (field.y / 100) * canvasSize.height }}
               onDragStop={(e, d) => {
-                onFieldsChange(fields.map(f => f.id === field.id ? { 
-                  ...f, 
-                  x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
-                  y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
-                } : f));
+                const newX = Number(((d.x / canvasSize.width) * 100).toFixed(4));
+                const newY = Number(((d.y / canvasSize.height) * 100).toFixed(4));
+                onFieldsChange(fields.map(f => f.id === field.id ? { ...f, x: newX, y: newY } : f));
               }}
               onResizeStop={(e, dir, ref, delta, pos) => {
-                // FIX: ref.offsetWidth ব্যবহার করা হয়েছে নিখুঁত মান পাওয়ার জন্য
-                onFieldsChange(fields.map(f => f.id === field.id ? {
-                  ...f,
-                  width: Number(((ref.offsetWidth / canvasSize.width) * 100).toFixed(4)),
-                  height: Number(((ref.offsetHeight / canvasSize.height) * 100).toFixed(4)),
-                  x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)),
-                  y: Number(((pos.y / canvasSize.height) * 100).toFixed(4))
-                } : f));
+                const newW = Number(((ref.offsetWidth / canvasSize.width) * 100).toFixed(4));
+                const newH = Number(((ref.offsetHeight / canvasSize.height) * 100).toFixed(4));
+                onFieldsChange(fields.map(f => f.id === field.id ? { ...f, width: newW, height: newH, x: (pos.x / canvasSize.width) * 100, y: (pos.y / canvasSize.height) * 100 } : f));
               }}
               bounds="parent"
               enableResizing={!readOnly}
               disableDragging={readOnly}
-              minWidth={50} // ছোট হয়ে হারিয়ে যাওয়া রোধ করতে
-              minHeight={20}
               className="z-20 group"
             >
-              <div 
-                className="w-full h-full border-2 flex items-center justify-center relative bg-white/60 backdrop-blur-[1px] transition-all"
-                style={{ borderColor: partyColor }}
-              >
-                <div className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[8px] font-black text-white uppercase truncate max-w-full" style={{ backgroundColor: partyColor }}>
+              <div className="w-full h-full border-2 flex items-center justify-center relative bg-white/60 backdrop-blur-[1px]" style={{ borderColor: partyColor }}>
+                <div className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[8px] font-black text-white uppercase" style={{ backgroundColor: partyColor }}>
                   {partyName}
                 </div>
-
-                <span className="text-[9px] font-black uppercase tracking-tighter select-none" style={{ color: partyColor }}>
-                  {field.type}
-                </span>
-
+                <span className="text-[9px] font-black uppercase pointer-events-none" style={{ color: partyColor }}>{field.type}</span>
                 {!readOnly && (
                   <button 
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-xl transition-all hover:scale-125 z-30" 
-                    onMouseDown={(e) => removeField(field.id, e)} // FIX: onMouseDown ক্যানভাসে ক্লিক হওয়া রোধ করে
+                    type="button"
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-xl z-50 hover:scale-125 transition-all" 
+                    onMouseDown={(e) => removeField(field.id, e)} // onMouseDown দ্রুত কাজ করে এবং ড্র্যাগ আটকায়
                   >
                     <Trash2 size={12} />
                   </button>
