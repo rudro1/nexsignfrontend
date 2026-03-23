@@ -93,7 +93,8 @@
 // src/lib/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { auth, googleProvider } from "../firebase.config.js";
-import { signInWithPopup } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, signOut } from "firebase/auth";
+import { toast } from "sonner";
 
 const AuthContext = createContext();
 
@@ -137,12 +138,54 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("token", userToken);
   };
 
-  const logout = () => {
+  // const logout = () => {
+  //   setUser(null);
+  //   setToken(null);
+  //   localStorage.removeItem("nexsign_user");
+  //   localStorage.removeItem("token");
+  // };
+
+  
+
+
+const logout = async () => {
+  try {
+    await auth.signOut(); // Firebase logout
     setUser(null);
     setToken(null);
     localStorage.removeItem("nexsign_user");
     localStorage.removeItem("token");
+
+    toast.success("Logged out successfully!"); 
+  } catch (err) {
+    console.error("Firebase logout error:", err);
+    toast.error("Logout failed. Please try again."); 
+  }
+};
+
+
+const registerWithEmail = async (email, password) => {
+    setLoading(true);
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(result.user);
+      setLoading(false);
+      return result;
+    } catch (error) {
+      setLoading(false);
+      throw error;
+    }
   };
+
+
+const checkEmailVerified = async () => {
+  const user = auth.currentUser;
+  if (user) {
+    await user.reload(); 
+    return user.emailVerified;
+  }
+  return false;
+};
 
   return (
     <AuthContext.Provider
@@ -153,6 +196,8 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         googleLogin,
+        registerWithEmail, 
+        checkEmailVerified,
         isAdmin: user?.role === "admin" || user?.role === "super_admin",
         isSuperAdmin: user?.role === "super_admin",
         isAuthenticated: !!user,

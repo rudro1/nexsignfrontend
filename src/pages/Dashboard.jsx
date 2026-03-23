@@ -239,6 +239,8 @@ export default function Dashboard() {
             onChange={e => setSearch(e.target.value)}
             className="pl-10 rounded-xl focus:outline-none" 
           />
+          <Input placeholder="Search by title…" value={search} onChange={e => setSearch(e.target.value)}
+           className="pl-10 rounded-xl focus:!ring-0 " />
         </div>
         <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
           <TabsList className="bg-slate-100 dark:bg-slate-900 rounded-xl p-1 border">

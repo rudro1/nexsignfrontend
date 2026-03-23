@@ -158,14 +158,14 @@ const scrollToSection = (id) => {
               <>
                 <button
                   onClick={() => handleLinkClick("login", "/login")}
-                  className={`px-1 py-1 md:px-4 md:py-2 rounded-lg font-bold border text-sky-400 hover:text-[#2AAAE0] ${activeLink === "login" ? "text-sky-600 font-bold" : ""}`}
+                  className={`px-2 py-1 sm:px-2 sm:py-1 md:px-4 md:py-2 text-xs md:text-sm rounded-lg font-bold border text-sky-400 hover:text-[#2AAAE0]`}
                 >
                   Sign In
                 </button>
 
                 <button
                   onClick={() => handleLinkClick("register", "/register")}
-                  className={`px-1 py-1 md:px-4 md:py-2 rounded-lg bg-sky-500 text-white font-bold hover:bg-sky-600 ${activeLink === "register" ? "text-blue-600 font-bold" : ""}`}
+                  className={`px-2 py-1 sm:px-4 md:px-4 md:py-2 text-xs md:text-sm rounded-lg bg-sky-500 text-white font-bold hover:bg-sky-600 `}
                 >
                   Get Started
                 </button>
