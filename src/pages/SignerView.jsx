@@ -3642,6 +3642,7 @@
 //   );
 // } all ok 
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
@@ -3680,14 +3681,14 @@ export default function SignerView() {
     return { completedFields, totalFields, remaining: totalFields - completedFields };
   }, [fields, myPartyIndex]);
 
-  // FIXED SCROLL LOGIC: Sorts by page and Y position so it goes in order
+  // 1. FIXED SCROLL LOGIC: Sorts fields by Page then Y position (Top to Bottom)
   const scrollToNextField = useCallback((currentFields) => {
     const nextField = [...currentFields]
       .filter(f => Number(f.partyIndex) === myPartyIndex && !f.filled)
       .sort((a, b) => {
         if (Number(a.page) !== Number(b.page)) return Number(a.page) - Number(b.page);
         return Number(a.y) - Number(b.y);
-      })[0]; // Get the first one in physical order
+      })[0]; 
 
     if (nextField) {
       setTimeout(() => {
@@ -3722,8 +3723,7 @@ export default function SignerView() {
       setFields(cleaned);
       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') setCompleted(true);
     } catch (err) { 
-      console.error("Session Load Error:", err);
-      toast.error('Invalid or expired signing link (404).'); 
+      toast.error('Invalid link or session expired.'); 
     } finally { 
       setLoading(false); 
     }
@@ -3751,7 +3751,7 @@ export default function SignerView() {
           pages.push({ num: i, viewport, pageObj: page });
         }
         setPagesData(pages);
-      } catch (err) { console.error("PDF Load Error:", err); }
+      } catch (err) { console.error("PDF Error:", err); }
     };
     loadPdf();
   }, [docData]);
@@ -3759,7 +3759,7 @@ export default function SignerView() {
   const handleFieldClick = (e, field) => {
     e.preventDefault();
     if (Number(field.partyIndex) !== myPartyIndex) { 
-      toast.error("This is not your signing area."); 
+      toast.error("Not your turn to sign here."); 
       return; 
     }
     if (field.type === 'text') {
@@ -3777,39 +3777,46 @@ export default function SignerView() {
 
   const handleSignature = (sigValue) => {
     if (!sigValue || sigValue.length < 200) { 
-      toast.error("Please provide a valid signature.");
+      toast.error("Signature is too short.");
       return;
     }
     const newFields = fields.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f);
     setFields(newFields);
     setShowSigPad(false);
     setActiveFieldId(null);
-    toast.success("Signature captured!");
+    toast.success("Signed!");
     scrollToNextField(newFields); 
   };
 
+  // 2. FIXED SUBMIT: Added error logging and data cleanup to prevent 500 errors
   const handleSubmit = async () => {
     if (mySigningStatus.remaining > 0) {
-      toast.error(`Please fill all ${mySigningStatus.remaining} remaining fields.`);
+      toast.error(`Required: ${mySigningStatus.remaining} more field(s).`);
       scrollToNextField(fields); 
       return;
     }
     setSubmitting(true);
     try {
-      await api.post(`/documents/sign/submit`, { token, fields });
+      // Cleanup data before sending to ensure backend compatibility
+      const cleanedFields = fields.map(({ id, value, page, type, x, y, width, height, partyIndex }) => ({
+        id, value, page, type, x, y, width, height, partyIndex
+      }));
+
+      await api.post(`/documents/sign/submit`, { token, fields: cleanedFields });
       setCompleted(true);
-      toast.success('Document signed successfully!');
+      toast.success('Submitted successfully!');
     } catch (err) { 
-        toast.error('Submission failed.'); 
+        console.error("500 Error details:", err.response?.data);
+        toast.error(err.response?.data?.error || 'Submission failed (Server Error 500).'); 
     } finally { setSubmitting(false); }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
   if (completed) return (
-    <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
-      <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
-      <h2 className="text-3xl font-bold text-slate-800">Signing Complete!</h2>
-      <p className="text-slate-500 max-w-md">Thank you. You will receive a copy via email shortly.</p>
+    <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4 bg-white">
+      <CheckCircle2 size={80} className="text-green-500 animate-pulse" />
+      <h2 className="text-3xl font-bold">All Done!</h2>
+      <p className="text-slate-500">Document signed. Check your email for a copy.</p>
     </div>
   );
 
@@ -3817,14 +3824,14 @@ export default function SignerView() {
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-[100] bg-white border-b p-4 flex justify-between items-center shadow-sm">
         <div className="flex flex-col overflow-hidden max-w-[50%]">
-          <span className="text-[10px] text-sky-500 font-black uppercase tracking-widest">Document</span>
-          <h1 className="font-bold text-slate-800 truncate leading-tight">{docData?.title}</h1>
+          <span className="text-[10px] text-sky-500 font-black">DOCUMENT</span>
+          <h1 className="font-bold text-slate-800 truncate">{docData?.title}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex px-3 py-1 rounded-full text-[11px] font-black border-2 bg-sky-50 border-sky-200 text-sky-700">
-            {mySigningStatus.completedFields} / {mySigningStatus.totalFields} SIGNED
+          <div className="hidden sm:flex px-3 py-1 rounded-full text-[11px] font-black border-2 bg-sky-50 border-sky-200 text-sky-700 uppercase">
+            {mySigningStatus.completedFields} / {mySigningStatus.totalFields} Completed
           </div>
-          <Button onClick={handleSubmit} disabled={submitting} className={`font-bold transition-all ${mySigningStatus.remaining === 0 ? 'bg-green-600' : 'bg-sky-600'}`}>
+          <Button onClick={handleSubmit} disabled={submitting} className={`font-bold ${mySigningStatus.remaining === 0 ? 'bg-green-600' : 'bg-sky-600'}`}>
             {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Finish'}
           </Button>
         </div>
@@ -3832,7 +3839,7 @@ export default function SignerView() {
 
       <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-2 flex flex-col items-center">
         {pagesData.map((page) => (
-          <div key={page.num} className="relative mb-6 bg-white shadow-xl border" style={{ width: page.viewport.width, height: page.viewport.height }}>
+          <div key={page.num} className="relative mb-6 bg-white shadow-2xl border" style={{ width: page.viewport.width, height: page.viewport.height }}>
             <canvas className="w-full h-auto" ref={el => {
               if (el && !el.dataset.rendered) {
                 const ctx = el.getContext('2d');
@@ -3847,17 +3854,17 @@ export default function SignerView() {
               return (
                 <div key={field.id} id={`field-${field.id}`} onClick={(e) => handleFieldClick(e, field)}
                   className={`absolute border-2 transition-all flex items-center justify-center 
-                    ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/10 cursor-pointer animate-pulse ring-offset-2 ring-sky-300' : 'border-slate-300'}`}
+                    ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/10 cursor-pointer animate-pulse ring-2 ring-sky-200' : 'border-slate-300'}`}
                   style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
                   
                   {field.filled ? (
                     field.value.startsWith('data:image') ? 
-                    <img src={field.value} className="w-full h-full object-contain p-1 mix-blend-multiply" alt="Signature" /> :
+                    <img src={field.value} className="w-full h-full object-contain p-1 mix-blend-multiply" alt="Sig" /> :
                     <span className="font-serif text-[12px] font-bold text-black break-all px-1">{field.value}</span>
                   ) : (
-                    <div className="flex flex-col items-center text-[9px] font-bold text-slate-500">
+                    <div className="flex flex-col items-center text-[9px] font-bold text-slate-400">
                        {isMine ? <PenTool size={14} className="text-sky-600" /> : <Lock size={10} />}
-                       <span className={isMine ? 'text-sky-600' : ''}>{isMine ? 'SIGN HERE' : `SIGNER ${Number(field.partyIndex) + 1}`}</span>
+                       <span className={isMine ? 'text-sky-600' : ''}>{isMine ? 'SIGN' : `P${Number(field.partyIndex) + 1}`}</span>
                     </div>
                   )}
                 </div>
@@ -3869,7 +3876,7 @@ export default function SignerView() {
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg p-6 bg-white rounded-2xl">
-          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Apply Your Signature</DialogTitle>
+          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Apply Signature</DialogTitle>
           <SignaturePad onSignatureComplete={handleSignature} />
         </DialogContent>
       </Dialog>
