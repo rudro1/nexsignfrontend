@@ -537,7 +537,334 @@
 //   );
 // }
 
-import React, { useState, useEffect, useCallback } from 'react';
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { useNavigate, Link } from 'react-router-dom';
+// import { api } from '@/api/apiClient';
+// import { useAuth } from '@/lib/AuthContext';
+// import { Card } from '@/components/ui/Card';
+// import { Button } from '@/components/ui/button';
+// import { Badge } from '@/components/ui/badge';
+// import { Input } from '@/components/ui/input';
+// import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// import { 
+//   Shield, Users, Clock, Search, 
+//   Trash2, Loader2, Activity, ChevronLeft, ChevronRight, 
+//   Calendar, Plus, History, FileText 
+// } from 'lucide-react';
+// import { format, isValid } from 'date-fns';
+// import { toast } from 'sonner';
+
+// export default function AdminDashboard() {
+//   const { user, isAdmin, loading: authLoading } = useAuth();
+//   const navigate = useNavigate();
+//   const [tab, setTab] = useState('users');
+//   const [search, setSearch] = useState('');
+  
+//   const [users, setUsers] = useState([]);
+//   const [documents, setDocuments] = useState([]);
+//   const [logs, setLogs] = useState([]); 
+  
+//   const [loading, setLoading] = useState({ users: true, docs: true, logs: true });
+//   const [logPage, setLogPage] = useState(1);
+//   const [hasMoreLogs, setHasMoreLogs] = useState(true);
+
+//   // ১. ডেটা ফেচিং (Users)
+//   const fetchUsers = useCallback(async () => {
+//     setLoading(prev => ({ ...prev, users: true }));
+//     try {
+//       const res = await api.get('/admin/users');
+//       setUsers(Array.isArray(res.data) ? res.data : (res.data?.users || []));
+//     } catch { toast.error("Failed to load user list"); }
+//     finally { setLoading(prev => ({ ...prev, users: false })); }
+//   }, []);
+
+//   // ২. ডেটা ফেচিং (Documents)
+//   const fetchDocs = useCallback(async () => {
+//     setLoading(prev => ({ ...prev, docs: true }));
+//     try {
+//       const res = await api.get('/admin/documents');
+//       const data = Array.isArray(res.data) ? res.data : (res.data?.documents || []);
+//       setDocuments(data.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)));
+//     } catch { toast.error("Failed to load documents"); }
+//     finally { setLoading(prev => ({ ...prev, docs: false })); }
+//   }, []);
+
+//   // ৩. ডেটা ফেচিং (Audit Logs with Pagination)
+//   const fetchLogs = useCallback(async (pageNo = 1) => {
+//     setLoading(prev => ({ ...prev, logs: true }));
+//     try {
+//       const res = await api.get(`/admin/audit-logs?page=${pageNo}&limit=15`);
+//       const logData = res.data?.logs || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+//       setLogs(logData);
+//       setHasMoreLogs(logData.length >= 15);
+//       setLogPage(pageNo);
+//     } catch { toast.error("Audit logs could not be loaded"); }
+//     finally { setLoading(prev => ({ ...prev, logs: false })); }
+//   }, []);
+
+//   const refreshAll = () => {
+//     fetchUsers();
+//     fetchDocs();
+//     fetchLogs(1);
+//   };
+
+//   useEffect(() => {
+//     if (authLoading) return;
+//     if (!isAdmin) { navigate('/dashboard'); return; }
+//     refreshAll();
+//   }, [isAdmin, authLoading, navigate]);
+
+//   const handleDeleteUser = async (userId) => {
+//     if (!window.confirm("Are you sure? This action cannot be undone.")) return;
+//     try {
+//       await api.delete(`/admin/users/${userId}`);
+//       setUsers(users.filter(u => u._id !== userId));
+//       toast.success("User deleted");
+//     } catch { toast.error("Deletion failed"); }
+//   };
+
+//   const handleDeleteDoc = async (docId) => {
+//     if (!window.confirm("Remove this document permanently?")) return;
+//     try {
+//       await api.delete(`/admin/documents/${docId}`);
+//       setDocuments(documents.filter(d => d._id !== docId));
+//       toast.success("Document removed");
+//     } catch { toast.error("Delete failed"); }
+//   };
+
+//   const safeFormatDate = (dateStr, fStr = 'hh:mm aa, d MMM yyyy') => {
+//     if (!dateStr) return 'N/A';
+//     const d = new Date(dateStr);
+//     return isValid(d) ? format(d, fStr) : 'N/A';
+//   };
+
+//   // ফিল্টারিং লজিক
+//   const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+//   const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
+//   const filteredLogs = logs.filter(l => !search || l.action?.toLowerCase().includes(search.toLowerCase()) || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()));
+
+//   if (authLoading) return (
+//     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 gap-4">
+//       <Loader2 className="animate-spin text-sky-600 w-12 h-12" />
+//       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verifying Admin...</p>
+//     </div>
+//   );
+
+//   return (
+//     <div className="w-full mx-auto px-4 md:px-8 py-8 bg-[#F8FAFC] dark:bg-slate-950 min-h-screen">
+      
+//       {/* Header */}
+//       <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+//         <div>
+//           <div className="flex items-center gap-2 mb-2">
+//             <Shield className="text-sky-600 w-5 h-5" />
+//             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sky-600">Secure Admin Environment</span>
+//           </div>
+//           <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Management Console</h1>
+//         </div>
+        
+//         <div className="flex gap-3">
+//           <Link to="/DocumentEditor">
+//             <Button className="bg-sky-600 hover:bg-sky-700 text-white rounded-2xl px-6 h-12 font-black shadow-xl">
+//               <Plus className="mr-2 w-5 h-5" /> NEW DOC
+//             </Button>
+//           </Link>
+//           <Button onClick={refreshAll} variant="outline" className="rounded-2xl px-6 h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50">
+//             <Activity size={18} className={`mr-2 text-emerald-500 ${(loading.users || loading.docs) ? 'animate-spin' : ''}`}/> REFRESH
+//           </Button>
+//         </div>
+//       </div>
+
+//       <Tabs value={tab} onValueChange={(v) => { setTab(v); setSearch(''); }} className="max-w-[1600px] mx-auto space-y-8">
+       
+//         <TabsList className="bg-slate-200/40 dark:bg-slate-900/50 p-1.5 rounded-[20px] w-full md:w-fit border">
+//           <TabsTrigger value="users" className="px-8 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest data-[state=active]:text-sky-600">Users</TabsTrigger>
+//           <TabsTrigger value="documents" className="px-8 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest data-[state=active]:text-sky-600">Documents</TabsTrigger>
+//           <TabsTrigger value="logs" className="px-8 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest data-[state=active]:text-sky-600">Audit Logs</TabsTrigger>
+//         </TabsList>
+
+//         {/* Global Search */}
+//         <div className="bg-white dark:bg-slate-900 p-4 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex items-center">
+//           <div className="relative flex-1">
+//             <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
+//             <Input 
+//               placeholder={`Search ${tab}...`} 
+//               value={search} 
+//               onChange={e => setSearch(e.target.value)} 
+//               className="pl-14 border-none bg-transparent h-14 text-base focus-visible:ring-0 font-medium dark:text-white" 
+//             />
+//           </div>
+//           {loading[tab] && <Loader2 className="animate-spin text-sky-500 mr-4 w-5 h-5" />}
+//         </div>
+
+//         {/* Content Section */}
+//         <div className="animate-in fade-in duration-500">
+          
+//           {/* DOCUMENTS VIEW */}
+//           {tab === 'documents' && (
+//             <div className="grid gap-6">
+//               {filteredDocs.length === 0 ? (
+//                 <div className="text-center py-20 text-slate-400 font-bold uppercase text-xs bg-white dark:bg-slate-900 rounded-[2rem]">No Records Found</div>
+//               ) : (
+//                 filteredDocs.map(d => (
+//                   <Card key={d._id} className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-6 md:p-10">
+//                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8 border-b dark:border-slate-800 pb-8">
+//                       <div>
+//                         <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-2">{d.title}</h2>
+//                         <div className="flex flex-wrap gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+//                           <span className="flex items-center gap-2"><Users size={12} className="text-sky-500"/> {d.owner?.full_name || 'System'}</span>
+//                           <span className="flex items-center gap-2"><Calendar size={12} className="text-sky-500"/> {safeFormatDate(d.createdAt)}</span>
+//                         </div>
+//                       </div>
+//                       <div className="flex items-center gap-3 w-full lg:w-auto">
+//                         {d.status === 'completed' && (
+//                           <Button onClick={() => window.open(d.fileUrl, '_blank')} className="flex-1 lg:flex-none bg-white dark:bg-slate-800 text-sky-600 border border-sky-100 h-12 px-6 rounded-2xl font-black">
+//                             <FileText size={16} className="mr-2" /> VIEW
+//                           </Button>
+//                         )}
+//                         <Badge className={`px-6 h-12 rounded-2xl justify-center text-[10px] font-black uppercase tracking-widest flex-1 lg:flex-none ${d.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-sky-500 text-white'}`}>
+//                           {d.status}
+//                         </Badge>
+//                         <Button onClick={() => handleDeleteDoc(d._id)} variant="ghost" className="h-12 w-12 rounded-2xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+//                           <Trash2 size={20}/>
+//                         </Button>
+//                       </div>
+//                     </div>
+
+//                     <div className="grid md:grid-cols-2 gap-6">
+//                       {d.parties?.map((p, i) => (
+//                         <div key={i} className="p-6 border border-slate-50 dark:border-slate-800 rounded-[1.5rem] bg-[#FCFEFF] dark:bg-slate-950/40">
+//                           <div className="flex justify-between items-center mb-4">
+//                             <span className="font-black text-slate-900 dark:text-slate-100 text-sm uppercase">{p.name}</span>
+//                             <Badge variant="outline" className={`text-[9px] font-black px-3 py-1 ${p.status === 'signed' ? 'text-emerald-500' : 'text-amber-500'}`}>{p.status}</Badge>
+//                           </div>
+//                           <div className="grid grid-cols-2 gap-4 text-[10px] text-slate-400 font-bold uppercase">
+//                             <div className="flex flex-col"><span>IP Address</span><span className="text-slate-900 dark:text-slate-300 truncate">{p.ipAddress || '---'}</span></div>
+//                             <div className="flex flex-col"><span>Location</span><span className="text-slate-900 dark:text-slate-300 truncate">{p.location || '---'}</span></div>
+//                           </div>
+//                         </div>
+//                       ))}
+//                     </div>
+//                   </Card>
+//                 ))
+//               )}
+//             </div>
+//           )}
+
+//           {/* USERS VIEW (Desktop & Mobile) */}
+//           {tab === 'users' && (
+//             <Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-6 md:p-10">
+//               {/* Desktop Table */}
+//               <div className="hidden md:block">
+//                 <table className="w-full text-left">
+//                   <thead>
+//                     <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b-2 dark:border-slate-800">
+//                       <th className="pb-6 px-4">User Profile</th>
+//                       <th className="pb-6 px-4">Role</th>
+//                       <th className="pb-6 px-4">Created</th>
+//                       <th className="pb-6 px-4 text-right">Action</th>
+//                     </tr>
+//                   </thead>
+//                   <tbody className="divide-y dark:divide-slate-800">
+//                     {filteredUsers.map(u => (
+//                       <tr key={u._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all">
+//                         <td className="py-6 px-4">
+//                           <div className="font-bold text-slate-900 dark:text-white text-base">{u.full_name}</div>
+//                           <div className="text-xs text-slate-400 font-medium">{u.email}</div>
+//                         </td>
+//                         <td className="py-6 px-4">
+//                           <Badge variant="outline" className="text-[9px] font-black uppercase px-4 py-1 border-slate-200 text-sky-600">{u.role}</Badge>
+//                         </td>
+//                         <td className="py-6 px-4 text-[11px] font-black text-slate-500">{safeFormatDate(u.createdAt, 'd MMM, yyyy')}</td>
+//                         <td className="py-6 px-4 text-right">
+//                           {u.role !== 'super_admin' && (
+//                             <Button onClick={() => handleDeleteUser(u._id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl h-12 w-12 p-0 bg-transparent">
+//                               <Trash2 size={20}/>
+//                             </Button>
+//                           )}
+//                         </td>
+//                       </tr>
+//                     ))}
+//                   </tbody>
+//                 </table>
+//               </div>
+
+//               {/* Mobile List */}
+//               <div className="md:hidden flex flex-col gap-4">
+//                 {filteredUsers.map(u => (
+//                   <div key={u._id} className="p-4 border dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950/40">
+//                     <div className="flex justify-between items-start mb-2">
+//                       <div><p className="font-bold text-slate-900 dark:text-white">{u.full_name}</p><p className="text-xs text-slate-400">{u.email}</p></div>
+//                       <Badge className="text-[9px]">{u.role}</Badge>
+//                     </div>
+//                     <div className="flex justify-between items-center mt-4">
+//                       <span className="text-[10px] font-bold text-slate-500 uppercase">{safeFormatDate(u.createdAt, 'd MMM, yyyy')}</span>
+//                       <Button onClick={() => handleDeleteUser(u._id)} variant="ghost" className="text-red-400 p-0 h-8 w-8"><Trash2 size={16}/></Button>
+//                     </div>
+//                   </div>
+//                 ))}
+//               </div>
+//             </Card>
+//           )}
+
+//           {/* AUDIT LOGS VIEW */}
+//           {tab === 'logs' && (
+//             <Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-6 md:p-10">
+//               <div className="flex items-center gap-3 mb-8">
+//                 <History className="text-sky-500" size={24} />
+//                 <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Audit Trail</h3>
+//               </div>
+              
+//               <div className="overflow-x-auto">
+//                 <table className="w-full text-left min-w-[600px]">
+//                   <thead>
+//                     <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b-2 dark:border-slate-800">
+//                       <th className="pb-6 px-4">Performed By</th>
+//                       <th className="pb-6 px-4">Action</th>
+//                       <th className="pb-6 px-4">Timestamp</th>
+//                       <th className="pb-6 px-4 text-right">Status</th>
+//                     </tr>
+//                   </thead>
+//                   <tbody className="divide-y dark:divide-slate-800">
+//                     {filteredLogs.map((log, i) => (
+//                       <tr key={log._id || i} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all">
+//                         <td className="py-6 px-4">
+//                           <div className="font-bold text-slate-900 dark:text-white text-sm">{log.performed_by?.name || 'System'}</div>
+//                           <div className="text-[10px] text-slate-400">{log.performed_by?.email || 'automated@system.com'}</div>
+//                         </td>
+//                         <td className="py-6 px-4">
+//                           <Badge className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-none uppercase px-3 py-1">
+//                             {log.action}
+//                           </Badge>
+//                         </td>
+//                         <td className="py-6 px-4 text-[11px] font-black text-slate-500 uppercase">{safeFormatDate(log.timestamp || log.createdAt)}</td>
+//                         <td className="py-6 px-4 text-right">
+//                           <div className="w-2 h-2 rounded-full bg-emerald-500 inline-block shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+//                         </td>
+//                       </tr>
+//                     ))}
+//                   </tbody>
+//                 </table>
+//               </div>
+
+//               {/* Pagination */}
+//               <div className="mt-10 pt-8 border-t dark:border-slate-800 flex justify-between items-center">
+//                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Page {logPage}</span>
+//                 <div className="flex gap-4">
+//                   <Button onClick={() => fetchLogs(logPage - 1)} disabled={logPage === 1} variant="outline" className="rounded-xl h-12 w-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><ChevronLeft size={20}/></Button>
+//                   <Button onClick={() => fetchLogs(logPage + 1)} disabled={!hasMoreLogs} variant="outline" className="rounded-xl h-12 w-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><ChevronRight size={20}/></Button>
+//                 </div>
+//               </div>
+//             </Card>
+//           )}
+
+//         </div>
+//       </Tabs>
+//     </div>
+//   );
+// }
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react'; // useMemo যোগ করা হয়েছে
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -568,57 +895,90 @@ export default function AdminDashboard() {
   const [logPage, setLogPage] = useState(1);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
 
-  // ১. ডেটা ফেচিং (Users)
-  const fetchUsers = useCallback(async () => {
-    setLoading(prev => ({ ...prev, users: true }));
+  // ১. ইউজার ফেচিং (অটো-রিফ্রেশ সাপোর্টেড)
+  const fetchUsers = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(prev => ({ ...prev, users: true }));
     try {
       const res = await api.get('/admin/users');
-      setUsers(Array.isArray(res.data) ? res.data : (res.data?.users || []));
-    } catch { toast.error("Failed to load user list"); }
-    finally { setLoading(prev => ({ ...prev, users: false })); }
+      const data = Array.isArray(res.data) ? res.data : (res.data?.users || []);
+      setUsers(data);
+    } catch { 
+      console.error("User load error");
+    } finally { 
+      setLoading(prev => ({ ...prev, users: false })); 
+    }
   }, []);
 
-  // ২. ডেটা ফেচিং (Documents)
-  const fetchDocs = useCallback(async () => {
-    setLoading(prev => ({ ...prev, docs: true }));
+  // ২. ডকুমেন্ট ফেচিং (অটো-রিফ্রেশ সাপোর্টেড)
+  const fetchDocs = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(prev => ({ ...prev, docs: true }));
     try {
       const res = await api.get('/admin/documents');
       const data = Array.isArray(res.data) ? res.data : (res.data?.documents || []);
       setDocuments(data.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)));
-    } catch { toast.error("Failed to load documents"); }
-    finally { setLoading(prev => ({ ...prev, docs: false })); }
+    } catch { 
+      console.error("Docs load error");
+    } finally { 
+      setLoading(prev => ({ ...prev, docs: false })); 
+    }
   }, []);
 
-  // ৩. ডেটা ফেচিং (Audit Logs with Pagination)
-  const fetchLogs = useCallback(async (pageNo = 1) => {
-    setLoading(prev => ({ ...prev, logs: true }));
+  // ৩. অডিট লগ ফেচিং
+  const fetchLogs = useCallback(async (pageNo = 1, showLoading = true) => {
+    if (showLoading) setLoading(prev => ({ ...prev, logs: true }));
     try {
       const res = await api.get(`/admin/audit-logs?page=${pageNo}&limit=15`);
       const logData = res.data?.logs || res.data?.data || (Array.isArray(res.data) ? res.data : []);
       setLogs(logData);
       setHasMoreLogs(logData.length >= 15);
       setLogPage(pageNo);
-    } catch { toast.error("Audit logs could not be loaded"); }
-    finally { setLoading(prev => ({ ...prev, logs: false })); }
+    } catch { 
+      console.error("Logs load error");
+    } finally { 
+      setLoading(prev => ({ ...prev, logs: false })); 
+    }
   }, []);
 
-  const refreshAll = () => {
-    fetchUsers();
-    fetchDocs();
-    fetchLogs(1);
+  const refreshAll = (showLoading = true) => {
+    fetchUsers(showLoading);
+    fetchDocs(showLoading);
+    fetchLogs(1, showLoading);
   };
 
+  // 🌟 অটো-আপডেট লজিক (প্রতি ১০ সেকেন্ডে ডেটা রিফ্রেশ হবে)
   useEffect(() => {
     if (authLoading) return;
     if (!isAdmin) { navigate('/dashboard'); return; }
-    refreshAll();
+    
+    // প্রথমবার লোড
+    refreshAll(true);
+
+    // ব্যাকগ্রাউন্ড ইন্টারভাল
+    const interval = setInterval(() => {
+      refreshAll(false); // ব্যাকগ্রাউন্ডে আপডেট হবে, লোডার দেখাবে না
+    }, 10000); 
+
+    return () => clearInterval(interval); // মেমোরি লিক রোধে ক্লিনিআপ
   }, [isAdmin, authLoading, navigate]);
+
+  // ফিল্টারিং লজিক (useMemo দিয়ে পারফরম্যান্স অপ্টিমাইজড)
+  const filteredUsers = useMemo(() => 
+    users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()))
+  , [users, search]);
+
+  const filteredDocs = useMemo(() => 
+    documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()))
+  , [documents, search]);
+
+  const filteredLogs = useMemo(() => 
+    logs.filter(l => !search || l.action?.toLowerCase().includes(search.toLowerCase()) || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()))
+  , [logs, search]);
 
   const handleDeleteUser = async (userId) => {
     if (!window.confirm("Are you sure? This action cannot be undone.")) return;
     try {
       await api.delete(`/admin/users/${userId}`);
-      setUsers(users.filter(u => u._id !== userId));
+      setUsers(prev => prev.filter(u => u._id !== userId));
       toast.success("User deleted");
     } catch { toast.error("Deletion failed"); }
   };
@@ -627,7 +987,7 @@ export default function AdminDashboard() {
     if (!window.confirm("Remove this document permanently?")) return;
     try {
       await api.delete(`/admin/documents/${docId}`);
-      setDocuments(documents.filter(d => d._id !== docId));
+      setDocuments(prev => prev.filter(d => d._id !== docId));
       toast.success("Document removed");
     } catch { toast.error("Delete failed"); }
   };
@@ -637,11 +997,6 @@ export default function AdminDashboard() {
     const d = new Date(dateStr);
     return isValid(d) ? format(d, fStr) : 'N/A';
   };
-
-  // ফিল্টারিং লজিক
-  const filteredUsers = users.filter(u => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
-  const filteredDocs = documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase()));
-  const filteredLogs = logs.filter(l => !search || l.action?.toLowerCase().includes(search.toLowerCase()) || l.performed_by?.email?.toLowerCase().includes(search.toLowerCase()));
 
   if (authLoading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 gap-4">
@@ -669,7 +1024,7 @@ export default function AdminDashboard() {
               <Plus className="mr-2 w-5 h-5" /> NEW DOC
             </Button>
           </Link>
-          <Button onClick={refreshAll} variant="outline" className="rounded-2xl px-6 h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50">
+          <Button onClick={() => refreshAll(true)} variant="outline" className="rounded-2xl px-6 h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50">
             <Activity size={18} className={`mr-2 text-emerald-500 ${(loading.users || loading.docs) ? 'animate-spin' : ''}`}/> REFRESH
           </Button>
         </div>
@@ -683,7 +1038,6 @@ export default function AdminDashboard() {
           <TabsTrigger value="logs" className="px-8 md:px-12 py-3 text-[10px] font-black uppercase tracking-widest data-[state=active]:text-sky-600">Audit Logs</TabsTrigger>
         </TabsList>
 
-        {/* Global Search */}
         <div className="bg-white dark:bg-slate-900 p-4 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex items-center">
           <div className="relative flex-1">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
@@ -697,10 +1051,8 @@ export default function AdminDashboard() {
           {loading[tab] && <Loader2 className="animate-spin text-sky-500 mr-4 w-5 h-5" />}
         </div>
 
-        {/* Content Section */}
         <div className="animate-in fade-in duration-500">
           
-          {/* DOCUMENTS VIEW */}
           {tab === 'documents' && (
             <div className="grid gap-6">
               {filteredDocs.length === 0 ? (
@@ -751,10 +1103,8 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* USERS VIEW (Desktop & Mobile) */}
           {tab === 'users' && (
             <Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-6 md:p-10">
-              {/* Desktop Table */}
               <div className="hidden md:block">
                 <table className="w-full text-left">
                   <thead>
@@ -788,8 +1138,6 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-
-              {/* Mobile List */}
               <div className="md:hidden flex flex-col gap-4">
                 {filteredUsers.map(u => (
                   <div key={u._id} className="p-4 border dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950/40">
@@ -807,14 +1155,12 @@ export default function AdminDashboard() {
             </Card>
           )}
 
-          {/* AUDIT LOGS VIEW */}
           {tab === 'logs' && (
             <Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-6 md:p-10">
               <div className="flex items-center gap-3 mb-8">
                 <History className="text-sky-500" size={24} />
                 <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Audit Trail</h3>
               </div>
-              
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[600px]">
                   <thead>
@@ -846,13 +1192,11 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-
-              {/* Pagination */}
               <div className="mt-10 pt-8 border-t dark:border-slate-800 flex justify-between items-center">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Page {logPage}</span>
                 <div className="flex gap-4">
-                  <Button onClick={() => fetchLogs(logPage - 1)} disabled={logPage === 1} variant="outline" className="rounded-xl h-12 w-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><ChevronLeft size={20}/></Button>
-                  <Button onClick={() => fetchLogs(logPage + 1)} disabled={!hasMoreLogs} variant="outline" className="rounded-xl h-12 w-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><ChevronRight size={20}/></Button>
+                  <Button onClick={() => fetchLogs(logPage - 1, true)} disabled={logPage === 1} variant="outline" className="rounded-xl h-12 w-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><ChevronLeft size={20}/></Button>
+                  <Button onClick={() => fetchLogs(logPage + 1, true)} disabled={!hasMoreLogs} variant="outline" className="rounded-xl h-12 w-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><ChevronRight size={20}/></Button>
                 </div>
               </div>
             </Card>

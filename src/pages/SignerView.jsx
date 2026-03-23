@@ -3877,15 +3877,242 @@
 //     </div>
 //   );
 // }
+// import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+// import { api } from '@/api/apiClient'; 
+// import { Button } from '@/components/ui/button';
+// import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+// import { toast } from 'sonner';
+// import { Loader2, CheckCircle2, Lock, PenTool, Mail, Clock } from 'lucide-react';
+// import SignaturePad from '../components/signing/SignaturePad';
+// import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+
+// pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
+
+// export default function SignerView() {
+//   const urlParams = new URLSearchParams(window.location.search);
+//   const token = urlParams.get('token');
+
+//   const [session, setSession] = useState(null);
+//   const [docData, setDocData] = useState(null); 
+//   const [loading, setLoading] = useState(true);
+//   const [fields, setFields] = useState([]);
+//   const [activeFieldId, setActiveFieldId] = useState(null);
+//   const [showSigPad, setShowSigPad] = useState(false);
+//   const [submitting, setSubmitting] = useState(false);
+//   const [completed, setCompleted] = useState(false);
+//   const [pagesData, setPagesData] = useState([]);
+//   const containerRef = useRef(null);
+
+//   const myPartyIndex = useMemo(() => {
+//     return session?.party?.index !== undefined ? Number(session.party.index) : null;
+//   }, [session]);
+
+//   const stats = useMemo(() => {
+//     const myFields = fields.filter(f => Number(f.partyIndex) === myPartyIndex);
+//     const done = myFields.filter(f => f.filled).length;
+//     const total = myFields.length;
+//     return { done, total, remaining: total - done };
+//   }, [fields, myPartyIndex]);
+
+//   const scrollToNextField = useCallback((currentFields) => {
+//     const nextField = [...currentFields]
+//       .filter(f => Number(f.partyIndex) === myPartyIndex && !f.filled)
+//       .sort((a, b) => Number(a.page) - Number(b.page) || Number(a.y) - Number(b.y))[0]; 
+
+//     if (nextField) {
+//       const element = document.getElementById(`field-${nextField.id}`);
+//       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+//     }
+//   }, [myPartyIndex]);
+
+//   const loadSession = useCallback(async () => {
+//     if (!token) { setLoading(false); return; }
+//     try {
+//       const res = await api.get(`/documents/sign/${token}`);
+//       setSession(res.data);
+//       setDocData(res.data.document);
+      
+//       const rawFields = res.data.document.fields || [];
+//       const cleaned = rawFields.map(f => {
+//         const obj = typeof f === 'string' ? JSON.parse(f) : f;
+//         return { 
+//           ...obj, 
+//           id: obj.id || `f_${Math.random()}`, 
+//           partyIndex: Number(obj.signerIndex ?? obj.partyIndex ?? 0), 
+//           filled: !!obj.value 
+//         };
+//       });
+//       setFields(cleaned);
+
+//       if (['completed', 'signed'].includes(res.data.document.status) || res.data.party.status === 'signed') {
+//         setCompleted(true);
+//       }
+//     } catch (err) { 
+//       toast.error('Invalid link.'); 
+//     } finally { setLoading(false); }
+//   }, [token]);
+
+//   useEffect(() => { loadSession(); }, [loadSession]);
+
+//   useEffect(() => {
+//     if (!docData?.fileId) return;
+//     const loadPdf = async () => {
+//       const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeURIComponent(docData.fileId)}`;
+//       try {
+//         const pdf = await pdfjsLib.getDocument({ url: proxyUrl, withCredentials: true }).promise;
+//         const width = containerRef.current?.clientWidth || 800;
+//         const pages = [];
+//         for (let i = 1; i <= pdf.numPages; i++) {
+//           const page = await pdf.getPage(i);
+//           const viewport = page.getViewport({ scale: (width - 40) / page.getViewport({ scale: 1 }).width });
+//           pages.push({ num: i, viewport, pageObj: page });
+//         }
+//         setPagesData(pages);
+//       } catch (err) { console.error("PDF Error:", err); }
+//     };
+//     loadPdf();
+//   }, [docData]);
+
+//   const handleFieldClick = (e, field) => {
+//     e.preventDefault();
+//     if (Number(field.partyIndex) !== myPartyIndex) return toast.error("Not your turn.");
+//     setActiveFieldId(field.id);
+//     setShowSigPad(true);
+//   };
+
+//   const handleSignature = (sigValue) => {
+//     const newFields = fields.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f);
+//     setFields(newFields);
+//     setShowSigPad(false);
+//     toast.success("Signed!");
+//     setTimeout(() => scrollToNextField(newFields), 100);
+//   };
+
+//   const handleSubmit = async () => {
+//     if (stats.remaining > 0) {
+//       toast.error(`Please fill all ${stats.remaining} fields.`);
+//       scrollToNextField(fields); 
+//       return;
+//     }
+//     setSubmitting(true);
+//     try {
+//       // Fast UI Response
+//       api.post(`/documents/sign/submit`, { token, fields }); 
+//       setCompleted(true);
+//       toast.success('Submitted Successfully!');
+//     } catch (err) { 
+//       setSubmitting(false);
+//       toast.error('Submission failed.'); 
+//     }
+//   };
+
+//   if (loading) return <div className="h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-sky-500" size={40} /></div>;
+
+//   // সাকসেস স্টেট মেসেজ আপডেট করা হয়েছে
+//   if (completed) return (
+//     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 text-center p-6">
+//       <div className="bg-white p-10 rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full flex flex-col items-center">
+//         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
+//           <CheckCircle2 size={50} className="text-green-600" />
+//         </div>
+//         <h2 className="text-3xl font-extrabold text-slate-800 mb-4">Successfully Signed!</h2>
+//         <div className="space-y-4 text-slate-600">
+//           <p className="text-lg">Your signature has been securely recorded.</p>
+//           <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-xl text-left border border-blue-100">
+//             <Mail className="text-blue-500 mt-1 shrink-0" size={20} />
+//             <p className="text-sm">
+//               Once <strong>all parties</strong> have finished signing, a final copy of the executed document will be automatically sent to your email.
+//             </p>
+//           </div>
+//           <div className="flex items-center justify-center gap-2 text-slate-400 text-sm mt-4">
+//             <Clock size={16} />
+//             <span>Thank you for using NexSign</span>
+//           </div>
+//         </div>
+//         <Button 
+//           variant="outline" 
+//           className="mt-8 w-full rounded-xl py-6 font-bold text-slate-500 hover:text-slate-800"
+//           onClick={() => window.close()}
+//         >
+//           Close Tab
+//         </Button>
+//       </div>
+//     </div>
+//   );
+
+//   return (
+//     <div className="min-h-screen bg-slate-100">
+//       <header className="sticky top-0 z-[100] bg-white border-b p-3 flex justify-between items-center shadow-sm">
+//         <div className="flex flex-col">
+//           <h1 className="font-bold text-slate-800 truncate max-w-[150px]">{docData?.title}</h1>
+//           <div className="flex items-center gap-2 mt-1">
+//              <div className="h-1.5 w-20 bg-slate-200 rounded-full overflow-hidden">
+//                 <div className="h-full bg-sky-500 transition-all duration-300" style={{ width: `${(stats.done/stats.total)*100}%` }} />
+//              </div>
+//              <span className="text-[10px] font-bold text-sky-600 uppercase">{stats.done}/{stats.total} Fields</span>
+//           </div>
+//         </div>
+//         <Button onClick={handleSubmit} disabled={submitting} className="rounded-full bg-sky-600 px-6 font-bold h-9 hover:bg-sky-700 shadow-md">
+//           {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Finish'}
+//         </Button>
+//       </header>
+
+//       <main ref={containerRef} className="w-full max-w-4xl mx-auto py-6 px-2">
+//         {pagesData.map((page) => (
+//           <div key={page.num} className="relative mb-6 bg-white shadow-xl border rounded mx-auto overflow-hidden" style={{ width: page.viewport.width, height: page.viewport.height }}>
+//             <canvas ref={el => {
+//               if (el && !el.dataset.rendered) {
+//                 const ctx = el.getContext('2d');
+//                 el.width = page.viewport.width; el.height = page.viewport.height;
+//                 page.pageObj.render({ canvasContext: ctx, viewport: page.viewport });
+//                 el.dataset.rendered = 'true';
+//               }
+//             }} />
+            
+//             {fields.filter(f => Number(f.page) === page.num).map(field => {
+//               const isMine = Number(field.partyIndex) === myPartyIndex;
+//               return (
+//                 <div key={field.id} id={`field-${field.id}`} onClick={(e) => handleFieldClick(e, field)}
+//                   className={`absolute border-2 flex items-center justify-center rounded transition-all
+//                     ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/10 cursor-pointer shadow-sm ring-4 ring-sky-500/5' : 'border-slate-300 bg-slate-100/20'}`}
+//                   style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
+                  
+//                   {field.filled ? (
+//                     <img src={field.value} className="w-[90%] h-[90%] object-contain mix-blend-multiply" alt="Signed" />
+//                   ) : (
+//                     <div className="flex flex-col items-center">
+//                        {isMine ? <PenTool size={16} className="text-sky-600" /> : <Lock size={12} className="text-slate-400" />}
+//                        <span className={`text-[9px] font-bold ${isMine ? 'text-sky-600' : 'text-slate-400'}`}>
+//                          {isMine ? 'SIGN' : `P${Number(field.partyIndex) + 1}`}
+//                        </span>
+//                     </div>
+//                   )}
+//                 </div>
+//               );
+//             })}
+//           </div>
+//         ))}
+//       </main>
+
+//       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
+//         <DialogContent className="max-w-lg p-6 bg-white rounded-2xl border-none shadow-2xl">
+//           <DialogTitle className="mb-4 font-bold text-xl text-slate-800">Add Your Signature</DialogTitle>
+//           <SignaturePad onSignatureComplete={handleSignature} />
+//         </DialogContent>
+//       </Dialog>
+//     </div>
+//   );
+// }
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { api } from '@/api/apiClient'; 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Lock, PenTool, Mail, Clock } from 'lucide-react';
+import { Loader2, CheckCircle2, Lock, PenTool, Mail, Clock, AlertCircle } from 'lucide-react';
 import SignaturePad from '../components/signing/SignaturePad';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
+// 🌟 কনফিগারেশন
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
 export default function SignerView() {
@@ -3903,20 +4130,36 @@ export default function SignerView() {
   const [pagesData, setPagesData] = useState([]);
   const containerRef = useRef(null);
 
-  const myPartyIndex = useMemo(() => {
-    return session?.party?.index !== undefined ? Number(session.party.index) : null;
-  }, [session]);
+  // 🌟 মেমোয়াইজড ভ্যালু
+  const myPartyIndex = useMemo(() => session?.party?.index ?? null, [session]);
 
   const stats = useMemo(() => {
-    const myFields = fields.filter(f => Number(f.partyIndex) === myPartyIndex);
+    const myFields = fields.filter(f => Number(f.partyIndex) === Number(myPartyIndex));
     const done = myFields.filter(f => f.filled).length;
     const total = myFields.length;
     return { done, total, remaining: total - done };
   }, [fields, myPartyIndex]);
 
+  // 🌟 লোকেশন ডাটা সংগ্রহের জন্য ইন্টারনাল ফাংশন
+  const getGeoData = async () => {
+    try {
+      const res = await fetch('https://ip-api.com/json/?fields=status,country,regionName,city,zip');
+      const data = await res.json();
+      if (data.status === 'success') {
+        return {
+          location: `${data.city}, ${data.regionName}, ${data.country}`,
+          postalCode: data.zip || "N/A"
+        };
+      }
+    } catch (e) {
+      console.error("Geo Data Error:", e);
+    }
+    return { location: "Unknown Location", postalCode: "N/A" };
+  };
+
   const scrollToNextField = useCallback((currentFields) => {
-    const nextField = [...currentFields]
-      .filter(f => Number(f.partyIndex) === myPartyIndex && !f.filled)
+    const nextField = currentFields
+      .filter(f => Number(f.partyIndex) === Number(myPartyIndex) && !f.filled)
       .sort((a, b) => Number(a.page) - Number(b.page) || Number(a.y) - Number(b.y))[0]; 
 
     if (nextField) {
@@ -3944,11 +4187,11 @@ export default function SignerView() {
       });
       setFields(cleaned);
 
-      if (['completed', 'signed'].includes(res.data.document.status) || res.data.party.status === 'signed') {
+      if (res.data.document.status === 'completed' || res.data.party.status === 'signed') {
         setCompleted(true);
       }
     } catch (err) { 
-      toast.error('Invalid link.'); 
+      toast.error('Invalid or expired link.'); 
     } finally { setLoading(false); }
   }, [token]);
 
@@ -3956,26 +4199,36 @@ export default function SignerView() {
 
   useEffect(() => {
     if (!docData?.fileId) return;
+    let isCancelled = false;
+
     const loadPdf = async () => {
       const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeURIComponent(docData.fileId)}`;
       try {
-        const pdf = await pdfjsLib.getDocument({ url: proxyUrl, withCredentials: true }).promise;
-        const width = containerRef.current?.clientWidth || 800;
+        const loadingTask = pdfjsLib.getDocument({ url: proxyUrl, withCredentials: true });
+        const pdf = await loadingTask.promise;
+        const containerWidth = containerRef.current?.clientWidth || 800;
+        
         const pages = [];
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: (width - 40) / page.getViewport({ scale: 1 }).width });
-          pages.push({ num: i, viewport, pageObj: page });
+          const originalViewport = page.getViewport({ scale: 1 });
+          const scale = (containerWidth - 20) / originalViewport.width;
+          pages.push({ num: i, viewport: page.getViewport({ scale }), pageObj: page });
         }
-        setPagesData(pages);
-      } catch (err) { console.error("PDF Error:", err); }
+        if (!isCancelled) setPagesData(pages);
+      } catch (err) { 
+        console.error("PDF Load Error:", err);
+      }
     };
     loadPdf();
+    return () => { isCancelled = true; };
   }, [docData]);
 
   const handleFieldClick = (e, field) => {
     e.preventDefault();
-    if (Number(field.partyIndex) !== myPartyIndex) return toast.error("Not your turn.");
+    if (Number(field.partyIndex) !== Number(myPartyIndex)) {
+      return toast.error("This field belongs to another signer.");
+    }
     setActiveFieldId(field.id);
     setShowSigPad(true);
   };
@@ -3984,106 +4237,123 @@ export default function SignerView() {
     const newFields = fields.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f);
     setFields(newFields);
     setShowSigPad(false);
-    toast.success("Signed!");
-    setTimeout(() => scrollToNextField(newFields), 100);
+    toast.success("Signature added!");
+    setTimeout(() => scrollToNextField(newFields), 300);
   };
 
   const handleSubmit = async () => {
     if (stats.remaining > 0) {
-      toast.error(`Please fill all ${stats.remaining} fields.`);
+      toast.error(`Please complete all ${stats.remaining} required fields.`);
       scrollToNextField(fields); 
       return;
     }
     setSubmitting(true);
+    
+    // 🌟 ব্যাকএন্ড অডিট লগের জন্য লোকেশন ডাটা সংগ্রহ
+    const geo = await getGeoData();
+
     try {
-      // Fast UI Response
-      api.post(`/documents/sign/submit`, { token, fields }); 
+      await api.post(`/documents/sign/submit`, { 
+        token, 
+        fields,
+        auditData: {
+            location: geo.location,
+            postalCode: geo.postalCode
+        }
+      }); 
       setCompleted(true);
-      toast.success('Submitted Successfully!');
+      toast.success('Document signed successfully!');
     } catch (err) { 
+      toast.error(err.response?.data?.error || 'Failed to submit. Please check your connection.'); 
+    } finally {
       setSubmitting(false);
-      toast.error('Submission failed.'); 
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-sky-500" size={40} /></div>;
+  if (loading) return (
+    <div className="h-screen flex flex-col items-center justify-center bg-white gap-4">
+      <Loader2 className="animate-spin text-sky-500" size={40} />
+      <p className="text-slate-500 font-medium">Securing your session...</p>
+    </div>
+  );
 
-  // সাকসেস স্টেট মেসেজ আপডেট করা হয়েছে
   if (completed) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 text-center p-6">
-      <div className="bg-white p-10 rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full flex flex-col items-center">
+      <div className="bg-white p-10 rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full flex flex-col items-center animate-in fade-in zoom-in duration-300">
         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
           <CheckCircle2 size={50} className="text-green-600" />
         </div>
-        <h2 className="text-3xl font-extrabold text-slate-800 mb-4">Successfully Signed!</h2>
+        <h2 className="text-3xl font-extrabold text-slate-800 mb-4">You're All Set!</h2>
         <div className="space-y-4 text-slate-600">
-          <p className="text-lg">Your signature has been securely recorded.</p>
-          <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-xl text-left border border-blue-100">
-            <Mail className="text-blue-500 mt-1 shrink-0" size={20} />
+          <p className="text-lg">Your signature has been recorded.</p>
+          <div className="flex items-start gap-3 bg-sky-50 p-4 rounded-xl text-left border border-sky-100">
+            <Mail className="text-sky-500 mt-1 shrink-0" size={20} />
             <p className="text-sm">
-              Once <strong>all parties</strong> have finished signing, a final copy of the executed document will be automatically sent to your email.
+              A final executed copy will be emailed to you once <strong>all parties</strong> have completed the signing process.
             </p>
-          </div>
-          <div className="flex items-center justify-center gap-2 text-slate-400 text-sm mt-4">
-            <Clock size={16} />
-            <span>Thank you for using NexSign</span>
           </div>
         </div>
         <Button 
           variant="outline" 
-          className="mt-8 w-full rounded-xl py-6 font-bold text-slate-500 hover:text-slate-800"
+          className="mt-8 w-full rounded-xl py-6 font-bold text-slate-500 hover:bg-slate-50"
           onClick={() => window.close()}
         >
-          Close Tab
+          Close this window
         </Button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="sticky top-0 z-[100] bg-white border-b p-3 flex justify-between items-center shadow-sm">
-        <div className="flex flex-col">
-          <h1 className="font-bold text-slate-800 truncate max-w-[150px]">{docData?.title}</h1>
+    <div className="min-h-screen bg-slate-200">
+      <header className="sticky top-0 z-[100] bg-white/95 backdrop-blur-md border-b p-3 flex justify-between items-center shadow-sm">
+        <div className="flex flex-col ml-2">
+          <h1 className="font-bold text-slate-800 truncate max-w-[200px]">{docData?.title || 'Loading...'}</h1>
           <div className="flex items-center gap-2 mt-1">
-             <div className="h-1.5 w-20 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-sky-500 transition-all duration-300" style={{ width: `${(stats.done/stats.total)*100}%` }} />
+             <div className="h-1.5 w-24 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-full bg-sky-500 transition-all duration-500" style={{ width: `${(stats.done/stats.total)*100}%` }} />
              </div>
-             <span className="text-[10px] font-bold text-sky-600 uppercase">{stats.done}/{stats.total} Fields</span>
+             <span className="text-[10px] font-bold text-sky-600 uppercase tracking-tight">{stats.done}/{stats.total} Fields Done</span>
           </div>
         </div>
-        <Button onClick={handleSubmit} disabled={submitting} className="rounded-full bg-sky-600 px-6 font-bold h-9 hover:bg-sky-700 shadow-md">
-          {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Finish'}
+        <Button onClick={handleSubmit} disabled={submitting} className="rounded-full bg-sky-600 px-8 font-bold h-10 hover:bg-sky-700 shadow-lg shadow-sky-200 active:scale-95 transition-all">
+          {submitting ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+          {submitting ? 'Processing...' : 'Finish'}
         </Button>
       </header>
 
-      <main ref={containerRef} className="w-full max-w-4xl mx-auto py-6 px-2">
+      <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-4 flex flex-col items-center">
         {pagesData.map((page) => (
-          <div key={page.num} className="relative mb-6 bg-white shadow-xl border rounded mx-auto overflow-hidden" style={{ width: page.viewport.width, height: page.viewport.height }}>
-            <canvas ref={el => {
+          <div key={page.num} className="relative mb-8 bg-white shadow-2xl border border-slate-300 rounded-sm overflow-hidden" 
+               style={{ width: page.viewport.width, height: page.viewport.height }}>
+            <canvas className="w-full h-full" ref={el => {
               if (el && !el.dataset.rendered) {
                 const ctx = el.getContext('2d');
-                el.width = page.viewport.width; el.height = page.viewport.height;
+                const ratio = window.devicePixelRatio || 1; 
+                el.width = page.viewport.width * ratio;
+                el.height = page.viewport.height * ratio;
+                ctx.scale(ratio, ratio);
                 page.pageObj.render({ canvasContext: ctx, viewport: page.viewport });
                 el.dataset.rendered = 'true';
               }
             }} />
             
             {fields.filter(f => Number(f.page) === page.num).map(field => {
-              const isMine = Number(field.partyIndex) === myPartyIndex;
+              const isMine = Number(field.partyIndex) === Number(myPartyIndex);
               return (
                 <div key={field.id} id={`field-${field.id}`} onClick={(e) => handleFieldClick(e, field)}
-                  className={`absolute border-2 flex items-center justify-center rounded transition-all
-                    ${isMine && !field.filled ? 'border-sky-500 bg-sky-500/10 cursor-pointer shadow-sm ring-4 ring-sky-500/5' : 'border-slate-300 bg-slate-100/20'}`}
+                  className={`absolute border-2 flex items-center justify-center rounded transition-all duration-200
+                    ${isMine && !field.filled ? 'border-sky-500 bg-sky-400/10 cursor-pointer shadow-inner animate-pulse ring-4 ring-sky-500/10' : 
+                      isMine && field.filled ? 'border-green-500 bg-transparent' : 'border-slate-300 bg-slate-200/30'}`}
                   style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
                   
                   {field.filled ? (
-                    <img src={field.value} className="w-[90%] h-[90%] object-contain mix-blend-multiply" alt="Signed" />
+                    <img src={field.value} className="w-[92%] h-[92%] object-contain mix-blend-multiply" alt="Signed" />
                   ) : (
-                    <div className="flex flex-col items-center">
-                       {isMine ? <PenTool size={16} className="text-sky-600" /> : <Lock size={12} className="text-slate-400" />}
-                       <span className={`text-[9px] font-bold ${isMine ? 'text-sky-600' : 'text-slate-400'}`}>
-                         {isMine ? 'SIGN' : `P${Number(field.partyIndex) + 1}`}
+                    <div className="flex flex-col items-center gap-1">
+                       {isMine ? <PenTool size={18} className="text-sky-600" /> : <Lock size={14} className="text-slate-400" />}
+                       <span className={`text-[10px] font-extrabold ${isMine ? 'text-sky-600' : 'text-slate-400'}`}>
+                         {isMine ? 'SIGN HERE' : `SIGNER ${Number(field.partyIndex) + 1}`}
                        </span>
                     </div>
                   )}
@@ -4095,9 +4365,14 @@ export default function SignerView() {
       </main>
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
-        <DialogContent className="max-w-lg p-6 bg-white rounded-2xl border-none shadow-2xl">
-          <DialogTitle className="mb-4 font-bold text-xl text-slate-800">Add Your Signature</DialogTitle>
-          <SignaturePad onSignatureComplete={handleSignature} />
+        <DialogContent className="max-w-lg p-0 bg-white rounded-2xl overflow-hidden border-none shadow-2xl">
+          <div className="bg-sky-600 p-4">
+            <DialogTitle className="font-bold text-lg text-white">Create Your Signature</DialogTitle>
+            <p className="text-sky-100 text-xs mt-1">Draw your signature inside the box below.</p>
+          </div>
+          <div className="p-6">
+            <SignaturePad onSignatureComplete={handleSignature} />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

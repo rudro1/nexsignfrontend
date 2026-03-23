@@ -474,7 +474,242 @@
 // }
 
 //ai 
-import React, { useRef, useState, useEffect } from 'react';
+// import React, { useRef, useState, useEffect } from 'react';
+// import { Button } from '@/components/ui/button';
+// import { Input } from '@/components/ui/input';
+// import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+// import { Eraser, Check, Type as TypeIcon, PenTool } from 'lucide-react';
+
+// export default function SignaturePad({ onSignatureComplete }) {
+//   const canvasRef = useRef(null);
+//   const [isDrawing, setIsDrawing] = useState(false);
+//   const [hasDrawn, setHasDrawn] = useState(false);
+//   const [typedSig, setTypedSig] = useState('');
+//   const [mode, setMode] = useState('draw');
+
+//   useEffect(() => {
+//     const canvas = canvasRef.current;
+//     if (!canvas || mode !== 'draw') return;
+//     const ctx = canvas.getContext('2d');
+//     const dpr = window.devicePixelRatio || 1;
+//     const rect = canvas.getBoundingClientRect();
+//     canvas.width = rect.width * dpr;
+//     canvas.height = rect.height * dpr;
+//     ctx.scale(dpr, dpr);
+//     ctx.strokeStyle = '#000000';
+//     ctx.lineWidth = 2.5;
+//     ctx.lineCap = 'round';
+//     ctx.lineJoin = 'round';
+//   }, [mode]);
+
+//   const getPos = (e) => {
+//     const canvas = canvasRef.current;
+//     const rect = canvas.getBoundingClientRect();
+//     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+//     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+//     return { x: clientX - rect.left, y: clientY - rect.top };
+//   };
+
+//   const startDraw = (e) => {
+//     const pos = getPos(e);
+//     const ctx = canvasRef.current.getContext('2d');
+//     ctx.beginPath();
+//     ctx.moveTo(pos.x, pos.y);
+//     setIsDrawing(true);
+//   };
+
+//   const draw = (e) => {
+//     if (!isDrawing) return;
+//     const pos = getPos(e);
+//     const ctx = canvasRef.current.getContext('2d');
+//     ctx.lineTo(pos.x, pos.y);
+//     ctx.stroke();
+//     setHasDrawn(true);
+//   };
+
+//   const endDraw = () => setIsDrawing(false);
+
+//   const clearCanvas = () => {
+//     const canvas = canvasRef.current;
+//     const ctx = canvas.getContext('2d');
+//     ctx.clearRect(0, 0, canvas.width, canvas.height);
+//     setHasDrawn(false);
+//   };
+
+//   // const handleConfirm = () => {
+//   //   let finalValue = "";
+//   //   if (mode === 'draw') {
+//   //     if (!hasDrawn) return;
+//   //     finalValue = canvasRef.current.toDataURL('image/png');
+//   //   } else {
+//   //     if (!typedSig.trim()) return;
+      
+//   //     // হাই-রেজোলিউশন ইমেজ তৈরির জন্য বড় ক্যানভাস
+//   //     const canvas = document.createElement('canvas');
+//   //     canvas.width = 1000; 
+//   //     canvas.height = 250;
+//   //     const ctx = canvas.getContext('2d');
+      
+//   //     // ব্যাকগ্রাউন্ড সাদা করা ক্লিয়ারিটির জন্য
+//   //     ctx.fillStyle = 'white';
+//   //     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+//   //     ctx.fillStyle = '#000000';
+//   //     // ফন্ট সেট করা (Times New Roman, Normal, No Italic)
+//   //     ctx.font = '500 80px "Times New Roman", serif';
+//   //     ctx.textAlign = 'center';
+//   //     ctx.textBaseline = 'middle';
+//   //     ctx.fillText(typedSig, 500, 125);
+      
+//   //     finalValue = canvas.toDataURL('image/png');
+//   //   }
+//   //   onSignatureComplete(finalValue);
+//   // };
+
+//   //solving snap error problem 
+
+// // const handleConfirm = () => {
+// //   let finalValue = "";
+// //   if (mode === 'draw') {
+// //     if (!hasDrawn) return;
+
+// //     // ১. একটি অফ-স্ক্রিন ক্যানভাস তৈরি করুন
+// //     const canvas = canvasRef.current;
+// //     const offscreenCanvas = document.createElement('canvas');
+// //     offscreenCanvas.width = canvas.width;
+// //     offscreenCanvas.height = canvas.height;
+// //     const ctx = offscreenCanvas.getContext('2d');
+
+// //     // ২. ব্যাকগ্রাউন্ড সাদা করুন (এটিই ব্ল্যাক হওয়া বন্ধ করবে)
+// //     ctx.fillStyle = 'white';
+// //     ctx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+// //     // ৩. সিগনেচারটি সাদা ব্যাকগ্রাউন্ডের ওপর বসান
+// //     ctx.drawImage(canvas, 0, 0);
+    
+// //     // ৪. এখন JPEG হিসেবে সেভ করুন
+// //     // finalValue = offscreenCanvas.toDataURL('image/jpeg', 0.5);
+// //     finalValue = canvasRef.current.toDataURL('image/png');
+// //   } else {
+// //     // টাইপ মোডে আপনি অলরেডি সাদা ব্যাকগ্রাউন্ড দিচ্ছেন, এটি ঠিক আছে
+// //     if (!typedSig.trim()) return;
+// //     const canvas = document.createElement('canvas');
+// //     canvas.width = 1000; 
+// //     canvas.height = 250;
+// //     const ctx = canvas.getContext('2d');
+// //     ctx.fillStyle = 'white';
+// //     ctx.fillRect(0, 0, canvas.width, canvas.height);
+// //     ctx.fillStyle = '#000000';
+// //     ctx.font = '500 80px "Times New Roman", serif';
+// //     ctx.textAlign = 'center';
+// //     ctx.textBaseline = 'middle';
+// //     ctx.fillText(typedSig, 500, 125);
+// //     finalValue = canvas.toDataURL('image/png', 0.5);
+// //   }
+// //   onSignatureComplete(finalValue);
+// // };
+
+
+
+
+// const handleConfirm = () => {
+//   let finalValue = "";
+
+//   if (mode === 'draw') {
+//     // ১. ড্র মোড চেক: যদি কিছু আঁকা না হয় তবে রিটার্ন করবে
+//     if (!hasDrawn) return;
+
+//     // ২. স্বচ্ছ PNG তৈরি: 
+//     // সরাসরি canvasRef থেকে ডাটা নিলে এটি ডিফল্টভাবে স্বচ্ছ থাকে।
+//     // এখানে কোনো সাদা ব্যাকগ্রাউন্ড বা অফ-স্ক্রিন ক্যানভাসের প্রয়োজন নেই।
+//     finalValue = canvasRef.current.toDataURL('image/png');
+
+//   } else {
+//     // ৩. টাইপ মোড চেক: যদি ইনপুট খালি থাকে তবে রিটার্ন করবে
+//     if (!typedSig.trim()) return;
+
+//     // ৪. অফ-স্ক্রিন ক্যানভাস তৈরি (টাইপ করা সিগনেচারের জন্য)
+//     const canvas = document.createElement('canvas');
+//     canvas.width = 1000; 
+//     canvas.height = 250;
+//     const ctx = canvas.getContext('2d');
+
+//     // ৫. গুরুত্বপূর্ণ পরিবর্তন: 
+//     // আমরা কোনো 'white' fill করছি না। clearRect ব্যবহার করে ক্যানভাস স্বচ্ছ রাখা হচ্ছে।
+//     ctx.clearRect(0, 0, canvas.width, canvas.height); 
+
+//     // ৬. টেক্সট কনফিগারেশন
+//     ctx.fillStyle = '#000000'; // সিগনেচারের রঙ কালো
+//     ctx.font = '500 80px "Times New Roman", serif'; // প্রফেশনাল ফন্ট
+//     ctx.textAlign = 'center';
+//     ctx.textBaseline = 'middle';
+    
+//     // ৭. স্বচ্ছ ক্যানভাসের ওপর নাম লেখা
+//     ctx.fillText(typedSig, 500, 125);
+
+//     // ৮. PNG হিসেবে আউটপুট নেওয়া (যা স্বচ্ছতা বজায় রাখবে)
+//     finalValue = canvas.toDataURL('image/png');
+//   }
+
+//   // ৯. ফাইনাল ডাটা পাঠানো
+//   onSignatureComplete(finalValue);
+// };
+//   return (
+//     <div className="space-y-5">
+//       <Tabs value={mode} onValueChange={setMode} className="w-full">
+//         <TabsList className="grid grid-cols-2 w-full bg-slate-100 rounded-xl p-1">
+//           <TabsTrigger value="draw" className="rounded-lg gap-2">
+//             <PenTool className="w-4 h-4" /> Draw
+//           </TabsTrigger>
+//           <TabsTrigger value="type" className="rounded-lg gap-2">
+//             <TypeIcon className="w-4 h-4" /> Type
+//           </TabsTrigger>
+//         </TabsList>
+
+//         <TabsContent value="draw" className="mt-4">
+//           <div className="relative border-2 border-slate-200 rounded-2xl bg-white overflow-hidden shadow-inner">
+//             <canvas
+//               ref={canvasRef}
+//               className="w-full h-40 cursor-crosshair touch-none"
+//               onMouseDown={startDraw}
+//               onMouseMove={draw}
+//               onMouseUp={endDraw}
+//               onMouseLeave={endDraw}
+//               onTouchStart={startDraw}
+//               onTouchMove={draw}
+//               onTouchEnd={endDraw}
+//             />
+//           </div>
+//           <div className="flex justify-end mt-3">
+//             <Button variant="ghost" size="sm" onClick={clearCanvas} className="text-rose-500">
+//               <Eraser className="w-4 h-4 mr-2" /> Clear Space
+//             </Button>
+//           </div>
+//         </TabsContent>
+
+//         <TabsContent value="type" className="mt-4">
+//           <Input
+//             value={typedSig}
+//             onChange={e => setTypedSig(e.target.value)}
+//             placeholder="Type your name..."
+//             className="h-24 text-4xl text-center rounded-2xl border-2 border-slate-200 focus:ring-sky-500"
+//             style={{ fontFamily: '"Times New Roman", serif' }} 
+//           />
+//         </TabsContent>
+//       </Tabs>
+
+//       <Button
+//         onClick={handleConfirm}
+//         disabled={(mode === 'draw' && !hasDrawn) || (mode === 'type' && !typedSig.trim())}
+//         className="w-full h-12 bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-lg"
+//       >
+//         <Check className="w-5 h-5 mr-2" /> Use This Signature
+//       </Button>
+//     </div>
+//   );
+// }
+
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -487,28 +722,39 @@ export default function SignaturePad({ onSignatureComplete }) {
   const [typedSig, setTypedSig] = useState('');
   const [mode, setMode] = useState('draw');
 
+  // ১. ক্যানভাস সেটআপ এবং হাই-রেজোলিউশন সাপোর্ট
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || mode !== 'draw') return;
+
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
+
+    // রেজোলিউশন শার্প করার জন্য Scaling
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
+
+    // ড্রয়িং স্টাইল
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
   }, [mode]);
 
-  const getPos = (e) => {
+  // ২. পজিশন ক্যালকুলেটর (Optimized for Mobile/Desktop)
+  const getPos = useCallback((e) => {
     const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: clientX - rect.left, y: clientY - rect.top };
-  };
+    return { 
+      x: clientX - rect.left, 
+      y: clientY - rect.top 
+    };
+  }, []);
 
   const startDraw = (e) => {
     const pos = getPos(e);
@@ -531,146 +777,62 @@ export default function SignaturePad({ onSignatureComplete }) {
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    // ক্যানভাস পুরোপুরি পরিষ্কার (স্বচ্ছ) করা
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
   };
 
-  // const handleConfirm = () => {
-  //   let finalValue = "";
-  //   if (mode === 'draw') {
-  //     if (!hasDrawn) return;
-  //     finalValue = canvasRef.current.toDataURL('image/png');
-  //   } else {
-  //     if (!typedSig.trim()) return;
+  // ৩. সিগনেচার কনফার্মেশন লজিক (Transparent PNG Fix)
+  const handleConfirm = () => {
+    let finalValue = "";
+
+    if (mode === 'draw') {
+      if (!hasDrawn) return;
+      // সরাসরি স্বচ্ছ PNG এক্সপোর্ট (সাদা ব্যাকগ্রাউন্ড ছাড়াই)
+      finalValue = canvasRef.current.toDataURL('image/png');
+    } else {
+      if (!typedSig.trim()) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1000; 
+      canvas.height = 250;
+      const ctx = canvas.getContext('2d');
+
+      // নিশ্চিত করা যে ক্যানভাসটি স্বচ্ছ
+      ctx.clearRect(0, 0, canvas.width, canvas.height); 
+
+      // প্রফেশনাল টেক্সট স্টাইল
+      ctx.fillStyle = '#000000'; 
+      ctx.font = '500 85px "Times New Roman", serif'; 
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       
-  //     // হাই-রেজোলিউশন ইমেজ তৈরির জন্য বড় ক্যানভাস
-  //     const canvas = document.createElement('canvas');
-  //     canvas.width = 1000; 
-  //     canvas.height = 250;
-  //     const ctx = canvas.getContext('2d');
-      
-  //     // ব্যাকগ্রাউন্ড সাদা করা ক্লিয়ারিটির জন্য
-  //     ctx.fillStyle = 'white';
-  //     ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillText(typedSig, 500, 125);
+      finalValue = canvas.toDataURL('image/png');
+    }
 
-  //     ctx.fillStyle = '#000000';
-  //     // ফন্ট সেট করা (Times New Roman, Normal, No Italic)
-  //     ctx.font = '500 80px "Times New Roman", serif';
-  //     ctx.textAlign = 'center';
-  //     ctx.textBaseline = 'middle';
-  //     ctx.fillText(typedSig, 500, 125);
-      
-  //     finalValue = canvas.toDataURL('image/png');
-  //   }
-  //   onSignatureComplete(finalValue);
-  // };
+    onSignatureComplete(finalValue);
+  };
 
-  //solving snap error problem 
-
-// const handleConfirm = () => {
-//   let finalValue = "";
-//   if (mode === 'draw') {
-//     if (!hasDrawn) return;
-
-//     // ১. একটি অফ-স্ক্রিন ক্যানভাস তৈরি করুন
-//     const canvas = canvasRef.current;
-//     const offscreenCanvas = document.createElement('canvas');
-//     offscreenCanvas.width = canvas.width;
-//     offscreenCanvas.height = canvas.height;
-//     const ctx = offscreenCanvas.getContext('2d');
-
-//     // ২. ব্যাকগ্রাউন্ড সাদা করুন (এটিই ব্ল্যাক হওয়া বন্ধ করবে)
-//     ctx.fillStyle = 'white';
-//     ctx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
-
-//     // ৩. সিগনেচারটি সাদা ব্যাকগ্রাউন্ডের ওপর বসান
-//     ctx.drawImage(canvas, 0, 0);
-    
-//     // ৪. এখন JPEG হিসেবে সেভ করুন
-//     // finalValue = offscreenCanvas.toDataURL('image/jpeg', 0.5);
-//     finalValue = canvasRef.current.toDataURL('image/png');
-//   } else {
-//     // টাইপ মোডে আপনি অলরেডি সাদা ব্যাকগ্রাউন্ড দিচ্ছেন, এটি ঠিক আছে
-//     if (!typedSig.trim()) return;
-//     const canvas = document.createElement('canvas');
-//     canvas.width = 1000; 
-//     canvas.height = 250;
-//     const ctx = canvas.getContext('2d');
-//     ctx.fillStyle = 'white';
-//     ctx.fillRect(0, 0, canvas.width, canvas.height);
-//     ctx.fillStyle = '#000000';
-//     ctx.font = '500 80px "Times New Roman", serif';
-//     ctx.textAlign = 'center';
-//     ctx.textBaseline = 'middle';
-//     ctx.fillText(typedSig, 500, 125);
-//     finalValue = canvas.toDataURL('image/png', 0.5);
-//   }
-//   onSignatureComplete(finalValue);
-// };
-
-
-
-
-const handleConfirm = () => {
-  let finalValue = "";
-
-  if (mode === 'draw') {
-    // ১. ড্র মোড চেক: যদি কিছু আঁকা না হয় তবে রিটার্ন করবে
-    if (!hasDrawn) return;
-
-    // ২. স্বচ্ছ PNG তৈরি: 
-    // সরাসরি canvasRef থেকে ডাটা নিলে এটি ডিফল্টভাবে স্বচ্ছ থাকে।
-    // এখানে কোনো সাদা ব্যাকগ্রাউন্ড বা অফ-স্ক্রিন ক্যানভাসের প্রয়োজন নেই।
-    finalValue = canvasRef.current.toDataURL('image/png');
-
-  } else {
-    // ৩. টাইপ মোড চেক: যদি ইনপুট খালি থাকে তবে রিটার্ন করবে
-    if (!typedSig.trim()) return;
-
-    // ৪. অফ-স্ক্রিন ক্যানভাস তৈরি (টাইপ করা সিগনেচারের জন্য)
-    const canvas = document.createElement('canvas');
-    canvas.width = 1000; 
-    canvas.height = 250;
-    const ctx = canvas.getContext('2d');
-
-    // ৫. গুরুত্বপূর্ণ পরিবর্তন: 
-    // আমরা কোনো 'white' fill করছি না। clearRect ব্যবহার করে ক্যানভাস স্বচ্ছ রাখা হচ্ছে।
-    ctx.clearRect(0, 0, canvas.width, canvas.height); 
-
-    // ৬. টেক্সট কনফিগারেশন
-    ctx.fillStyle = '#000000'; // সিগনেচারের রঙ কালো
-    ctx.font = '500 80px "Times New Roman", serif'; // প্রফেশনাল ফন্ট
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // ৭. স্বচ্ছ ক্যানভাসের ওপর নাম লেখা
-    ctx.fillText(typedSig, 500, 125);
-
-    // ৮. PNG হিসেবে আউটপুট নেওয়া (যা স্বচ্ছতা বজায় রাখবে)
-    finalValue = canvas.toDataURL('image/png');
-  }
-
-  // ৯. ফাইনাল ডাটা পাঠানো
-  onSignatureComplete(finalValue);
-};
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-in fade-in duration-300">
       <Tabs value={mode} onValueChange={setMode} className="w-full">
         <TabsList className="grid grid-cols-2 w-full bg-slate-100 rounded-xl p-1">
-          <TabsTrigger value="draw" className="rounded-lg gap-2">
+          <TabsTrigger value="draw" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <PenTool className="w-4 h-4" /> Draw
           </TabsTrigger>
-          <TabsTrigger value="type" className="rounded-lg gap-2">
+          <TabsTrigger value="type" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <TypeIcon className="w-4 h-4" /> Type
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="draw" className="mt-4">
-          <div className="relative border-2 border-slate-200 rounded-2xl bg-white overflow-hidden shadow-inner">
+        <TabsContent value="draw" className="mt-4 outline-none">
+          <div className="relative border-2 border-slate-200 rounded-2xl bg-slate-50 shadow-inner group transition-all hover:border-sky-200 overflow-hidden">
             <canvas
               ref={canvasRef}
-              className="w-full h-40 cursor-crosshair touch-none"
+              className="w-full h-44 cursor-crosshair touch-none bg-white/50"
               onMouseDown={startDraw}
               onMouseMove={draw}
               onMouseUp={endDraw}
@@ -680,30 +842,36 @@ const handleConfirm = () => {
               onTouchEnd={endDraw}
             />
           </div>
-          <div className="flex justify-end mt-3">
-            <Button variant="ghost" size="sm" onClick={clearCanvas} className="text-rose-500">
-              <Eraser className="w-4 h-4 mr-2" /> Clear Space
+          <div className="flex justify-between items-center mt-3">
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-2">Sign within the box</p>
+            <Button variant="ghost" size="sm" onClick={clearCanvas} className="text-rose-500 hover:bg-rose-50 rounded-lg">
+              <Eraser className="w-4 h-4 mr-2" /> Clear
             </Button>
           </div>
         </TabsContent>
 
-        <TabsContent value="type" className="mt-4">
-          <Input
-            value={typedSig}
-            onChange={e => setTypedSig(e.target.value)}
-            placeholder="Type your name..."
-            className="h-24 text-4xl text-center rounded-2xl border-2 border-slate-200 focus:ring-sky-500"
-            style={{ fontFamily: '"Times New Roman", serif' }} 
-          />
+        <TabsContent value="type" className="mt-4 outline-none">
+          <div className="relative">
+            <Input
+              value={typedSig}
+              onChange={e => setTypedSig(e.target.value)}
+              placeholder="Enter your full name..."
+              className="h-28 text-4xl text-center rounded-2xl border-2 border-slate-200 focus:border-sky-500 focus:ring-0 transition-all bg-slate-50/30"
+              style={{ fontFamily: '"Times New Roman", serif' }} 
+            />
+            {typedSig && (
+              <p className="absolute bottom-2 right-4 text-[9px] text-slate-400 italic">Signature Preview</p>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 
       <Button
         onClick={handleConfirm}
         disabled={(mode === 'draw' && !hasDrawn) || (mode === 'type' && !typedSig.trim())}
-        className="w-full h-12 bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-lg"
+        className="w-full h-14 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl shadow-xl shadow-sky-100 transition-all active:scale-[0.98] font-bold text-lg"
       >
-        <Check className="w-5 h-5 mr-2" /> Use This Signature
+        <Check className="w-6 h-6 mr-2" /> Use This Signature
       </Button>
     </div>
   );
