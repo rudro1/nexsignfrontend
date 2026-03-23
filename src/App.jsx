@@ -5,8 +5,9 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import { Toaster } from "@/components/ui/toaster";
+//import { Toaster } from "@/components/ui/toaster";
 import { pagesConfig } from './pages.config';
+import { Toaster, toast } from "sonner";
 
 // Pages (Manual Imports for special routes)
 import { Landing } from "@/pages/Landing";
@@ -15,6 +16,7 @@ import PageNotFound from './lib/PageNotFound';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Pricing from './pages/Pricing';
+import Auth from './pages/Auth';
 
 const { Pages, Layout } = pagesConfig;
 
@@ -125,13 +127,25 @@ const AuthenticatedApp = () => {
       <Route path="/" element={<Landing />} />
 
       {/* 3. REDIRECT LOGIC: Prevent logged-in users from seeing Login/Register */}
+
+
+
+      {/* <Route 
+        path="/login" 
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <AuthPage initialMode="login" />} 
+      /> */}
+      {/* <Route 
+        path="/register" 
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <AuthPage initialMode="register" />} 
+      /> */}
+
       <Route 
         path="/login" 
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} 
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Auth initialMode= "login"></Auth>} 
       />
       <Route 
         path="/register" 
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} 
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Auth initialMode="register"></Auth>} 
       />
       
       <Route path="/sign" element={<SignerView />} />
@@ -170,9 +184,17 @@ export default function App() {
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
           <Router>
+               {/* Toaster should be at the top level, but inside Router */}
+         <Toaster
+  position="top-right"
+  richColors
+  toastOptions={{
+    style: { zIndex: 9999 } // ensure on top of everything
+  }}
+/> 
             <AuthenticatedApp />
           </Router>
-          <Toaster />
+        
         </QueryClientProvider>
       </AuthProvider>
     </ThemeProvider>
