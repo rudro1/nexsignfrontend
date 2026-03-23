@@ -4341,7 +4341,7 @@ const handleSubmit = async () => {
 </Button>
       </header>
 
-      <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-4 flex flex-col items-center">
+      {/* <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-4 flex flex-col items-center">
         {pagesData.map((page) => (
           <div key={page.num} className="relative mb-8 bg-white shadow-2xl border border-slate-300 rounded-sm overflow-hidden" 
                style={{ width: page.viewport.width, height: page.viewport.height }}>
@@ -4381,7 +4381,54 @@ const handleSubmit = async () => {
             })}
           </div>
         ))}
-      </main>
+      </main> */}
+      <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-4 flex flex-col items-center">
+  {pagesData.map((page) => (
+    <div key={page.num} className="relative mb-8 bg-white shadow-2xl border border-slate-300 rounded-sm overflow-hidden" 
+         style={{ width: page.viewport.width, height: page.viewport.height }}>
+      <canvas className="w-full h-full" ref={el => {
+        if (el && !el.dataset.rendered) {
+          const ctx = el.getContext('2d');
+          const ratio = window.devicePixelRatio || 1; 
+          el.width = page.viewport.width * ratio;
+          el.height = page.viewport.height * ratio;
+          ctx.scale(ratio, ratio);
+          page.pageObj.render({ canvasContext: ctx, viewport: page.viewport });
+          el.dataset.rendered = 'true';
+        }
+      }} />
+      
+      {fields.filter(f => Number(f.page) === page.num).map(field => {
+        const isMine = Number(field.partyIndex) === Number(myPartyIndex);
+        // 🌟 ফিক্স: যদি ভ্যালু থাকে তবে সেটি filled হিসেবে গণ্য হবে, সে যার স্বাক্ষরই হোক
+        const hasValue = field.filled || (field.value && field.value.length > 0);
+
+        return (
+          <div key={field.id} id={`field-${field.id}`} 
+            // 🌟 ফিক্স: শুধুমাত্র নিজের এবং খালি ফিল্ডে ক্লিক করা যাবে
+            onClick={(e) => isMine && !hasValue && handleFieldClick(e, field)}
+            className={`absolute border-2 flex items-center justify-center rounded transition-all duration-200
+              ${isMine && !hasValue ? 'border-sky-500 bg-sky-400/10 cursor-pointer shadow-inner animate-pulse ring-4 ring-sky-500/10' : 
+                hasValue ? 'border-green-500 bg-transparent' : 'border-slate-300 bg-slate-200/30'}`}
+            style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
+            
+            {hasValue ? (
+              // 🌟 ফিক্স: এখানে isMine চেক তুলে দেওয়া হয়েছে যাতে সবাই সবার স্বাক্ষর দেখতে পায়
+              <img src={field.value} className="w-[92%] h-[92%] object-contain mix-blend-multiply" alt="Signed" />
+            ) : (
+              <div className="flex flex-col items-center gap-1">
+                 {isMine ? <PenTool size={18} className="text-sky-600" /> : <Lock size={14} className="text-slate-400" />}
+                 <span className={`text-[10px] font-extrabold ${isMine ? 'text-sky-600' : 'text-slate-400'}`}>
+                   {isMine ? 'SIGN HERE' : `SIGNER ${Number(field.partyIndex) + 1}`}
+                 </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  ))}
+</main>
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
         <DialogContent className="max-w-lg p-0 bg-white rounded-2xl overflow-hidden border-none shadow-2xl">

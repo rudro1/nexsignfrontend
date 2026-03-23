@@ -2386,7 +2386,7 @@ export default function PdfViewer({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
 
-  // ১. মেমোয়াইজড ফিল্ড ফিল্টারিং (Fast Rendering)
+  // ১. মেমোয়াইজড ফিল্ড ফিল্টারিং (Fast Rendering)
   const currentPageFields = useMemo(() => 
     fields.filter(f => Number(f.page) === Number(currentPage)), 
     [fields, currentPage]
@@ -2472,7 +2472,8 @@ export default function PdfViewer({
       y: Number((((e.clientY - rect.top) / canvasSize.height) * 100 - fH / 2).toFixed(4)),
       width: fW, 
       height: fH, 
-      party_index: Number(selectedPartyIndex)
+      // 🌟 ফিক্স ১: party_index এর বদলে partyIndex ব্যবহার করা হয়েছে (SignerView এর সাথে মিল রাখতে)
+      partyIndex: Number(selectedPartyIndex)
     };
     
     onFieldsChange([...fields, newField]);
@@ -2527,8 +2528,10 @@ export default function PdfViewer({
         <canvas ref={canvasRef} className="pdf-canvas block mx-auto" />
 
         {currentPageFields.map(field => {
-          const color = parties?.[field.party_index]?.color || PARTY_COLORS[field.party_index % PARTY_COLORS.length];
-          const isHighlighted = highlightPartyIndex === null || highlightPartyIndex === field.party_index;
+          // 🌟 ফিক্স ২: party_index এর বদলে partyIndex রিড করা হচ্ছে
+          const currentIdx = field.partyIndex ?? field.party_index; 
+          const color = parties?.[currentIdx]?.color || PARTY_COLORS[currentIdx % PARTY_COLORS.length];
+          const isHighlighted = highlightPartyIndex === null || highlightPartyIndex === currentIdx;
 
           return (
             <Rnd
@@ -2570,14 +2573,14 @@ export default function PdfViewer({
                   className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[8px] font-black text-white uppercase" 
                   style={{ backgroundColor: color }}
                 >
-                  {parties?.[field.party_index]?.name || `Party ${field.party_index + 1}`}
+                  {/* 🌟 ফিক্স ৩: partyIndex অনুযায়ী নাম দেখানো */}
+                  {parties?.[currentIdx]?.name || `Party ${currentIdx + 1}`}
                 </div>
 
                 <span className="text-[9px] font-black uppercase pointer-events-none" style={{ color }}>
                   {field.type}
                 </span>
 
-                {/* 🌟 DELETE BUTTON FIX: Use onMouseDown to trigger before drag */}
                 {!readOnly && (
                   <button 
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-xl transition-all hover:scale-125 z-[100] cursor-pointer"

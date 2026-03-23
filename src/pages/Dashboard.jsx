@@ -233,12 +233,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center">
         <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 " />
-          <Input 
-            placeholder="Search by title…" 
-            value={search} 
-            onChange={e => setSearch(e.target.value)}
-            className="pl-10 rounded-xl focus:outline-none" 
-          />
+        
           <Input placeholder="Search by title…" value={search} onChange={e => setSearch(e.target.value)}
            className="pl-10 rounded-xl focus:!ring-0 " />
         </div>
