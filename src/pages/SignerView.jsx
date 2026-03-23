@@ -3366,6 +3366,32 @@ export default function SignerView() {
   }, [token]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
+// এই কোডটি নতুন যোগ করুন
+useEffect(() => {
+  if (pagesData.length > 0 && fields.length > 0 && !loading) {
+    // ইউজারের প্রথম খালি (Unfilled) ফিল্ডটি খুঁজে বের করা
+    const targetField = fields.find(f => 
+      Number(f.partyIndex) === myPartyIndex && !f.filled
+    );
+
+    if (targetField) {
+      const scrollTimeout = setTimeout(() => {
+        const element = document.getElementById(`field-${targetField.id}`);
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+          // ফিল্ডটি হাইলাইট করা
+          element.style.ring = "4px";
+        }
+      }, 1500); // ১.৫ সেকেন্ড ডিলে যাতে PDF রেন্ডার হতে পারে
+
+      return () => clearTimeout(scrollTimeout);
+    }
+  }
+}, [pagesData, fields, loading, myPartyIndex]);
+
 
   useEffect(() => {
     if (!docData?.fileId) return;
@@ -3541,7 +3567,7 @@ export default function SignerView() {
               }
             }} />
             
-            {fields.filter(f => Number(f.page) === page.num).map(field => {
+            {/* {fields.filter(f => Number(f.page) === page.num).map(field => {
               const isMine = Number(field.partyIndex) === myPartyIndex;
               return (
                 <div key={field.id} onClick={(e) => handleFieldClick(e, field)}
@@ -3559,7 +3585,49 @@ export default function SignerView() {
                   )}
                 </div>
               );
-            })}
+            })} */}
+
+            {fields.filter(f => Number(f.page) === page.num).map(field => {
+  const isMine = Number(field.partyIndex) === myPartyIndex;
+  return (
+    <div 
+      key={field.id} 
+      id={`field-${field.id}`} // 👈 এটি যোগ হলো (অটো-স্ক্রলিং এর জন্য)
+      onClick={(e) => handleFieldClick(e, field)}
+      className={`absolute border-2 transition-all flex items-center justify-center 
+        ${isMine && !field.filled 
+          ? 'border-sky-500 bg-sky-500/10 cursor-pointer shadow-[0_0_15px_rgba(14,165,233,0.3)]' 
+          : 'border-slate-300'}`}
+      style={{ 
+        left: `${field.x}%`, 
+        top: `${field.y}%`, 
+        width: `${field.width}%`, 
+        height: `${field.height}%`,
+        zIndex: 50 
+      }}>
+      
+      {field.filled ? (
+        field.value.startsWith('data:image') ? 
+        <img src={field.value} className="w-full h-full object-contain p-1" alt="sig" /> :
+        <span className="font-serif text-[12px] font-bold text-black">{field.value}</span>
+      ) : (
+        <div className="flex flex-col items-center text-[9px] font-bold text-slate-500">
+           {isMine ? (
+             <>
+               <PenTool size={14} className="animate-bounce text-sky-600 mb-0.5" />
+               <span className="text-sky-600 font-black">SIGN HERE</span>
+             </>
+           ) : (
+             <>
+               <Lock size={10} />
+               <span>SIGNER {Number(field.partyIndex) + 1}</span>
+             </>
+           )}
+        </div>
+      )}
+    </div>
+  );
+})}
           </div>
         ))}
       </main>

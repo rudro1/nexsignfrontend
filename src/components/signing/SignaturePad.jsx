@@ -568,43 +568,90 @@ export default function SignaturePad({ onSignatureComplete }) {
 
   //solving snap error problem 
 
+// const handleConfirm = () => {
+//   let finalValue = "";
+//   if (mode === 'draw') {
+//     if (!hasDrawn) return;
+
+//     // ১. একটি অফ-স্ক্রিন ক্যানভাস তৈরি করুন
+//     const canvas = canvasRef.current;
+//     const offscreenCanvas = document.createElement('canvas');
+//     offscreenCanvas.width = canvas.width;
+//     offscreenCanvas.height = canvas.height;
+//     const ctx = offscreenCanvas.getContext('2d');
+
+//     // ২. ব্যাকগ্রাউন্ড সাদা করুন (এটিই ব্ল্যাক হওয়া বন্ধ করবে)
+//     ctx.fillStyle = 'white';
+//     ctx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+//     // ৩. সিগনেচারটি সাদা ব্যাকগ্রাউন্ডের ওপর বসান
+//     ctx.drawImage(canvas, 0, 0);
+    
+//     // ৪. এখন JPEG হিসেবে সেভ করুন
+//     // finalValue = offscreenCanvas.toDataURL('image/jpeg', 0.5);
+//     finalValue = canvasRef.current.toDataURL('image/png');
+//   } else {
+//     // টাইপ মোডে আপনি অলরেডি সাদা ব্যাকগ্রাউন্ড দিচ্ছেন, এটি ঠিক আছে
+//     if (!typedSig.trim()) return;
+//     const canvas = document.createElement('canvas');
+//     canvas.width = 1000; 
+//     canvas.height = 250;
+//     const ctx = canvas.getContext('2d');
+//     ctx.fillStyle = 'white';
+//     ctx.fillRect(0, 0, canvas.width, canvas.height);
+//     ctx.fillStyle = '#000000';
+//     ctx.font = '500 80px "Times New Roman", serif';
+//     ctx.textAlign = 'center';
+//     ctx.textBaseline = 'middle';
+//     ctx.fillText(typedSig, 500, 125);
+//     finalValue = canvas.toDataURL('image/png', 0.5);
+//   }
+//   onSignatureComplete(finalValue);
+// };
+
+
+
+
 const handleConfirm = () => {
   let finalValue = "";
+
   if (mode === 'draw') {
+    // ১. ড্র মোড চেক: যদি কিছু আঁকা না হয় তবে রিটার্ন করবে
     if (!hasDrawn) return;
 
-    // ১. একটি অফ-স্ক্রিন ক্যানভাস তৈরি করুন
-    const canvas = canvasRef.current;
-    const offscreenCanvas = document.createElement('canvas');
-    offscreenCanvas.width = canvas.width;
-    offscreenCanvas.height = canvas.height;
-    const ctx = offscreenCanvas.getContext('2d');
+    // ২. স্বচ্ছ PNG তৈরি: 
+    // সরাসরি canvasRef থেকে ডাটা নিলে এটি ডিফল্টভাবে স্বচ্ছ থাকে।
+    // এখানে কোনো সাদা ব্যাকগ্রাউন্ড বা অফ-স্ক্রিন ক্যানভাসের প্রয়োজন নেই।
+    finalValue = canvasRef.current.toDataURL('image/png');
 
-    // ২. ব্যাকগ্রাউন্ড সাদা করুন (এটিই ব্ল্যাক হওয়া বন্ধ করবে)
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
-
-    // ৩. সিগনেচারটি সাদা ব্যাকগ্রাউন্ডের ওপর বসান
-    ctx.drawImage(canvas, 0, 0);
-    
-    // ৪. এখন JPEG হিসেবে সেভ করুন
-    finalValue = offscreenCanvas.toDataURL('image/jpeg', 0.5);
   } else {
-    // টাইপ মোডে আপনি অলরেডি সাদা ব্যাকগ্রাউন্ড দিচ্ছেন, এটি ঠিক আছে
+    // ৩. টাইপ মোড চেক: যদি ইনপুট খালি থাকে তবে রিটার্ন করবে
     if (!typedSig.trim()) return;
+
+    // ৪. অফ-স্ক্রিন ক্যানভাস তৈরি (টাইপ করা সিগনেচারের জন্য)
     const canvas = document.createElement('canvas');
     canvas.width = 1000; 
     canvas.height = 250;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#000000';
-    ctx.font = '500 80px "Times New Roman", serif';
+
+    // ৫. গুরুত্বপূর্ণ পরিবর্তন: 
+    // আমরা কোনো 'white' fill করছি না। clearRect ব্যবহার করে ক্যানভাস স্বচ্ছ রাখা হচ্ছে।
+    ctx.clearRect(0, 0, canvas.width, canvas.height); 
+
+    // ৬. টেক্সট কনফিগারেশন
+    ctx.fillStyle = '#000000'; // সিগনেচারের রঙ কালো
+    ctx.font = '500 80px "Times New Roman", serif'; // প্রফেশনাল ফন্ট
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    
+    // ৭. স্বচ্ছ ক্যানভাসের ওপর নাম লেখা
     ctx.fillText(typedSig, 500, 125);
-    finalValue = canvas.toDataURL('image/jpeg', 0.5);
+
+    // ৮. PNG হিসেবে আউটপুট নেওয়া (যা স্বচ্ছতা বজায় রাখবে)
+    finalValue = canvas.toDataURL('image/png');
   }
+
+  // ৯. ফাইনাল ডাটা পাঠানো
   onSignatureComplete(finalValue);
 };
   return (
