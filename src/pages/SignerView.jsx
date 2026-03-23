@@ -3683,7 +3683,7 @@ export default function SignerView() {
     return { completedFields, totalFields, remaining };
   }, [fields, myPartyIndex]);
 
-  // হেল্পার ফাংশন: পরবর্তী খালি ফিল্ডে স্ক্রল করা
+  // Helper function: Scroll to the next empty field for current user
   const scrollToNextField = useCallback((currentFields) => {
     const nextField = currentFields.find(f => Number(f.partyIndex) === myPartyIndex && !f.filled);
     if (nextField) {
@@ -3692,7 +3692,7 @@ export default function SignerView() {
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 500); // ফিল্ড আপডেটের পর সামান্য ডিলে
+      }, 500); 
     }
   }, [myPartyIndex]);
 
@@ -3715,18 +3715,18 @@ export default function SignerView() {
       setFields(cleaned);
       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') setCompleted(true);
     } catch (err) { 
-      toast.error('লিঙ্কটি কাজ করছে না।'); 
+      toast.error('Invalid or expired signing link.'); 
     } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
 
-  // পিডিএফ লোড হওয়ার পর প্রথম ফিল্ডে নিয়ে যাওয়া
+  // Navigate to first field once PDF and data are loaded
   useEffect(() => {
     if (pagesData.length > 0 && !loading && fields.length > 0) {
       scrollToNextField(fields);
     }
-  }, [pagesData.length, loading]);
+  }, [pagesData.length, loading, fields, scrollToNextField]);
 
   useEffect(() => {
     if (!docData?.fileId) return;
@@ -3742,7 +3742,7 @@ export default function SignerView() {
           pages.push({ num: i, viewport, pageObj: page });
         }
         setPagesData(pages);
-      } catch (err) { console.error(err); }
+      } catch (err) { console.error("PDF Load Error:", err); }
     };
     loadPdf();
   }, [docData]);
@@ -3750,15 +3750,15 @@ export default function SignerView() {
   const handleFieldClick = (e, field) => {
     e.preventDefault();
     if (Number(field.partyIndex) !== myPartyIndex) { 
-      toast.error("এটি আপনার স্বাক্ষরের জায়গা নয়।"); 
+      toast.error("This field belongs to another signer."); 
       return; 
     }
     if (field.type === 'text') {
-      const val = prompt("Enter text:", field.value || "");
+      const val = prompt("Enter required text:", field.value || "");
       if (val !== null) {
         const newFields = fields.map(f => f.id === field.id ? { ...f, value: val, filled: true } : f);
         setFields(newFields);
-        scrollToNextField(newFields); // টেক্সট লিখলে পরের ফিল্ডে যাবে
+        scrollToNextField(newFields); 
       }
     } else {
       setActiveFieldId(field.id);
@@ -3768,38 +3768,40 @@ export default function SignerView() {
 
   const handleSignature = (sigValue) => {
     if (!sigValue || sigValue.length < 200) { 
-      toast.error("স্বাক্ষরটি খুব ছোট।");
+      toast.error("Signature is too short. Please try again.");
       return;
     }
     const newFields = fields.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f);
     setFields(newFields);
     setShowSigPad(false);
     setActiveFieldId(null);
-    toast.success("স্বাক্ষর গ্রহণ করা হয়েছে!");
-    scrollToNextField(newFields); // সই করলে পরের ফিল্ডে যাবে
+    toast.success("Signature captured!");
+    scrollToNextField(newFields); 
   };
 
   const handleSubmit = async () => {
     if (mySigningStatus.remaining > 0) {
-      toast.error(`বাকি আছে! আপনার আরও ${mySigningStatus.remaining}টি ফিল্ড পূরণ করতে হবে।`);
-      scrollToNextField(fields); // সাবমিট দিতে গেলে যদি বাকি থাকে, সেখানে নিয়ে যাবে
+      toast.error(`Required: You have ${mySigningStatus.remaining} more field(s) to fill.`);
+      scrollToNextField(fields); 
       return;
     }
     setSubmitting(true);
     try {
       const res = await api.post(`/documents/sign/submit`, { token, fields });
       setCompleted(true);
-      toast.success(res.data.completed ? 'ডকুমেন্ট সম্পন্ন হয়েছে!' : 'আপনার স্বাক্ষর জমা হয়েছে।');
-    } catch (err) { toast.error('ব্যর্থ হয়েছে।'); }
-    finally { setSubmitting(false); }
+      toast.success(res.data.completed ? 'Document successfully completed!' : 'Your signature has been submitted.');
+    } catch (err) { 
+        toast.error('Submission failed. Please try again.'); 
+    } finally { setSubmitting(false); }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
   
   if (completed) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
-      <CheckCircle2 size={80} className="text-green-500" />
-      <h2 className="text-3xl font-bold">স্বাক্ষর সম্পন্ন!</h2>
+      <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
+      <h2 className="text-3xl font-bold text-slate-800">Signing Complete!</h2>
+      <p className="text-slate-500 max-w-md">The document has been successfully processed. You will receive a copy via email shortly.</p>
     </div>
   );
 
@@ -3807,14 +3809,14 @@ export default function SignerView() {
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-[100] bg-white border-b p-4 flex justify-between items-center shadow-sm">
         <div className="flex flex-col overflow-hidden max-w-[50%]">
-          <span className="text-[10px] text-sky-500 font-black uppercase">Document</span>
-          <h1 className="font-bold text-slate-800 truncate">{docData?.title}</h1>
+          <span className="text-[10px] text-sky-500 font-black uppercase tracking-widest">Document</span>
+          <h1 className="font-bold text-slate-800 truncate leading-tight">{docData?.title}</h1>
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex px-3 py-1 rounded-full text-[11px] font-black border-2 bg-sky-50 border-sky-200 text-sky-700">
             {mySigningStatus.completedFields} / {mySigningStatus.totalFields} SIGNED
           </div>
-          <Button onClick={handleSubmit} disabled={submitting} className={`font-bold ${mySigningStatus.remaining === 0 ? 'bg-green-600' : 'bg-sky-600'}`}>
+          <Button onClick={handleSubmit} disabled={submitting} className={`font-bold transition-all ${mySigningStatus.remaining === 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
             {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Finish'}
           </Button>
         </div>
@@ -3822,7 +3824,7 @@ export default function SignerView() {
 
       <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-2 flex flex-col items-center">
         {pagesData.map((page) => (
-          <div key={page.num} className="relative mb-6 bg-white shadow-xl border" style={{ width: page.viewport.width, height: page.viewport.height }}>
+          <div key={page.num} className="relative mb-6 bg-white shadow-xl border overflow-hidden" style={{ width: page.viewport.width, height: page.viewport.height }}>
             <canvas className="w-full h-auto" ref={el => {
               if (el && !el.dataset.rendered) {
                 const ctx = el.getContext('2d');
@@ -3842,12 +3844,12 @@ export default function SignerView() {
                   
                   {field.filled ? (
                     field.value.startsWith('data:image') ? 
-                    <img src={field.value} className="w-full h-full object-contain p-1 mix-blend-multiply" /> :
+                    <img src={field.value} className="w-full h-full object-contain p-1 mix-blend-multiply" alt="Signature" /> :
                     <span className="font-serif text-[12px] font-bold text-black break-all px-1">{field.value}</span>
                   ) : (
                     <div className="flex flex-col items-center text-[9px] font-bold text-slate-500">
                        {isMine ? <PenTool size={14} className="text-sky-600" /> : <Lock size={10} />}
-                       <span className={isMine ? 'text-sky-600' : ''}>{isMine ? 'SIGN' : `SIGNER ${Number(field.partyIndex) + 1}`}</span>
+                       <span className={isMine ? 'text-sky-600' : ''}>{isMine ? 'SIGN HERE' : `SIGNER ${Number(field.partyIndex) + 1}`}</span>
                     </div>
                   )}
                 </div>
@@ -3859,7 +3861,7 @@ export default function SignerView() {
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg p-6 bg-white rounded-2xl">
-          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">আপনার স্বাক্ষর দিন</DialogTitle>
+          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Apply Your Signature</DialogTitle>
           <SignaturePad onSignatureComplete={handleSignature} />
         </DialogContent>
       </Dialog>
