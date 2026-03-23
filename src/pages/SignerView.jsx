@@ -3643,13 +3643,12 @@
 // } all ok 
 
 
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Lock, PenTool, FileCheck } from 'lucide-react';
+import { Loader2, CheckCircle2, Lock, PenTool } from 'lucide-react';
 import SignaturePad from '../components/signing/SignaturePad';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
@@ -3679,34 +3678,33 @@ export default function SignerView() {
     const myFields = fields.filter(f => Number(f.partyIndex) === myPartyIndex);
     const completedFields = myFields.filter(f => f.filled).length;
     const totalFields = myFields.length;
-    const remaining = totalFields - completedFields;
-    return { completedFields, totalFields, remaining };
+    return { completedFields, totalFields, remaining: totalFields - completedFields };
   }, [fields, myPartyIndex]);
 
-  // Enhanced Scroll Logic: Waits for layout stability
+  // FIX: Robust Scrolling with longer delay for PDF rendering
   const scrollToNextField = useCallback((currentFields) => {
     const nextField = currentFields.find(f => Number(f.partyIndex) === myPartyIndex && !f.filled);
     if (nextField) {
-      // Small delay to allow React to finish DOM updates
       setTimeout(() => {
         const element = document.getElementById(`field-${nextField.id}`);
         if (element) {
           element.scrollIntoView({ 
             behavior: 'smooth', 
-            block: 'center',
-            inline: 'nearest' 
+            block: 'center' 
           });
         }
-      }, 300); 
+      }, 800); 
     }
   }, [myPartyIndex]);
 
   const loadSession = useCallback(async () => {
     if (!token) { setLoading(false); return; }
     try {
+      // Ensure this matches your backend: /api/documents/sign/:token
       const res = await api.get(`/documents/sign/${token}`);
       setSession(res.data);
       setDocData(res.data.document);
+      
       const rawFields = res.data.document.fields || [];
       const cleaned = rawFields.map(f => {
         const obj = typeof f === 'string' ? JSON.parse(f) : f;
@@ -3720,7 +3718,8 @@ export default function SignerView() {
       setFields(cleaned);
       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') setCompleted(true);
     } catch (err) { 
-      toast.error('This link is invalid or has expired.'); 
+      console.error("Session Load Error:", err);
+      toast.error('Invalid or expired signing link (404).'); 
     } finally { 
       setLoading(false); 
     }
@@ -3728,7 +3727,7 @@ export default function SignerView() {
 
   useEffect(() => { loadSession(); }, [loadSession]);
 
-  // Initial scroll when PDF pages are rendered
+  // Initial scroll when pages are ready
   useEffect(() => {
     if (pagesData.length > 0 && !loading && fields.length > 0) {
       scrollToNextField(fields);
@@ -3761,7 +3760,7 @@ export default function SignerView() {
       return; 
     }
     if (field.type === 'text') {
-      const val = prompt("Enter required text:", field.value || "");
+      const val = prompt("Enter text:", field.value || "");
       if (val !== null) {
         const newFields = fields.map(f => f.id === field.id ? { ...f, value: val, filled: true } : f);
         setFields(newFields);
@@ -3775,7 +3774,7 @@ export default function SignerView() {
 
   const handleSignature = (sigValue) => {
     if (!sigValue || sigValue.length < 200) { 
-      toast.error("Signature is too short. Please try again.");
+      toast.error("Please provide a valid signature.");
       return;
     }
     const newFields = fields.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f);
@@ -3783,34 +3782,31 @@ export default function SignerView() {
     setShowSigPad(false);
     setActiveFieldId(null);
     toast.success("Signature captured!");
-    
-    // Auto-scroll to next field after signing
     scrollToNextField(newFields); 
   };
 
   const handleSubmit = async () => {
     if (mySigningStatus.remaining > 0) {
-      toast.error(`Required: You have ${mySigningStatus.remaining} more field(s) to fill.`);
+      toast.error(`Please fill all ${mySigningStatus.remaining} remaining fields.`);
       scrollToNextField(fields); 
       return;
     }
     setSubmitting(true);
     try {
-      const res = await api.post(`/documents/sign/submit`, { token, fields });
+      await api.post(`/documents/sign/submit`, { token, fields });
       setCompleted(true);
-      toast.success('Document successfully completed!');
+      toast.success('Document signed successfully!');
     } catch (err) { 
-        toast.error('Submission failed. Please try again.'); 
+        toast.error('Submission failed.'); 
     } finally { setSubmitting(false); }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
-  
   if (completed) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
       <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
-      <h2 className="text-3xl font-bold">Signing completed!</h2>
-      <p className="text-slate-500 max-w-md">The document has been successfully processed. You will receive a copy via email shortly.</p>
+      <h2 className="text-3xl font-bold text-slate-800">Signing Complete!</h2>
+      <p className="text-slate-500 max-w-md">Thank you. You will receive a copy via email shortly.</p>
     </div>
   );
 
@@ -3825,7 +3821,7 @@ export default function SignerView() {
           <div className="hidden sm:flex px-3 py-1 rounded-full text-[11px] font-black border-2 bg-sky-50 border-sky-200 text-sky-700">
             {mySigningStatus.completedFields} / {mySigningStatus.totalFields} SIGNED
           </div>
-          <Button onClick={handleSubmit} disabled={submitting} className={`font-bold transition-all ${mySigningStatus.remaining === 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
+          <Button onClick={handleSubmit} disabled={submitting} className={`font-bold ${mySigningStatus.remaining === 0 ? 'bg-green-600' : 'bg-sky-600'}`}>
             {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Finish'}
           </Button>
         </div>
@@ -3870,7 +3866,7 @@ export default function SignerView() {
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg p-6 bg-white rounded-2xl">
-          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Please sign here.</DialogTitle>
+          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Apply Your Signature</DialogTitle>
           <SignaturePad onSignatureComplete={handleSignature} />
         </DialogContent>
       </Dialog>
