@@ -2129,7 +2129,9 @@ import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
-// ... Worker URL and PARTY_COLORS same as before ...
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.5.207/legacy/build/pdf.worker.min.mjs';
+
+const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
 
 export default function PdfViewer({
   fileUrl, fileId, fields, onFieldsChange, currentPage, onPageChange,
@@ -2137,12 +2139,12 @@ export default function PdfViewer({
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  const renderTaskRef = useRef(null); // রেন্ডার ক্যানসেল করার জন্য
+  const renderTaskRef = useRef(null);
   const [pdfDoc, setPdfDoc] = useState(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
 
-  // PDF Loading Logic (Same as your code)
+  // PDF লোড করার লজিক
   useEffect(() => {
     if (!fileUrl && !fileId) return;
     const loadPdfDoc = async () => {
@@ -2162,12 +2164,11 @@ export default function PdfViewer({
     loadPdfDoc();
   }, [fileUrl, fileId]);
 
-  // Pagination Fix: High-Quality Rendering
+  // Pagination & Rendering Fix
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;
 
     const renderPage = async () => {
-      // ১. আগের কোনো রেন্ডার টাস্ক চললে তা ক্যানসেল করে দিন
       if (renderTaskRef.current) {
         renderTaskRef.current.cancel();
       }
@@ -2181,17 +2182,19 @@ export default function PdfViewer({
         
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
+
+        // ক্যানভাস রিসেট (Pagination-এর জন্য জরুরি)
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        
         canvas.width = scaledViewport.width;
         canvas.height = scaledViewport.height;
         setCanvasSize({ width: scaledViewport.width, height: scaledViewport.height });
 
-        // ২. নতুন রেন্ডার টাস্কটি রেফারেন্সে রাখুন
         const renderContext = { canvasContext: context, viewport: scaledViewport };
         renderTaskRef.current = page.render(renderContext);
         
         await renderTaskRef.current.promise;
       } catch (err) {
-        // রেন্ডার ক্যানসেল হলে এরর ইগনোর করুন
         if (err.name !== 'RenderingCancelledException') {
           console.error("Render Error:", err);
         }
@@ -2200,25 +2203,48 @@ export default function PdfViewer({
 
     renderPage();
 
-    // ক্লিনআপ ফাংশন
     return () => {
       if (renderTaskRef.current) renderTaskRef.current.cancel();
     };
-  }, [pdfDoc, currentPage]); // currentPage চেঞ্জ হলেই এটি রান করবে
+  }, [pdfDoc, currentPage]);
 
-  // ... handleContainerClick function same as before ...
+  const handleContainerClick = (e) => {
+    if (readOnly || !pendingFieldType || loading || !e.target.classList.contains('pdf-canvas')) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    
+    const fW = pendingFieldType === 'signature' ? 22 : 18;
+    const fH = pendingFieldType === 'signature' ? 8 : 5;
+
+    const newField = {
+      id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      type: pendingFieldType,
+      page: currentPage,
+      x: Number((((e.clientX - rect.left) / canvasSize.width) * 100 - fW / 2).toFixed(4)),
+      y: Number((((e.clientY - rect.top) / canvasSize.height) * 100 - fH / 2).toFixed(4)),
+      width: fW,
+      height: fH,
+      partyIndex: Number(selectedPartyIndex)
+    };
+    onFieldsChange([...fields, newField]);
+  };
+
+  // Delete Action Fix
+  const removeField = (id, e) => {
+    e.stopPropagation(); // ক্লিক নিচে যাওয়া বন্ধ করবে
+    e.preventDefault();
+    onFieldsChange(fields.filter(f => f.id !== id));
+  };
 
   return (
     <div ref={containerRef} className="flex-1 w-full overflow-hidden p-4">
-      {/* Pagination UI Fix */}
+      {/* Pagination Controls */}
       {pdfDoc && pdfDoc.numPages > 1 && (
         <div className="flex items-center justify-center gap-4 mb-6">
           <Button 
-            variant="outline" 
-            size="icon" 
+            variant="outline" size="icon" 
             disabled={currentPage <= 1} 
-            onClick={() => onPageChange(currentPage - 1)} // Parent state update
-            className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] cursor-pointer"
+            onClick={() => onPageChange(currentPage - 1)} // Pagination Work
+            className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] z-50"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -2228,25 +2254,71 @@ export default function PdfViewer({
           </span>
 
           <Button 
-            variant="outline" 
-            size="icon" 
+            variant="outline" size="icon" 
             disabled={currentPage >= pdfDoc.numPages} 
-            onClick={() => onPageChange(currentPage + 1)} // Parent state update
-            className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] cursor-pointer"
+            onClick={() => onPageChange(currentPage + 1)} // Pagination Work
+            className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] z-50"
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
       )}
 
-      {/* Canvas Container Part (Same as before) */}
-      <div className="canvas-container relative mx-auto shadow-2xl border bg-white rounded-xl overflow-hidden"
-        style={{ width: canvasSize.width || '100%', height: canvasSize.height || '600px' }}
+      <div 
+        className="canvas-container relative mx-auto shadow-2xl border bg-white rounded-xl overflow-hidden"
+        style={{ width: canvasSize.width || '100%', height: canvasSize.height || '600px', cursor: pendingFieldType ? 'crosshair' : 'default' }}
+        onClick={handleContainerClick}
       >
         <canvas ref={canvasRef} className="pdf-canvas block mx-auto" />
-        
-        {/* Fields Mapping logic stays the same */}
-        {/* ... */}
+
+        {fields.filter(f => f.page === currentPage).map(field => {
+          const partyColor = parties?.[field.partyIndex]?.color || PARTY_COLORS[field.partyIndex % PARTY_COLORS.length];
+          const partyName = parties?.[field.partyIndex]?.name || `Party ${field.partyIndex + 1}`;
+
+          return (
+            <Rnd
+              key={field.id}
+              size={{ width: `${field.width}%`, height: `${field.height}%` }}
+              position={{ x: (field.x / 100) * canvasSize.width, y: (field.y / 100) * canvasSize.height }}
+              onDragStop={(e, d) => {
+                onFieldsChange(fields.map(f => f.id === field.id ? { 
+                  ...f, 
+                  x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
+                  y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
+                } : f));
+              }}
+              onResizeStop={(e, dir, ref, delta, pos) => {
+                onFieldsChange(fields.map(f => f.id === field.id ? {
+                  ...f,
+                  width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)),
+                  height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)),
+                  x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)),
+                  y: Number(((pos.y / canvasSize.height) * 100).toFixed(4))
+                } : f));
+              }}
+              bounds="parent"
+              enableResizing={!readOnly}
+              disableDragging={readOnly}
+              className="z-20 group"
+            >
+              <div className="w-full h-full border-2 flex items-center justify-center relative bg-white/60 backdrop-blur-[1px]" style={{ borderColor: partyColor }}>
+                <div className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[8px] font-black text-white uppercase" style={{ backgroundColor: partyColor }}>
+                  {partyName}
+                </div>
+                <span className="text-[9px] font-black uppercase pointer-events-none" style={{ color: partyColor }}>{field.type}</span>
+                
+                {!readOnly && (
+                  <button 
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-xl transition-all z-50"
+                    onMouseDown={(e) => removeField(field.id, e)} // onMouseDown solves the drag vs delete conflict
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            </Rnd>
+          );
+        })}
       </div>
     </div>
   );
