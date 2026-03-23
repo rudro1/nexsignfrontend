@@ -80,14 +80,14 @@ import axios from 'axios';
 
 // ১. বেস কনফিগারেশন
 export const api = axios.create({
-  // baseURL চেক করুন আপনার .env এর সাথে মিল আছে কি না
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api',
+  // নিশ্চিত করুন VITE_API_BASE_URL এর শেষে যেন '/' না থাকে
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api',
   
-  // ✅ গুরুত্বপূর্ণ: এটি false করে দিন কারণ আপনি টোকেন localStorage এ রাখছেন।
-  // এটিই আপনার 'Preflight wildcard' এররটি ফিক্স করবে।
-  withCredentials: false, 
+  // ✅ ব্যাকএন্ডের সাথে মিল রেখে এটি true করে দিন
+  // এটি কুকি বা অথোরাইজেশন হেডার সঠিকভাবে হ্যান্ডেল করতে সাহায্য করবে
+  withCredentials: true, 
   
-  timeout: 100000, 
+  timeout: 60000, // ১ মিনিট টাইমআউট (ভার্সেল ফ্রি টায়ারের জন্য যথেষ্ট)
 });
 
 // ২. রিকোয়েস্ট ইন্টারসেপ্টর
@@ -95,34 +95,39 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
+      // টোকেন হেডার সেট করা
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // কনটেন্ট টাইপ নিশ্চিত করা
+    config.headers['Content-Type'] = 'application/json';
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
 // ৩. রেসপন্স ইন্টারসেপ্টর
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const originalRequest = error.config;
+    // নেটওয়ার্ক এরর বা টাইমআউট হ্যান্ডেল করা
+    if (!error.response) {
+      console.error('[Network Error]: Check your internet or API Server status.');
+      return Promise.reject(new Error('Server is unreachable. Please try again later.'));
+    }
 
-    if (error.response) {
-      const { status } = error.response;
+    const { status } = error.response;
 
-      if (status === 401 && !originalRequest._retry) {
-        originalRequest._retry = true;
-        if (!window.location.pathname.includes('/login')) {
-          localStorage.clear();
-          window.location.href = '/login?expired=true';
-        }
+    // টোকেন এক্সপায়ার হলে লগআউট করানো
+    if (status === 401) {
+      const isLoginPage = window.location.pathname.includes('/login');
+      if (!isLoginPage) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user'); // ইউজার ডাটাও রিমুভ করুন
+        window.location.href = '/login?expired=true';
       }
-      
-      console.error(`[API Error ${status}]:`, error.response.data?.message || 'Server Error');
-    } else if (error.request) {
-      // ✅ এটি সেই নেটওয়ার্ক/CORS এরর যা আপনি ফেস করছেন
-      console.error('[Network Error]: সার্ভারের সাথে কানেক্ট করা যাচ্ছে না। পোর্ট চেক করুন।');
     }
     
     return Promise.reject(error);
