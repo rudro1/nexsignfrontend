@@ -3715,8 +3715,15 @@ export default function SignerView() {
       setFields(cleaned);
       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') setCompleted(true);
     } catch (err) { 
+<<<<<<< HEAD
       toast.error('Invalid or expired signing link.'); 
     } finally { setLoading(false); }
+=======
+      toast.error('This link is invalid or has expired.'); 
+    } finally { 
+      setLoading(false); 
+    }
+>>>>>>> e767d08a77ff23d5cde059d5f056e411ca8078ab
   }, [token]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
@@ -3750,7 +3757,11 @@ export default function SignerView() {
   const handleFieldClick = (e, field) => {
     e.preventDefault();
     if (Number(field.partyIndex) !== myPartyIndex) { 
+<<<<<<< HEAD
       toast.error("This field belongs to another signer."); 
+=======
+      toast.error("This is not your signing area."); 
+>>>>>>> e767d08a77ff23d5cde059d5f056e411ca8078ab
       return; 
     }
     if (field.type === 'text') {
@@ -3800,8 +3811,13 @@ export default function SignerView() {
   if (completed) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
       <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
+<<<<<<< HEAD
       <h2 className="text-3xl font-bold text-slate-800">Signing Complete!</h2>
       <p className="text-slate-500 max-w-md">The document has been successfully processed. You will receive a copy via email shortly.</p>
+=======
+      <h2 className="text-3xl font-bold">Signing completed!</h2>
+      <p className="text-slate-500 max-w-md">After all parties have completed their signatures, you will receive a copy via email. Thank you!</p>
+>>>>>>> e767d08a77ff23d5cde059d5f056e411ca8078ab
     </div>
   );
 
@@ -3860,8 +3876,13 @@ export default function SignerView() {
       </main>
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
+<<<<<<< HEAD
         <DialogContent className="max-w-[95vw] sm:max-w-lg p-6 bg-white rounded-2xl">
           <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Apply Your Signature</DialogTitle>
+=======
+        <DialogContent className="max-w-lg p-6 bg-white rounded-2xl">
+          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Please sign here.</DialogTitle>
+>>>>>>> e767d08a77ff23d5cde059d5f056e411ca8078ab
           <SignaturePad onSignatureComplete={handleSignature} />
         </DialogContent>
       </Dialog>

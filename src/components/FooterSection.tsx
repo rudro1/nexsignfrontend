@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Twitter, Linkedin, Github, Facebook, Instagram, Star } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Logo from './ui/Logo';
 import { api } from '@/api/apiClient'; 
 import { useAuth } from '@/lib/AuthContext'; 
@@ -12,38 +12,28 @@ export function FooterSection() {
   const [email, setEmail] = useState('');
   const [review, setReview] = useState('');
 const [isSubmitting, setIsSubmitting] = useState(false);
-// const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     if (!email || !rating) return toast.error("Please provide email and rating!");
+  const [activeLink, setActiveLink] = useState("");
+    const navigate = useNavigate();
 
-//     // লোডিং টোস্ট দেখানো
-//     const loadingToast = toast.loading("Sending your feedback to our team...");
+  // Scroll to section
+const scrollToSection = (id) => {
+  if (location.pathname !== "/") {
+   navigate ("/", { state: { scrollTo: id } });
 
-//     try {
-//       await api.post('/feedback/send-feedback', {
-//         email,
-//         name: user?.full_name || 'Valued User',
-//         stars: rating,
-//         review: review 
-//       });
+    // wait for navigation then scroll
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      el?.scrollIntoView({ behavior: "smooth" });
+    }, 200);
+  } else {
+    const el = document.getElementById(id);
+    el?.scrollIntoView({ behavior: "smooth" });
+  }
 
-//       // সাকসেস টোস্ট
-//       toast.success("Thank you for your feedback! A confirmation email is on its way. 📩", {
-//         id: loadingToast,
-//         duration: 5000,
-//       });
-      
-//       setEmail('');
-//       setReview('');
-//       setRating(0);
-//     } catch (error) {
-//       console.error("Feedback error:", error);
-//       toast.error("We couldn't send your feedback. Please try again later.", {
-//         id: loadingToast,
-//       });
-//     }
-//   };
- 
+  setActiveLink(id);
+};
+
+
 const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -126,14 +116,21 @@ return (
             <h3 className="text-white font-semibold text-lg text-center">Product</h3>
             <ul className="flex flex-col md:flex-row gap-6 text-sky-400 text-center font-medium">
               <li>
-                <Link to="/#features" className="hover:text-sky-600 transition-colors">
-                  Features
-                </Link>
+                <button
+              onClick={() => scrollToSection("features")}
+              className={`hover:text-sky-500 ${activeLink === "features" ? "text-sky-500 font-bold border-0" : ""}`}
+            >
+              Features
+            </button>
               </li>
               <li>
-                <Link to="/#howitworks" className="hover:text-sky-600 transition-colors">
-                  How It Works
-                </Link>
+                    <button
+              onClick={() => scrollToSection("how-it-works")}
+              className={`hover:text-sky-500 ${activeLink === "how-it-works" ? "text-sky-500 font-bold" : ""}`}
+            >
+              How It Works
+            </button>
+               
               </li>
               <li>
                 <Link to="/pricing" className="hover:text-sky-600 transition-colors">
