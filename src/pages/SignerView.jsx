@@ -3683,16 +3683,21 @@ export default function SignerView() {
     return { completedFields, totalFields, remaining };
   }, [fields, myPartyIndex]);
 
-  // Helper function: Scroll to the next empty field for current user
+  // Enhanced Scroll Logic: Waits for layout stability
   const scrollToNextField = useCallback((currentFields) => {
     const nextField = currentFields.find(f => Number(f.partyIndex) === myPartyIndex && !f.filled);
     if (nextField) {
+      // Small delay to allow React to finish DOM updates
       setTimeout(() => {
         const element = document.getElementById(`field-${nextField.id}`);
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest' 
+          });
         }
-      }, 500); 
+      }, 300); 
     }
   }, [myPartyIndex]);
 
@@ -3715,25 +3720,20 @@ export default function SignerView() {
       setFields(cleaned);
       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') setCompleted(true);
     } catch (err) { 
-<<<<<<< HEAD
-      toast.error('Invalid or expired signing link.'); 
-    } finally { setLoading(false); }
-=======
       toast.error('This link is invalid or has expired.'); 
     } finally { 
       setLoading(false); 
     }
->>>>>>> e767d08a77ff23d5cde059d5f056e411ca8078ab
   }, [token]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
 
-  // Navigate to first field once PDF and data are loaded
+  // Initial scroll when PDF pages are rendered
   useEffect(() => {
     if (pagesData.length > 0 && !loading && fields.length > 0) {
       scrollToNextField(fields);
     }
-  }, [pagesData.length, loading, fields, scrollToNextField]);
+  }, [pagesData.length, loading, scrollToNextField]);
 
   useEffect(() => {
     if (!docData?.fileId) return;
@@ -3757,11 +3757,7 @@ export default function SignerView() {
   const handleFieldClick = (e, field) => {
     e.preventDefault();
     if (Number(field.partyIndex) !== myPartyIndex) { 
-<<<<<<< HEAD
-      toast.error("This field belongs to another signer."); 
-=======
       toast.error("This is not your signing area."); 
->>>>>>> e767d08a77ff23d5cde059d5f056e411ca8078ab
       return; 
     }
     if (field.type === 'text') {
@@ -3787,6 +3783,8 @@ export default function SignerView() {
     setShowSigPad(false);
     setActiveFieldId(null);
     toast.success("Signature captured!");
+    
+    // Auto-scroll to next field after signing
     scrollToNextField(newFields); 
   };
 
@@ -3800,7 +3798,7 @@ export default function SignerView() {
     try {
       const res = await api.post(`/documents/sign/submit`, { token, fields });
       setCompleted(true);
-      toast.success(res.data.completed ? 'Document successfully completed!' : 'Your signature has been submitted.');
+      toast.success('Document successfully completed!');
     } catch (err) { 
         toast.error('Submission failed. Please try again.'); 
     } finally { setSubmitting(false); }
@@ -3811,13 +3809,8 @@ export default function SignerView() {
   if (completed) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
       <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
-<<<<<<< HEAD
-      <h2 className="text-3xl font-bold text-slate-800">Signing Complete!</h2>
-      <p className="text-slate-500 max-w-md">The document has been successfully processed. You will receive a copy via email shortly.</p>
-=======
       <h2 className="text-3xl font-bold">Signing completed!</h2>
-      <p className="text-slate-500 max-w-md">After all parties have completed their signatures, you will receive a copy via email. Thank you!</p>
->>>>>>> e767d08a77ff23d5cde059d5f056e411ca8078ab
+      <p className="text-slate-500 max-w-md">The document has been successfully processed. You will receive a copy via email shortly.</p>
     </div>
   );
 
@@ -3840,7 +3833,7 @@ export default function SignerView() {
 
       <main ref={containerRef} className="w-full max-w-4xl mx-auto py-8 px-2 flex flex-col items-center">
         {pagesData.map((page) => (
-          <div key={page.num} className="relative mb-6 bg-white shadow-xl border overflow-hidden" style={{ width: page.viewport.width, height: page.viewport.height }}>
+          <div key={page.num} className="relative mb-6 bg-white shadow-xl border" style={{ width: page.viewport.width, height: page.viewport.height }}>
             <canvas className="w-full h-auto" ref={el => {
               if (el && !el.dataset.rendered) {
                 const ctx = el.getContext('2d');
@@ -3876,13 +3869,8 @@ export default function SignerView() {
       </main>
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
-<<<<<<< HEAD
         <DialogContent className="max-w-[95vw] sm:max-w-lg p-6 bg-white rounded-2xl">
-          <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Apply Your Signature</DialogTitle>
-=======
-        <DialogContent className="max-w-lg p-6 bg-white rounded-2xl">
           <DialogTitle className="mb-4 text-slate-800 font-bold text-xl border-b pb-2">Please sign here.</DialogTitle>
->>>>>>> e767d08a77ff23d5cde059d5f056e411ca8078ab
           <SignaturePad onSignatureComplete={handleSignature} />
         </DialogContent>
       </Dialog>
