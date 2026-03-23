@@ -3642,7 +3642,6 @@
 //   );
 // } all ok 
 
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
@@ -3681,9 +3680,15 @@ export default function SignerView() {
     return { completedFields, totalFields, remaining: totalFields - completedFields };
   }, [fields, myPartyIndex]);
 
-  // FIX: Robust Scrolling with longer delay for PDF rendering
+  // FIXED SCROLL LOGIC: Sorts by page and Y position so it goes in order
   const scrollToNextField = useCallback((currentFields) => {
-    const nextField = currentFields.find(f => Number(f.partyIndex) === myPartyIndex && !f.filled);
+    const nextField = [...currentFields]
+      .filter(f => Number(f.partyIndex) === myPartyIndex && !f.filled)
+      .sort((a, b) => {
+        if (Number(a.page) !== Number(b.page)) return Number(a.page) - Number(b.page);
+        return Number(a.y) - Number(b.y);
+      })[0]; // Get the first one in physical order
+
     if (nextField) {
       setTimeout(() => {
         const element = document.getElementById(`field-${nextField.id}`);
@@ -3700,7 +3705,6 @@ export default function SignerView() {
   const loadSession = useCallback(async () => {
     if (!token) { setLoading(false); return; }
     try {
-      // Ensure this matches your backend: /api/documents/sign/:token
       const res = await api.get(`/documents/sign/${token}`);
       setSession(res.data);
       setDocData(res.data.document);
@@ -3727,7 +3731,6 @@ export default function SignerView() {
 
   useEffect(() => { loadSession(); }, [loadSession]);
 
-  // Initial scroll when pages are ready
   useEffect(() => {
     if (pagesData.length > 0 && !loading && fields.length > 0) {
       scrollToNextField(fields);
@@ -3821,7 +3824,7 @@ export default function SignerView() {
           <div className="hidden sm:flex px-3 py-1 rounded-full text-[11px] font-black border-2 bg-sky-50 border-sky-200 text-sky-700">
             {mySigningStatus.completedFields} / {mySigningStatus.totalFields} SIGNED
           </div>
-          <Button onClick={handleSubmit} disabled={submitting} className={`font-bold ${mySigningStatus.remaining === 0 ? 'bg-green-600' : 'bg-sky-600'}`}>
+          <Button onClick={handleSubmit} disabled={submitting} className={`font-bold transition-all ${mySigningStatus.remaining === 0 ? 'bg-green-600' : 'bg-sky-600'}`}>
             {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Finish'}
           </Button>
         </div>
