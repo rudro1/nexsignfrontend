@@ -280,7 +280,7 @@
 //     </Card>
 //   );
 // }
-import React, { useMemo } from 'react'; // 🌟 Performance এর জন্য useMemo
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from "../ui/Card"; 
 import { Badge } from '@/components/ui/badge';
@@ -297,7 +297,6 @@ const statusConfig = {
 
 const PARTY_COLORS = ['#0ea5e9','#8b5cf6','#f59e0b','#10b981','#ef4444','#ec4899'];
 
-// 🌟 React.memo ব্যবহার করা হয়েছে যাতে অপ্রয়োজনে রেন্ডার না হয়
 const DocumentCard = React.memo(({ doc }) => {
   const navigate = useNavigate();
   
@@ -305,32 +304,36 @@ const DocumentCard = React.memo(({ doc }) => {
   const StatusIcon = config.icon;
   const parties = doc.parties || [];
 
-  // 🌟 প্রোগ্রেস ক্যালকুলেশন মেমোয়াইজড করা হয়েছে
+  // 🌟 প্রোগ্রেস ক্যালকুলেশন মেমোয়াইজড
   const progress = useMemo(() => {
     if (!parties.length) return 0;
     const signedCount = parties.filter(p => p.status === 'signed').length;
     return Math.round((signedCount / parties.length) * 100);
   }, [parties]);
 
-  // 🌟 বর্তমান সাইনার বের করার লজিক
+  // 🌟 বর্তমান সাইনার লজিক মেমোয়াইজড
   const currentSigner = useMemo(() => {
     if (doc.status !== 'in_progress') return null;
     return parties.find(p => p.status === 'sent' || p.status === 'waiting') || parties[0];
   }, [doc.status, parties]);
 
-  const formatDate = (dateString) => {
+  // 🌟 ডেট ফরম্যাটিং মেমোয়াইজড (পারফরম্যান্স বুস্ট)
+  const formattedDate = useMemo(() => {
+    const dateString = doc.updatedAt || doc.createdAt;
     if (!dateString) return '---';
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric'
       });
     } catch (e) { return '---'; }
-  };
+  }, [doc.updatedAt, doc.createdAt]);
 
   const handleAction = (e) => {
-    e.stopPropagation(); // 🌟 কার্ডের ক্লিক ইভেন্ট থেকে আলাদা রাখতে
+    e.stopPropagation();
     if (doc.status === 'completed' && doc.fileUrl) {
-      const finalUrl = `${doc.fileUrl}${doc.fileUrl.includes('?') ? '&' : '?'}cache_v=${new Date(doc.updatedAt).getTime()}`;
+      // ক্যাশ এড়াতে টাইমস্ট্যাম্প যোগ করা হয়েছে
+      const separator = doc.fileUrl.includes('?') ? '&' : '?';
+      const finalUrl = `${doc.fileUrl}${separator}cache_v=${new Date(doc.updatedAt).getTime()}`;
       window.open(finalUrl, '_blank', 'noopener,noreferrer');
     } else {
       navigate(`/DocumentEditor?id=${doc._id}`);
@@ -339,13 +342,11 @@ const DocumentCard = React.memo(({ doc }) => {
 
   return (
     <Card 
-      onClick={() => navigate(`/DocumentEditor?id=${doc._id}`)} // 🌟 পুরো কার্ড ক্লিকেবল করা হয়েছে
+      onClick={() => navigate(`/DocumentEditor?id=${doc._id}`)}
       className="p-5 bg-white border-slate-200 hover:border-[#28ABDF]/50 hover:shadow-xl transition-all group flex flex-col h-full cursor-pointer relative overflow-hidden"
     >
-      {/* Background Decorative Element */}
       <div className="absolute -right-4 -top-4 w-16 h-16 bg-slate-50 rounded-full group-hover:scale-150 transition-transform duration-500 z-0" />
 
-      {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-5 relative z-10">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="w-10 h-10 rounded-xl bg-[#28ABDF]/10 flex items-center justify-center flex-shrink-0 group-hover:bg-[#28ABDF] transition-all duration-300">
@@ -355,7 +356,7 @@ const DocumentCard = React.memo(({ doc }) => {
             <h3 className="font-bold text-slate-800 truncate text-base group-hover:text-[#28ABDF] transition-colors">
               {doc.title || 'Untitled Document'}
             </h3>
-            <p className="text-[11px] font-semibold text-slate-400 mt-0.5">{formatDate(doc.updatedAt || doc.createdAt)}</p>
+            <p className="text-[11px] font-semibold text-slate-400 mt-0.5">{formattedDate}</p>
           </div>
         </div>
         <Badge className={`${config.color} border-0 font-bold text-[10px] uppercase tracking-wider px-2.5 py-1.5 shadow-sm`}>
@@ -364,7 +365,6 @@ const DocumentCard = React.memo(({ doc }) => {
         </Badge>
       </div>
 
-      {/* Progress & Parties */}
       <div className="flex-1 relative z-10">
         {parties.length > 0 ? (
           <div className="mb-5">
@@ -376,7 +376,6 @@ const DocumentCard = React.memo(({ doc }) => {
               <span className="text-[12px] font-black text-[#28ABDF]">{progress}%</span>
             </div>
             
-            {/* Segmented Progress Bar - Scalable for many recipients */}
             <div className="flex gap-1 h-2 mb-4 bg-slate-50 rounded-full p-0.5">
               {parties.map((p, i) => (
                 <div 
@@ -393,10 +392,10 @@ const DocumentCard = React.memo(({ doc }) => {
             {currentSigner && (
               <div className="bg-[#28ABDF]/5 p-2.5 rounded-xl border border-[#28ABDF]/10 animate-in fade-in slide-in-from-bottom-2">
                 <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Awaiting Signature</p>
-                <p className="text-[11px] text-[#28ABDF] font-bold truncate flex items-center gap-1">
+                <div className="text-[11px] text-[#28ABDF] font-bold truncate flex items-center gap-1">
                    <div className="w-1.5 h-1.5 rounded-full bg-[#28ABDF] animate-pulse" />
                    {currentSigner.name}
-                </p>
+                </div>
               </div>
             )}
           </div>
@@ -408,14 +407,16 @@ const DocumentCard = React.memo(({ doc }) => {
         )}
       </div>
 
-      {/* Footer Action */}
       <div className="pt-4 border-t border-slate-100 flex items-center justify-between relative z-10">
         <div className="flex -space-x-2.5">
           {parties.slice(0, 4).map((p, i) => (
             <div 
               key={i} 
               className="w-7 h-7 rounded-full border-2 border-white bg-white shadow-sm flex items-center justify-center text-[9px] font-black uppercase overflow-hidden" 
-              style={{ color: PARTY_COLORS[i % PARTY_COLORS.length], border: `1px solid ${PARTY_COLORS[i % PARTY_COLORS.length]}20` }}
+              style={{ 
+                color: PARTY_COLORS[i % PARTY_COLORS.length], 
+                border: `1px solid ${PARTY_COLORS[i % PARTY_COLORS.length]}20` 
+              }}
               title={p.name}
             >
               {p.name?.charAt(0) || '?'}

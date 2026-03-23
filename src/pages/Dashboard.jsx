@@ -127,14 +127,13 @@
 //     </div>
 //   );
 // }
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, FileText, Clock, CheckCircle2, Send } from 'lucide-react';
+import { Plus, Search, FileText, Clock, CheckCircle2, Send, Loader2, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import StatsCard from '../components/dashboard/StatsCard';
 import DocumentCard from '../components/dashboard/DocumentCard';
@@ -149,38 +148,46 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ১. ডেটা ফেচিং ফাংশন (useCallback দিয়ে অপ্টিমাইজড)
-  const fetchDocuments = useCallback(async (showLoading = true) => {
-    if (showLoading) setIsLoading(true);
+  // 🌟 ফাস্ট লোডিংয়ের জন্য প্যাগিনেশন স্টেট
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const LIMIT = 6; 
+
+  // ১. ডেটা ফেচিং ফাংশন (Limit & Page প্যারামিটার সহ)
+  const fetchDocuments = useCallback(async (pageNum = 1, isInitial = false) => {
+    if (isInitial) setIsLoading(true);
+    else setIsFetchingMore(true);
+    
     setError(null);
     try {
-      const res = await api.get('/documents');
+      // সার্ভার থেকে অল্প অল্প করে ডেটা আনা হচ্ছে
+      const res = await api.get(`/documents?page=${pageNum}&limit=${LIMIT}`);
+      const newDocs = Array.isArray(res.data) ? res.data : (res.data.documents || []);
       
-      const sortedDocs = res.data.sort((a, b) => {
-        const dateA = new Date(a.updatedAt || a.createdAt || 0);
-        const dateB = new Date(b.updatedAt || b.createdAt || 0);
-        return dateB - dateA; 
-      });
+      if (isInitial) {
+        setDocuments(newDocs);
+      } else {
+        setDocuments(prev => [...prev, ...newDocs]);
+      }
 
-      setDocuments(sortedDocs);
+      // যদি লিমিটের চেয়ে কম ডেটা আসে, তারমানে আর ডেটা নেই
+      if (newDocs.length < LIMIT) setHasMore(false);
+      else setHasMore(true);
+
     } catch (err) {
       console.error("Dashboard Fetch Error:", err);
       setError("ডকুমেন্ট লোড করতে সমস্যা হচ্ছে।");
     } finally {
       setIsLoading(false);
+      setIsFetchingMore(false);
     }
   }, []);
 
-  // ২. অটো-রিফ্রেশ লজিক (Polling: প্রতি ৫ সেকেন্ডে আপডেট হবে)
+  // ২. ইনিশিয়াল লোড লজিক (৫ সেকেন্ড পোলিং সরানো হয়েছে পারফরম্যান্সের জন্য)
   useEffect(() => {
     if (!authLoading && !isAdmin) {
-      fetchDocuments(true); // প্রথমবার লোডার দেখাবে
-
-      const interval = setInterval(() => {
-        fetchDocuments(false); // পরের বারগুলো ব্যাকগ্রাউন্ডে আপডেট হবে (UI কাঁপবে না)
-      }, 5000); 
-
-      return () => clearInterval(interval); // পেজ থেকে চলে গেলে বন্ধ হবে
+      fetchDocuments(1, true);
     }
 
     if (!authLoading && isAdmin) {
@@ -188,7 +195,13 @@ export default function Dashboard() {
     }
   }, [isAdmin, authLoading, navigate, fetchDocuments]);
 
-  // ৩. মেমোইজড স্ট্যাটাস ক্যালকুলেশন (পারফরম্যান্স ফিক্স)
+  // ৩. লোড মোর হ্যান্ডলার
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchDocuments(nextPage, false);
+  };
+
   const stats = useMemo(() => ({
     total: documents.length,
     inProgress: documents.filter(d => d.status === 'in_progress').length,
@@ -196,7 +209,6 @@ export default function Dashboard() {
     drafts: documents.filter(d => d.status === 'draft').length,
   }), [documents]);
 
-  // ৪. মেমোইজড ফিল্টার লজিক
   const filtered = useMemo(() => {
     return documents.filter(doc => {
       const matchSearch = !search || doc.title?.toLowerCase().includes(search.toLowerCase());
@@ -233,7 +245,6 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center">
         <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 " />
-        
           <Input placeholder="Search by title…" value={search} onChange={e => setSearch(e.target.value)}
            className="pl-10 rounded-xl focus:!ring-0 " />
         </div>
@@ -249,12 +260,33 @@ export default function Dashboard() {
 
       {isLoading && documents.length === 0 ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}
+          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map(doc => <DocumentCard key={doc._id} doc={doc} />)}
-        </div>
+        <>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filtered.map(doc => <DocumentCard key={doc._id} doc={doc} />)}
+          </div>
+
+          {/* 🌟 লোড মোর সেকশন (শুধুমাত্র যখন আরও ডাটা থাকবে) */}
+          {hasMore && documents.length >= LIMIT && (
+            <div className="flex justify-center mt-10 mb-6">
+              <Button 
+                variant="outline" 
+                onClick={handleLoadMore} 
+                disabled={isFetchingMore}
+                className="rounded-full border-sky-200 text-sky-600 hover:bg-sky-50 px-8"
+              >
+                {isFetchingMore ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 mr-2" />
+                )}
+                {isFetchingMore ? 'Loading...' : 'Show More'}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
