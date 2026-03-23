@@ -2129,8 +2129,8 @@ import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
 // সঠিক ওয়ার্কার পাথ
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.5.207/legacy/build/pdf.worker.min.mjs';
-
+// pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.5.207/legacy/build/pdf.worker.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#6366f1', '#14b8a6'];
 
 export default function PdfViewer({
@@ -2310,15 +2310,24 @@ export default function PdfViewer({
                   y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
                 } : f));
               }}
+              // onResizeStop={(e, dir, ref, delta, pos) => {
+              //   onFieldsChange(fields.map(f => f.id === field.id ? {
+              //     ...f,
+              //     width: (parseFloat(ref.style.width) / canvasSize.width) * 100,
+              //     height: (parseFloat(ref.style.height) / canvasSize.height) * 100,
+              //     x: (pos.x / canvasSize.width) * 100,
+              //     y: (pos.y / canvasSize.height) * 100
+              //   } : f));
+              // }}
               onResizeStop={(e, dir, ref, delta, pos) => {
-                onFieldsChange(fields.map(f => f.id === field.id ? {
-                  ...f,
-                  width: (parseFloat(ref.style.width) / canvasSize.width) * 100,
-                  height: (parseFloat(ref.style.height) / canvasSize.height) * 100,
-                  x: (pos.x / canvasSize.width) * 100,
-                  y: (pos.y / canvasSize.height) * 100
-                } : f));
-              }}
+  onFieldsChange(fields.map(f => f.id === field.id ? {
+    ...f,
+    width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)),
+    height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)),
+    x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)),
+    y: Number(((pos.y / canvasSize.height) * 100).toFixed(4))
+  } : f));
+}}
               bounds="parent"
               enableResizing={!readOnly}
               disableDragging={readOnly}
