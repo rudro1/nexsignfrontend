@@ -1685,15 +1685,205 @@
 //     </div>
 //   );
 // }
-import React, { useState, useEffect } from 'react';
+// import React, { useState, useEffect } from 'react';
+// import { useNavigate, useLocation } from 'react-router-dom';
+// import { api } from '@/api/apiClient';
+// import { useAuth } from '@/lib/AuthContext';
+// import { Button } from '@/components/ui/button';
+// import { Input } from '@/components/ui/input';
+// import { Card } from '@/components/ui/Card';
+// import { toast } from 'sonner';
+// import { Upload, Send, ArrowLeft, FileText, Loader2, Mail } from 'lucide-react';
+// import PartyManager from '@/components/editor/PartyManager';
+// import FieldToolbar from '@/components/editor/FieldToolbar';
+// import PdfViewer from '@/components/editor/PdfViewer';
+
+// export default function DocumentEditor() {
+//   const navigate  = useNavigate();
+//   const location  = useLocation();
+//   const { user }  = useAuth();
+
+//   const [docId]   = useState(() => new URLSearchParams(location.search).get('id'));
+//   const [rawFile, setRawFile]   = useState(null);
+//   const [title, setTitle]       = useState('');
+//   const [fileUrl, setFileUrl]   = useState('');
+//   const [fileId, setFileId]     = useState('');
+//   const [parties, setParties]   = useState([]);
+//   const [fields, setFields]     = useState([]);
+//   const [ccEmails, setCcEmails] = useState([]);
+//   const [currentPage, setCurrentPage]     = useState(1);
+//   const [totalPages, setTotalPages]       = useState(1);
+//   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
+//   const [pendingFieldType, setPendingFieldType]     = useState(null);
+//   const [processing, setProcessing] = useState(false);
+
+//   useEffect(() => {
+//     if (!docId || docId === 'new') return;
+//     api.get(`/documents/${docId}`)
+//       .then(res => {
+//         const d = res.data.document || res.data;
+//         setTitle(d.title || '');
+//         setFileUrl(d.fileUrl || '');
+//         setFileId(d.fileId || 'existing');
+//         setParties(d.parties || []);
+//         setCcEmails(d.ccEmails || []);
+//         setFields(d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || []);
+//       })
+//       .catch(() => toast.error('Failed to load document'));
+//   }, [docId]);
+
+//   const handleFileSelect = (e) => {
+//     const file = e.target.files[0];
+//     if (!file || file.type !== 'application/pdf')
+//       return toast.error('Please upload a valid PDF file');
+//     setRawFile(file);
+//     setTitle(file.name.replace('.pdf', ''));
+//     setFileUrl(URL.createObjectURL(file));
+//     setFileId('preview');
+//     toast.success('PDF loaded! Now add parties and fields.');
+//   };
+
+//   const handleSend = async () => {
+//     if (!rawFile && !fileUrl) return toast.error('Please upload a PDF file');
+//     if (!parties.length)       return toast.error('Please add at least one signer');
+//     if (!parties.every(p => p.name && p.email))
+//       return toast.error('All parties need a name and email');
+//     if (!fields.length)        return toast.error('Please place at least one signature field');
+
+//     setProcessing(true);
+//     try {
+//       const formData = new FormData();
+//       if (rawFile instanceof File) formData.append('file', rawFile);
+//       formData.append('title',      title || 'Untitled');
+//       formData.append('parties',    JSON.stringify(parties));
+//       formData.append('ccEmails',   JSON.stringify(ccEmails));
+//       formData.append('fields',     JSON.stringify(fields));
+//       formData.append('totalPages', String(totalPages));
+
+//       const res = await api.post('/documents/upload-and-send', formData);
+//       if (res.data.success) {
+//         toast.success('Document sent to all parties!');
+//         navigate('/dashboard');
+//       }
+//     } catch (error) {
+//       console.error('Upload Error:', error.response?.data);
+//       toast.error(error.response?.data?.error || 'Failed to send document');
+//     } finally {
+//       setProcessing(false);
+//     }
+//   };
+
+//   return (
+//     <div className="max-w-[1400px] mx-auto px-4 py-8">
+//       {/* Header */}
+//       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+//         <div className="flex items-center gap-4 w-full sm:w-auto">
+//           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
+//             <ArrowLeft className="w-5 h-5 text-slate-600" />
+//           </Button>
+//           <div className="flex flex-col">
+//             <Input
+//               value={title}
+//               onChange={e => setTitle(e.target.value)}
+//               placeholder="Document Title"
+//               className="text-xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent p-0 h-auto"
+//             />
+//             <span className="text-[10px] text-[#28ABDF] font-bold uppercase tracking-widest">NeXsign Editor</span>
+//           </div>
+//         </div>
+//         <Button
+//           onClick={handleSend}
+//           disabled={processing || !fileUrl}
+//           className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-lg transition-all active:scale-95 w-full sm:w-auto"
+//         >
+//           {processing
+//             ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+//             : <Send className="w-4 h-4 mr-2" />}
+//           {docId && docId !== 'new' ? 'Update & Send' : 'Confirm & Send'}
+//         </Button>
+//       </div>
+
+//       <div className="flex flex-col lg:flex-row gap-8">
+//         {/* Sidebar */}
+//         <div className="w-full lg:w-80 space-y-6 lg:sticky lg:top-4 lg:self-start">
+//           {!fileId && (
+//             <Card className="p-10 border-dashed border-2 flex flex-col items-center text-center bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
+//               <Upload className="w-12 h-12 mb-4 text-slate-300" />
+//               <Button asChild variant="secondary" className="rounded-lg">
+//                 <label className="cursor-pointer">
+//                   Select PDF
+//                   <input type="file" className="hidden" accept="application/pdf" onChange={handleFileSelect} />
+//                 </label>
+//               </Button>
+//             </Card>
+//           )}
+
+//           <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+//             <PartyManager parties={parties} onChange={setParties} />
+//           </Card>
+
+//           <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+//             <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 dark:text-slate-300 text-sm">
+//               <Mail size={16} className="text-[#28ABDF]" /> CC Recipients
+//             </div>
+//             <Input
+//               placeholder="Emails (comma separated)"
+//               value={ccEmails.join(', ')}
+//               onChange={e => setCcEmails(
+//                 e.target.value.split(',').map(email => email.trim()).filter(Boolean)
+//               )}
+//               className="text-xs rounded-lg"
+//             />
+//           </Card>
+
+//           {fileId && (
+//             <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+//               <FieldToolbar
+//                 parties={parties}
+//                 selectedPartyIndex={selectedPartyIndex}
+//                 onPartySelect={setSelectedPartyIndex}
+//                 onAddField={type => setPendingFieldType(type)}
+//               />
+//             </Card>
+//           )}
+//         </div>
+
+//         {/* PDF Viewer */}
+//         <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[800px]">
+//           {fileId ? (
+//             <PdfViewer
+//               fileUrl={fileUrl}
+//               fields={fields}
+//               onFieldsChange={setFields}
+//               currentPage={currentPage}
+//               onPageChange={setCurrentPage}
+//               onTotalPagesChange={setTotalPages}
+//               pendingFieldType={pendingFieldType}
+//               selectedPartyIndex={selectedPartyIndex}
+//               parties={parties}
+//               onFieldPlaced={() => setPendingFieldType(null)}
+//             />
+//           ) : (
+//             <div className="h-full flex flex-col items-center justify-center text-slate-300 py-40">
+//               <FileText className="w-20 h-20 mb-4 opacity-10" />
+//               <p className="font-medium text-slate-400">Upload a PDF to begin</p>
+//             </div>
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Upload, Send, ArrowLeft, FileText, Loader2, Mail } from 'lucide-react';
+import { Upload, Send, ArrowLeft, FileText, Loader2, Mail, X } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer from '@/components/editor/PdfViewer';
@@ -1703,154 +1893,339 @@ export default function DocumentEditor() {
   const location  = useLocation();
   const { user }  = useAuth();
 
-  const [docId]   = useState(() => new URLSearchParams(location.search).get('id'));
-  const [rawFile, setRawFile]   = useState(null);
-  const [title, setTitle]       = useState('');
-  const [fileUrl, setFileUrl]   = useState('');
-  const [fileId, setFileId]     = useState('');
-  const [parties, setParties]   = useState([]);
-  const [fields, setFields]     = useState([]);
-  const [ccEmails, setCcEmails] = useState([]);
-  const [currentPage, setCurrentPage]     = useState(1);
-  const [totalPages, setTotalPages]       = useState(1);
+  const [docId] = useState(() => {
+    const id = new URLSearchParams(location.search).get('id');
+    return id === 'new' ? null : id;
+  });
+
+  const [rawFile, setRawFile]     = useState(null);
+  const [title, setTitle]         = useState('');
+  const [fileUrl, setFileUrl]     = useState('');
+  const [fileReady, setFileReady] = useState(false); // true once a file is selected/loaded
+  const [parties, setParties]     = useState([]);
+  const [fields, setFields]       = useState([]);
+  const [ccEmails, setCcEmails]   = useState([]);
+  const [ccInput, setCcInput]     = useState('');
+
+  const [currentPage, setCurrentPage]               = useState(1);
+  const [totalPages, setTotalPages]                 = useState(1);
   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
   const [pendingFieldType, setPendingFieldType]     = useState(null);
-  const [processing, setProcessing] = useState(false);
+  const [processing, setProcessing]                 = useState(false);
 
+  // ── Load existing document ───────────────────────────────────────────────
   useEffect(() => {
-    if (!docId || docId === 'new') return;
+    if (!docId) return;
     api.get(`/documents/${docId}`)
       .then(res => {
         const d = res.data.document || res.data;
         setTitle(d.title || '');
         setFileUrl(d.fileUrl || '');
-        setFileId(d.fileId || 'existing');
+        setFileReady(true);
         setParties(d.parties || []);
         setCcEmails(d.ccEmails || []);
-        setFields(d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || []);
+        setFields((d.fields || []).map(f => typeof f === 'string' ? JSON.parse(f) : f));
       })
       .catch(() => toast.error('Failed to load document'));
   }, [docId]);
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file || file.type !== 'application/pdf')
-      return toast.error('Please upload a valid PDF file');
+  // ── File selection ───────────────────────────────────────────────────────
+  const handleFileSelect = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Please upload a valid PDF file.');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error('PDF must be under 15MB.');
+      return;
+    }
+
+    // Revoke previous blob URL to free memory
+    if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
+
     setRawFile(file);
-    setTitle(file.name.replace('.pdf', ''));
+    setTitle(prev => prev || file.name.replace(/\.pdf$/i, ''));
     setFileUrl(URL.createObjectURL(file));
-    setFileId('preview');
-    toast.success('PDF loaded! Now add parties and fields.');
+    setFileReady(true);
+    setFields([]); // reset fields when new file is chosen
+    setCurrentPage(1);
+    toast.success('PDF loaded! Add parties and place signature fields.');
+
+    // Reset the input so the same file can be re-selected if needed
+    e.target.value = '';
+  }, [fileUrl]);
+
+  // ── CC email helpers ─────────────────────────────────────────────────────
+  const addCcEmail = () => {
+    const email = ccInput.trim().toLowerCase();
+    if (!email) return;
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+    if (ccEmails.includes(email)) {
+      toast.error('This email is already added.');
+      return;
+    }
+    setCcEmails(prev => [...prev, email]);
+    setCcInput('');
   };
 
-  const handleSend = async () => {
-    if (!rawFile && !fileUrl) return toast.error('Please upload a PDF file');
-    if (!parties.length)       return toast.error('Please add at least one signer');
-    if (!parties.every(p => p.name && p.email))
-      return toast.error('All parties need a name and email');
-    if (!fields.length)        return toast.error('Please place at least one signature field');
+  const removeCcEmail = (email) => {
+    setCcEmails(prev => prev.filter(e => e !== email));
+  };
 
+  // ── Validation ───────────────────────────────────────────────────────────
+  const validate = () => {
+    if (!rawFile && !fileUrl) {
+      toast.error('Please upload a PDF file first.');
+      return false;
+    }
+    if (!title.trim()) {
+      toast.error('Please enter a document title.');
+      return false;
+    }
+    if (!parties.length) {
+      toast.error('Please add at least one signer.');
+      return false;
+    }
+    if (parties.some(p => !p.name?.trim() || !p.email?.trim())) {
+      toast.error('All signers need a name and email address.');
+      return false;
+    }
+    // Basic email validation for parties
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (parties.some(p => !emailRegex.test(p.email))) {
+      toast.error('One or more signer emails are invalid.');
+      return false;
+    }
+    if (!fields.length) {
+      toast.error('Please place at least one signature or text field on the document.');
+      return false;
+    }
+    // Check each party has at least one field
+    const partiesWithFields = new Set(fields.map(f => Number(f.partyIndex)));
+    const missingParty = parties.find((_, i) => !partiesWithFields.has(i));
+    if (missingParty) {
+      toast.error(`Please add a field for "${missingParty.name}".`);
+      return false;
+    }
+    return true;
+  };
+
+  // ── Send document ────────────────────────────────────────────────────────
+  const handleSend = async () => {
+    if (!validate()) return;
     setProcessing(true);
+
     try {
       const formData = new FormData();
-      if (rawFile instanceof File) formData.append('file', rawFile);
-      formData.append('title',      title || 'Untitled');
-      formData.append('parties',    JSON.stringify(parties));
+
+      // ✅ FIX: only append file if it's a fresh File object (not an existing Cloudinary URL)
+      if (rawFile instanceof File) {
+        formData.append('file', rawFile);
+      }
+
+      formData.append('title',      title.trim());
+      formData.append('parties',    JSON.stringify(
+        parties.map(p => ({ name: p.name.trim(), email: p.email.trim().toLowerCase() }))
+      ));
       formData.append('ccEmails',   JSON.stringify(ccEmails));
       formData.append('fields',     JSON.stringify(fields));
       formData.append('totalPages', String(totalPages));
 
       const res = await api.post('/documents/upload-and-send', formData);
-      if (res.data.success) {
-        toast.success('Document sent to all parties!');
+
+      if (res.data?.success) {
+        toast.success('🎉 Document sent to all signers!');
+        // Revoke blob URL before navigating away
+        if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
         navigate('/dashboard');
+      } else {
+        toast.error(res.data?.error || 'Something went wrong. Please try again.');
       }
-    } catch (error) {
-      console.error('Upload Error:', error.response?.data);
-      toast.error(error.response?.data?.error || 'Failed to send document');
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Failed to send document.';
+      console.error('Send error:', err.response?.data || err);
+      toast.error(msg);
     } finally {
       setProcessing(false);
     }
   };
 
+  const canSend = fileReady && parties.length > 0 && fields.length > 0 && !processing;
+
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
+    <div className="max-w-[1400px] mx-auto px-3 sm:px-4 py-6 sm:py-8">
+
+      {/* ── Top Bar ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/dashboard')}
+            className="rounded-full flex-shrink-0"
+          >
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </Button>
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0 flex-1">
             <Input
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="Document Title"
-              className="text-xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent p-0 h-auto"
+              placeholder="Document Title..."
+              className="text-lg sm:text-xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent p-0 h-auto truncate"
             />
-            <span className="text-[10px] text-[#28ABDF] font-bold uppercase tracking-widest">NeXsign Editor</span>
+            <span className="text-[10px] text-[#28ABDF] font-bold uppercase tracking-widest">
+              NeXsign Editor
+            </span>
           </div>
         </div>
         <Button
           onClick={handleSend}
-          disabled={processing || !fileUrl}
-          className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-lg transition-all active:scale-95 w-full sm:w-auto"
+          disabled={!canSend}
+          className="bg-[#28ABDF] hover:bg-[#2399c8] disabled:opacity-40 text-white rounded-xl px-6 sm:px-8 h-11 shadow-lg transition-all active:scale-95 w-full sm:w-auto font-semibold"
         >
           {processing
-            ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            : <Send className="w-4 h-4 mr-2" />}
-          {docId && docId !== 'new' ? 'Update & Send' : 'Confirm & Send'}
+            ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...</>
+            : <><Send className="w-4 h-4 mr-2" /> {docId ? 'Update & Send' : 'Confirm & Send'}</>
+          }
         </Button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar */}
-        <div className="w-full lg:w-80 space-y-6 lg:sticky lg:top-4 lg:self-start">
-          {!fileId && (
-            <Card className="p-10 border-dashed border-2 flex flex-col items-center text-center bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-              <Upload className="w-12 h-12 mb-4 text-slate-300" />
-              <Button asChild variant="secondary" className="rounded-lg">
+      <div className="flex flex-col lg:flex-row gap-6">
+
+        {/* ── Sidebar ─────────────────────────────────────────────────── */}
+        <div className="w-full lg:w-[300px] xl:w-[320px] space-y-4 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pb-4">
+
+          {/* PDF Upload */}
+          {!fileReady ? (
+            <Card className="p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center text-center bg-slate-50 dark:bg-slate-900/50 rounded-2xl gap-3">
+              <div className="w-14 h-14 bg-sky-50 rounded-2xl flex items-center justify-center">
+                <Upload className="w-7 h-7 text-[#28ABDF]" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 text-sm">Upload PDF</p>
+                <p className="text-xs text-slate-400 mt-1">Max 15MB</p>
+              </div>
+              <Button asChild variant="secondary" className="rounded-xl w-full font-semibold">
                 <label className="cursor-pointer">
-                  Select PDF
+                  Select PDF File
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="application/pdf"
+                    onChange={handleFileSelect}
+                  />
+                </label>
+              </Button>
+            </Card>
+          ) : (
+            // Replace PDF button (shown when a file is already loaded)
+            <Card className="p-3 border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50 flex items-center gap-3">
+              <div className="w-9 h-9 bg-sky-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <FileText className="w-4 h-4 text-[#28ABDF]" />
+              </div>
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate flex-1 min-w-0">
+                {rawFile?.name || title || 'Document loaded'}
+              </p>
+              <Button asChild variant="ghost" size="sm" className="rounded-lg text-xs text-slate-400 hover:text-[#28ABDF] flex-shrink-0">
+                <label className="cursor-pointer">
+                  Change
                   <input type="file" className="hidden" accept="application/pdf" onChange={handleFileSelect} />
                 </label>
               </Button>
             </Card>
           )}
 
-          <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+          {/* Parties */}
+          <Card className="p-4 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
             <PartyManager parties={parties} onChange={setParties} />
           </Card>
 
-          <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+          {/* CC Recipients */}
+          <Card className="p-4 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
             <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 dark:text-slate-300 text-sm">
-              <Mail size={16} className="text-[#28ABDF]" /> CC Recipients
+              <Mail size={15} className="text-[#28ABDF]" />
+              CC Recipients
             </div>
-            <Input
-              placeholder="Emails (comma separated)"
-              value={ccEmails.join(', ')}
-              onChange={e => setCcEmails(
-                e.target.value.split(',').map(email => email.trim()).filter(Boolean)
-              )}
-              className="text-xs rounded-lg"
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="email@example.com"
+                value={ccInput}
+                onChange={e => setCcInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCcEmail())}
+                className="text-xs rounded-lg h-9 flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addCcEmail}
+                className="rounded-lg h-9 px-3 text-xs font-semibold border-[#28ABDF] text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white"
+              >
+                Add
+              </Button>
+            </div>
+            {ccEmails.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {ccEmails.map(email => (
+                  <span
+                    key={email}
+                    className="flex items-center gap-1 text-[10px] bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-2.5 py-1 font-medium"
+                  >
+                    {email}
+                    <button
+                      type="button"
+                      onClick={() => removeCcEmail(email)}
+                      className="hover:text-red-500 transition-colors"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </Card>
 
-          {fileId && (
-            <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+          {/* Field Toolbar — only shown when a file is ready and parties exist */}
+          {fileReady && parties.length > 0 && (
+            <Card className="p-4 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
               <FieldToolbar
                 parties={parties}
                 selectedPartyIndex={selectedPartyIndex}
                 onPartySelect={setSelectedPartyIndex}
                 onAddField={type => setPendingFieldType(type)}
+                pendingFieldType={pendingFieldType}
               />
             </Card>
           )}
+
+          {/* Fields summary */}
+          {fields.length > 0 && (
+            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">
+                {fields.length} field{fields.length > 1 ? 's' : ''} placed
+              </p>
+              {parties.map((p, i) => {
+                const count = fields.filter(f => Number(f.partyIndex) === i).length;
+                return count > 0 ? (
+                  <div key={i} className="flex justify-between items-center text-[11px] py-1">
+                    <span className="font-medium text-slate-600 dark:text-slate-400 truncate mr-2">{p.name}</span>
+                    <span className="font-bold text-[#28ABDF]">{count} field{count > 1 ? 's' : ''}</span>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          )}
         </div>
 
-        {/* PDF Viewer */}
-        <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[800px]">
-          {fileId ? (
+        {/* ── PDF Viewer ──────────────────────────────────────────────── */}
+        <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[600px] sm:min-h-[800px]">
+          {fileReady ? (
             <PdfViewer
               fileUrl={fileUrl}
               fields={fields}
@@ -1864,9 +2239,12 @@ export default function DocumentEditor() {
               onFieldPlaced={() => setPendingFieldType(null)}
             />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-300 py-40">
-              <FileText className="w-20 h-20 mb-4 opacity-10" />
-              <p className="font-medium text-slate-400">Upload a PDF to begin</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-300 py-32 px-8 text-center">
+              <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-3xl flex items-center justify-center mb-6">
+                <FileText className="w-12 h-12 opacity-30" />
+              </div>
+              <p className="font-semibold text-slate-400 text-lg mb-2">No document yet</p>
+              <p className="text-slate-300 text-sm">Upload a PDF from the sidebar to get started.</p>
             </div>
           )}
         </div>

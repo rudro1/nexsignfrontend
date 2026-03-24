@@ -134,32 +134,106 @@
 //   }
 // );
 
+// import axios from 'axios';
+
+// export const api = axios.create({
+//   baseURL: import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api',
+//   withCredentials: true, 
+//   timeout: 60000, 
+// });
+
+// api.interceptors.request.use(
+//   (config) => {
+//     const token = localStorage.getItem('token');
+    
+//     // ১. টোকেন থাকলে সেটি হেডার-এ সেট করা
+//     if (token) {
+//       config.headers.Authorization = `Bearer ${token}`;
+//     }
+    
+//     // ২. Content-Type হ্যান্ডলিং (CORS ফ্রেন্ডলি)
+//     if (config.data instanceof FormData) {
+//       // FormData হলে হেডার ডিলিট করা জরুরি যাতে ব্রাউজার সঠিক boundary সেট করতে পারে
+//       delete config.headers['Content-Type'];
+//     } else if (!config.headers['Content-Type']) {
+//       // শুধু ডাটা থাকলে ডিফল্ট JSON সেট করা
+//       config.headers['Content-Type'] = 'application/json';
+//     }
+
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
+
+// api.interceptors.response.use(
+//   (response) => response,
+//   (error) => {
+//     // ৩. নেটওয়ার্ক এরর বা টাইমআউট হ্যান্ডলিং
+//     if (!error.response) {
+//       console.error("Network Error: Please check your backend CORS settings or Internet.");
+//     }
+
+//     // ৪. অথেন্টিকেশন এরর (Expired Token)
+//     if (error.response?.status === 401) {
+//       const isLoginPage = window.location.pathname === '/login';
+//       if (!isLoginPage) {
+//         localStorage.removeItem('token');
+//         // ইউজার যেন বারবার রিডাইরেক্ট না হয় তাই চেক করা
+//         window.location.href = '/login?expired=true';
+//       }
+//     }
+//     return Promise.reject(error);
+//   }
+// );
 import axios from 'axios';
 
+// ✅ FIX: strip trailing slash to prevent double-slash bugs
+const BASE = (import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api').replace(/\/$/, '');
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api',
-  withCredentials: true, 
-  timeout: 60000, 
+  baseURL: BASE,
+  withCredentials: true,
+  timeout: 60000,
 });
+
+/**
+ * ✅ CORE FIX — Cloudinary Proxy URL Builder
+ *
+ * BUG BEFORE: replace(/\//g, '_') destroyed version numbers like "v1774334567"
+ * because backend's replace(/_/g, '/') turned ALL underscores back to slashes,
+ * making "v1774334567" → "v1774334567" (fine) but "nexsign_docs" → "nexsign/docs" ✓
+ * — ACTUALLY the real problem: Vercel strips the path after the last dot
+ * if there is a .pdf extension in the middle of a URL segment.
+ *
+ * FIX: encode "/" as "~~" (double tilde) — safe in URL paths, never appears
+ * in Cloudinary public IDs, and easy to decode on the backend.
+ *
+ * ⚠️  You must also update your backend proxy route decoder:
+ *     const cloudPath = req.params.path.replace(/~~/g, '/');
+ */
+export function buildProxyUrl(cloudinaryUrl) {
+  if (!cloudinaryUrl) return '';
+  if (cloudinaryUrl.startsWith('blob:') || cloudinaryUrl.startsWith('data:')) {
+    return cloudinaryUrl;
+  }
+  const parts = cloudinaryUrl.split('/upload/');
+  if (parts.length < 2) return cloudinaryUrl;
+  // Encode slashes as ~~ so express wildcard captures the full path safely
+  const encoded = parts[1].replace(/\//g, '~~');
+  return `${BASE}/documents/proxy/${encoded}`;
+}
 
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    
-    // ১. টোকেন থাকলে সেটি হেডার-এ সেট করা
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // ২. Content-Type হ্যান্ডলিং (CORS ফ্রেন্ডলি)
     if (config.data instanceof FormData) {
-      // FormData হলে হেডার ডিলিট করা জরুরি যাতে ব্রাউজার সঠিক boundary সেট করতে পারে
       delete config.headers['Content-Type'];
     } else if (!config.headers['Content-Type']) {
-      // শুধু ডাটা থাকলে ডিফল্ট JSON সেট করা
       config.headers['Content-Type'] = 'application/json';
     }
-
     return config;
   },
   (error) => Promise.reject(error)
@@ -168,17 +242,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // ৩. নেটওয়ার্ক এরর বা টাইমআউট হ্যান্ডলিং
     if (!error.response) {
-      console.error("Network Error: Please check your backend CORS settings or Internet.");
+      console.error('Network Error: Check backend CORS or internet connection.');
     }
-
-    // ৪. অথেন্টিকেশন এরর (Expired Token)
     if (error.response?.status === 401) {
-      const isLoginPage = window.location.pathname === '/login';
-      if (!isLoginPage) {
+      if (window.location.pathname !== '/login') {
         localStorage.removeItem('token');
-        // ইউজার যেন বারবার রিডাইরেক্ট না হয় তাই চেক করা
         window.location.href = '/login?expired=true';
       }
     }

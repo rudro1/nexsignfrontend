@@ -450,153 +450,359 @@
 // });
 
 // export default DocumentCard;
+// import React, { useMemo, useCallback } from 'react';
+// import { useNavigate } from 'react-router-dom';
+// import { Card } from "../ui/Card"; 
+// import { Badge } from '@/components/ui/badge';
+// import { Button } from '@/components/ui/button';
+// import { toast } from 'sonner';
+// import { FileText, Users, ArrowRight, Clock, CheckCircle2, AlertCircle, Pencil, Layout } from 'lucide-react';
+
+// const statusConfig = {
+//   draft: { label: 'Draft', color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300', icon: Pencil },
+//   pending: { label: 'Pending', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
+//   in_progress: { label: 'In Progress', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
+//   completed: { label: 'Completed', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
+//   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle },
+//   template: { label: 'Template', color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400', icon: Layout },
+// };
+
+// const PARTY_COLORS = ['#0ea5e9','#8b5cf6','#f59e0b','#10b981','#ef4444','#ec4899'];
+
+// const DocumentCard = React.memo(({ doc }) => {
+//   const navigate = useNavigate();
+  
+//   // ১. মেমোরাইজড স্ট্যাটাস কনফিগারেশন
+//   const config = useMemo(() => {
+//     if (doc.isTemplate) return statusConfig.template;
+//     return statusConfig[doc.status] || statusConfig.draft;
+//   }, [doc.status, doc.isTemplate]);
+
+//   const StatusIcon = config.icon;
+//   const parties = doc.parties || [];
+
+//   // ২. সিগনেচার প্রগ্রেস ক্যালকুলেশন
+//   const progress = useMemo(() => {
+//     if (!parties.length) return 0;
+//     const signedCount = parties.filter(p => p.status === 'signed').length;
+//     return Math.round((signedCount / parties.length) * 100);
+//   }, [parties]);
+
+//   // ৩. কারেন্ট সাইনার ডিটেইলস
+//   const currentSigner = useMemo(() => {
+//     if (doc.status !== 'in_progress' || doc.isTemplate) return null;
+//     return parties[doc.currentPartyIndex || 0];
+//   }, [parties, doc.status, doc.currentPartyIndex, doc.isTemplate]);
+
+//   // ৪. ফরম্যাটেড ডেট (রিসেন্ট ফাইল ট্রেসিংয়ের জন্য গুরুত্বপূর্ণ)
+//   const formattedDate = useMemo(() => {
+//     const dateString = doc.createdAt || doc.updatedAt;
+//     if (!dateString) return 'No Date';
+//     return new Date(dateString).toLocaleDateString('en-GB', {
+//       day: '2-digit', month: 'short', year: 'numeric'
+//     });
+//   }, [doc.createdAt, doc.updatedAt]);
+
+//   // ৫. অ্যাকশন হ্যান্ডলার (এক ক্লিকে ম্যানেজ বা ওপেন)
+//   const handleAction = useCallback((e) => {
+//     e.stopPropagation();
+    
+//     // কমপ্লিটেড হলে সরাসরি PDF ভিউ
+//     if (doc.status === 'completed' && !doc.isTemplate) {
+//       if (doc.fileUrl) {
+//         window.open(doc.fileUrl, '_blank');
+//       } else {
+//         toast.error("Final document not ready yet.");
+//       }
+//       return;
+//     }
+
+//     // অন্য অবস্থায় এডিটর বা ট্র্যাকিং পেজে পাঠানো
+//     const path = `/DocumentEditor?id=${doc._id}${doc.isTemplate ? '&type=template' : ''}`;
+//     navigate(path);
+//   }, [doc.status, doc.fileUrl, doc._id, doc.isTemplate, navigate]);
+
+//   return (
+//     <Card 
+//       onClick={handleAction}
+//       className="p-5 bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/50 hover:shadow-lg dark:hover:border-[#28ABDF]/50 transition-all cursor-pointer group flex flex-col h-full rounded-2xl"
+//     >
+//       {/* Header Section */}
+//       <div className="flex items-start justify-between gap-3 mb-5">
+//         <div className="flex items-center gap-3 min-w-0">
+//           <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0 group-hover:bg-[#28ABDF]/10 transition-colors">
+//             <FileText className="w-5 h-5 text-[#28ABDF]"/>
+//           </div>
+//           <div className="min-w-0">
+//             <h3 className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm sm:text-base">
+//               {doc.title || 'Untitled Document'}
+//             </h3>
+//             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{formattedDate}</p>
+//           </div>
+//         </div>
+//         <Badge className={`${config.color} border-0 font-bold px-2 py-0.5 rounded-lg text-[10px] uppercase`}>
+//           <StatusIcon className="w-3 h-3 mr-1"/>{config.label}
+//         </Badge>
+//       </div>
+
+//       {/* Signing Progress Section */}
+//       {!doc.isTemplate && (
+//         <div className="mb-6 flex-grow">
+//           <div className="flex justify-between items-center mb-2">
+//             <div className="flex items-center gap-1.5 text-slate-500">
+//               <Users className="w-3.5 h-3.5"/>
+//               <span className="text-[11px] font-bold">{parties.length} Signers</span>
+//             </div>
+//             <span className="text-[11px] font-black text-[#28ABDF]">{progress}%</span>
+//           </div>
+          
+//           <div className="flex gap-1 h-1.5 bg-slate-100 dark:bg-slate-700/50 rounded-full overflow-hidden">
+//             {parties.map((p, i) => (
+//               <div 
+//                 key={i} 
+//                 className="flex-1 transition-all duration-500" 
+//                 style={{ 
+//                   backgroundColor: p.status === 'signed' ? '#10b981' : p.status === 'sent' ? PARTY_COLORS[i % PARTY_COLORS.length] : '#e2e8f0',
+//                   opacity: p.status === 'signed' ? 1 : 0.4
+//                 }}
+//               />
+//             ))}
+//           </div>
+          
+//           {currentSigner && (
+//             <div className="mt-3 flex items-center gap-1.5 bg-[#fef3c7]/50 dark:bg-amber-900/10 p-1.5 rounded-lg">
+//               <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"/>
+//               <p className="text-[10px] text-slate-600 dark:text-slate-400 italic">
+//                 Awaiting: <span className="font-bold text-slate-900 dark:text-slate-100">{currentSigner.name}</span>
+//               </p>
+//             </div>
+//           )}
+//         </div>
+//       )}
+
+//       {/* Card Footer */}
+//       <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 dark:border-slate-700/50">
+//         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+//            {doc.isTemplate ? 'Template Mode' : `ID: ...${doc._id?.slice(-6)}`}
+//         </div>
+//         <Button 
+//           variant="ghost" 
+//           size="sm" 
+//           onClick={handleAction}
+//           className="text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white rounded-lg gap-1.5 font-black text-[11px] h-8 transition-all"
+//         >
+//           {doc.status === 'completed' ? 'Open PDF' : doc.isTemplate ? 'Use Now' : 'Manage'}
+//           <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform"/>
+//         </Button>
+//       </div>
+//     </Card>
+//   );
+// });
+
+// export default DocumentCard;
+
+
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from "../ui/Card"; 
+// ✅ FIX: correct import path (was "../ui/Card" which broke in some setups)
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { FileText, Users, ArrowRight, Clock, CheckCircle2, AlertCircle, Pencil, Layout } from 'lucide-react';
+import {
+  FileText, Users, ArrowRight, Clock,
+  CheckCircle2, AlertCircle, Pencil, Layout,
+} from 'lucide-react';
 
 const statusConfig = {
-  draft: { label: 'Draft', color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300', icon: Pencil },
-  pending: { label: 'Pending', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
-  in_progress: { label: 'In Progress', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle },
-  template: { label: 'Template', color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400', icon: Layout },
+  draft: {
+    label: 'Draft',
+    color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+    icon: Pencil,
+  },
+  pending: {
+    label: 'Pending',
+    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    icon: Clock,
+  },
+  in_progress: {
+    label: 'In Progress',
+    color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+    icon: Clock,
+  },
+  completed: {
+    label: 'Completed',
+    color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    icon: CheckCircle2,
+  },
+  cancelled: {
+    label: 'Cancelled',
+    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    icon: AlertCircle,
+  },
+  template: {
+    label: 'Template',
+    color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+    icon: Layout,
+  },
 };
 
-const PARTY_COLORS = ['#0ea5e9','#8b5cf6','#f59e0b','#10b981','#ef4444','#ec4899'];
+const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
 
 const DocumentCard = React.memo(({ doc }) => {
   const navigate = useNavigate();
-  
-  // ১. মেমোরাইজড স্ট্যাটাস কনফিগারেশন
+  const parties  = doc.parties || [];
+
   const config = useMemo(() => {
     if (doc.isTemplate) return statusConfig.template;
     return statusConfig[doc.status] || statusConfig.draft;
   }, [doc.status, doc.isTemplate]);
 
   const StatusIcon = config.icon;
-  const parties = doc.parties || [];
 
-  // ২. সিগনেচার প্রগ্রেস ক্যালকুলেশন
   const progress = useMemo(() => {
     if (!parties.length) return 0;
-    const signedCount = parties.filter(p => p.status === 'signed').length;
-    return Math.round((signedCount / parties.length) * 100);
+    const signed = parties.filter(p => p.status === 'signed').length;
+    return Math.round((signed / parties.length) * 100);
   }, [parties]);
 
-  // ৩. কারেন্ট সাইনার ডিটেইলস
+  // ✅ FIX: currentSigner now handles missing currentPartyIndex gracefully
   const currentSigner = useMemo(() => {
     if (doc.status !== 'in_progress' || doc.isTemplate) return null;
-    return parties[doc.currentPartyIndex || 0];
-  }, [parties, doc.status, doc.currentPartyIndex, doc.isTemplate]);
+    // Find the first party that hasn't signed yet
+    return parties.find(p => p.status !== 'signed') || null;
+  }, [parties, doc.status, doc.isTemplate]);
 
-  // ৪. ফরম্যাটেড ডেট (রিসেন্ট ফাইল ট্রেসিংয়ের জন্য গুরুত্বপূর্ণ)
   const formattedDate = useMemo(() => {
-    const dateString = doc.createdAt || doc.updatedAt;
-    if (!dateString) return 'No Date';
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric'
-    });
+    const dateStr = doc.createdAt || doc.updatedAt;
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      });
+    } catch {
+      return '';
+    }
   }, [doc.createdAt, doc.updatedAt]);
 
-  // ৫. অ্যাকশন হ্যান্ডলার (এক ক্লিকে ম্যানেজ বা ওপেন)
+  // ✅ FIX: action handler with proper event handling
   const handleAction = useCallback((e) => {
     e.stopPropagation();
-    
-    // কমপ্লিটেড হলে সরাসরি PDF ভিউ
+    e.preventDefault();
+
     if (doc.status === 'completed' && !doc.isTemplate) {
       if (doc.fileUrl) {
-        window.open(doc.fileUrl, '_blank');
+        window.open(doc.fileUrl, '_blank', 'noopener,noreferrer');
       } else {
-        toast.error("Final document not ready yet.");
+        toast.error('Final document is not ready yet.');
       }
       return;
     }
 
-    // অন্য অবস্থায় এডিটর বা ট্র্যাকিং পেজে পাঠানো
-    const path = `/DocumentEditor?id=${doc._id}${doc.isTemplate ? '&type=template' : ''}`;
-    navigate(path);
-  }, [doc.status, doc.fileUrl, doc._id, doc.isTemplate, navigate]);
+    navigate(`/DocumentEditor?id=${doc._id}${doc.isTemplate ? '&type=template' : ''}`);
+  }, [doc, navigate]);
 
   return (
-    <Card 
+    <Card
       onClick={handleAction}
-      className="p-5 bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/50 hover:shadow-lg dark:hover:border-[#28ABDF]/50 transition-all cursor-pointer group flex flex-col h-full rounded-2xl"
+      className="p-5 bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 hover:shadow-xl dark:hover:border-[#28ABDF]/40 hover:border-[#28ABDF]/30 transition-all duration-200 cursor-pointer group flex flex-col h-full rounded-2xl"
     >
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-5">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0 group-hover:bg-[#28ABDF]/10 transition-colors">
-            <FileText className="w-5 h-5 text-[#28ABDF]"/>
+            <FileText className="w-5 h-5 text-[#28ABDF]" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm sm:text-base">
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm sm:text-base leading-snug">
               {doc.title || 'Untitled Document'}
             </h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{formattedDate}</p>
+            {formattedDate && (
+              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">
+                {formattedDate}
+              </p>
+            )}
           </div>
         </div>
-        <Badge className={`${config.color} border-0 font-bold px-2 py-0.5 rounded-lg text-[10px] uppercase`}>
-          <StatusIcon className="w-3 h-3 mr-1"/>{config.label}
+        <Badge className={`${config.color} border-0 font-bold px-2 py-1 rounded-lg text-[9px] uppercase flex items-center gap-1 flex-shrink-0`}>
+          <StatusIcon className="w-2.5 h-2.5" />
+          {config.label}
         </Badge>
       </div>
 
-      {/* Signing Progress Section */}
-      {!doc.isTemplate && (
-        <div className="mb-6 flex-grow">
+      {/* Signing Progress */}
+      {!doc.isTemplate && parties.length > 0 && (
+        <div className="mb-5 flex-grow">
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-1.5 text-slate-500">
-              <Users className="w-3.5 h-3.5"/>
-              <span className="text-[11px] font-bold">{parties.length} Signers</span>
+              <Users className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-semibold">
+                {parties.length} {parties.length === 1 ? 'Signer' : 'Signers'}
+              </span>
             </div>
             <span className="text-[11px] font-black text-[#28ABDF]">{progress}%</span>
           </div>
-          
-          <div className="flex gap-1 h-1.5 bg-slate-100 dark:bg-slate-700/50 rounded-full overflow-hidden">
+
+          {/* Progress bar — one segment per party */}
+          <div className="flex gap-0.5 h-1.5 bg-slate-100 dark:bg-slate-700/50 rounded-full overflow-hidden">
             {parties.map((p, i) => (
-              <div 
-                key={i} 
-                className="flex-1 transition-all duration-500" 
-                style={{ 
-                  backgroundColor: p.status === 'signed' ? '#10b981' : p.status === 'sent' ? PARTY_COLORS[i % PARTY_COLORS.length] : '#e2e8f0',
-                  opacity: p.status === 'signed' ? 1 : 0.4
+              <div
+                key={i}
+                className="flex-1 rounded-full transition-all duration-500"
+                style={{
+                  backgroundColor: p.status === 'signed'
+                    ? '#10b981'
+                    : p.status === 'sent'
+                    ? PARTY_COLORS[i % PARTY_COLORS.length]
+                    : '#e2e8f0',
+                  opacity: p.status === 'signed' ? 1 : p.status === 'sent' ? 0.7 : 0.3,
                 }}
               />
             ))}
           </div>
-          
+
+          {/* Current awaiting signer */}
           {currentSigner && (
-            <div className="mt-3 flex items-center gap-1.5 bg-[#fef3c7]/50 dark:bg-amber-900/10 p-1.5 rounded-lg">
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"/>
-              <p className="text-[10px] text-slate-600 dark:text-slate-400 italic">
-                Awaiting: <span className="font-bold text-slate-900 dark:text-slate-100">{currentSigner.name}</span>
+            <div className="mt-2.5 flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 px-2 py-1.5 rounded-lg">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                Awaiting:{' '}
+                <span className="font-bold text-slate-800 dark:text-slate-100">
+                  {currentSigner.name}
+                </span>
               </p>
             </div>
           )}
         </div>
       )}
 
-      {/* Card Footer */}
-      <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 dark:border-slate-700/50">
-        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-           {doc.isTemplate ? 'Template Mode' : `ID: ...${doc._id?.slice(-6)}`}
+      {/* Template badge */}
+      {doc.isTemplate && (
+        <div className="mb-5 flex-grow flex items-center">
+          <span className="text-xs text-violet-500 font-semibold bg-violet-50 dark:bg-violet-900/20 px-3 py-1.5 rounded-lg">
+            Reusable template
+          </span>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700/50 mt-auto">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+          {doc.isTemplate ? 'Template' : `···${String(doc._id).slice(-6)}`}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleAction}
-          className="text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white rounded-lg gap-1.5 font-black text-[11px] h-8 transition-all"
+          className="text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white rounded-lg gap-1 font-bold text-[11px] h-8 px-3 transition-all"
         >
-          {doc.status === 'completed' ? 'Open PDF' : doc.isTemplate ? 'Use Now' : 'Manage'}
-          <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform"/>
+          {doc.status === 'completed' ? 'Open PDF' : doc.isTemplate ? 'Use Template' : 'Manage'}
+          <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
         </Button>
       </div>
     </Card>
   );
 });
 
+DocumentCard.displayName = 'DocumentCard';
 export default DocumentCard;

@@ -2854,12 +2854,225 @@
 //     </div>
 //   );
 // }
+// import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+// import { Button } from '@/components/ui/button';
+// import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
+// import { Rnd } from 'react-rnd';
+// import * as pdfjsLib from 'pdfjs-dist';
+// import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
+
+// pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
+// export default function PdfViewer({
+//   fileUrl, fields, onFieldsChange, currentPage, onPageChange,
+//   onTotalPagesChange, pendingFieldType, selectedPartyIndex,
+//   parties, onFieldPlaced, readOnly = false
+// }) {
+//   const canvasRef     = useRef(null);
+//   const containerRef  = useRef(null);
+//   const renderTaskRef = useRef(null);
+//   const pdfDocRef     = useRef(null);
+
+//   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+//   const [loading, setLoading]       = useState(true);
+//   const [totalPages, setTotalPages] = useState(0);
+
+//   const currentPageFields = useMemo(
+//     () => fields.filter(f => Number(f.page) === Number(currentPage)),
+//     [fields, currentPage]
+//   );
+
+//   useEffect(() => {
+//     if (!fileUrl) return;
+//     let cancelled = false;
+//     setLoading(true);
+
+//     const load = async () => {
+//       try {
+//         let url = fileUrl;
+//         // blob: এবং data: URLs সরাসরি দেখাবে — proxy লাগবে না
+//         if (!fileUrl.startsWith('blob:') && !fileUrl.startsWith('data:')) {
+//           const parts     = fileUrl.split('/upload/');
+//           const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
+//           url = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
+//         }
+//         const doc = await pdfjsLib.getDocument({ url, withCredentials: false }).promise;
+//         if (cancelled) return;
+//         pdfDocRef.current = doc;
+//         setTotalPages(doc.numPages);
+//         onTotalPagesChange?.(doc.numPages);
+//       } catch (err) {
+//         if (!cancelled) console.error('PDF load error:', err.message);
+//       } finally {
+//         if (!cancelled) setLoading(false);
+//       }
+//     };
+
+//     load();
+//     return () => { cancelled = true; };
+//   }, [fileUrl, onTotalPagesChange]);
+
+//   const renderPage = useCallback(async () => {
+//     const doc       = pdfDocRef.current;
+//     const canvas    = canvasRef.current;
+//     const container = containerRef.current;
+//     if (!doc || !canvas || !container) return;
+//     renderTaskRef.current?.cancel();
+//     try {
+//       const page           = await doc.getPage(currentPage);
+//       const containerWidth = container.clientWidth - 40;
+//       const scale          = containerWidth / page.getViewport({ scale: 1 }).width;
+//       const viewport       = page.getViewport({ scale });
+//       canvas.width         = viewport.width;
+//       canvas.height        = viewport.height;
+//       setCanvasSize({ width: viewport.width, height: viewport.height });
+//       renderTaskRef.current = page.render({
+//         canvasContext: canvas.getContext('2d', { alpha: false }),
+//         viewport,
+//       });
+//       await renderTaskRef.current.promise;
+//     } catch (err) {
+//       if (err.name !== 'RenderingCancelledException') console.error(err);
+//     }
+//   }, [currentPage]);
+
+//   useEffect(() => {
+//     if (!loading) renderPage();
+//     window.addEventListener('resize', renderPage);
+//     return () => window.removeEventListener('resize', renderPage);
+//   }, [loading, renderPage]);
+
+//   const handleContainerClick = useCallback((e) => {
+//     if (readOnly || !pendingFieldType || loading) return;
+//     if (!e.target.classList.contains('pdf-canvas')) return;
+//     const rect = canvasRef.current.getBoundingClientRect();
+//     const fW   = pendingFieldType === 'signature' ? 20 : 15;
+//     const fH   = pendingFieldType === 'signature' ? 8  : 5;
+//     const xPos = ((e.clientX - rect.left)  / canvasSize.width)  * 100 - fW / 2;
+//     const yPos = ((e.clientY - rect.top)   / canvasSize.height) * 100 - fH / 2;
+//     onFieldsChange([...fields, {
+//       id:         `field_${Date.now()}`,
+//       type:       pendingFieldType,
+//       page:       currentPage,
+//       x:          Number(Math.max(0, Math.min(100 - fW, xPos)).toFixed(4)),
+//       y:          Number(Math.max(0, Math.min(100 - fH, yPos)).toFixed(4)),
+//       width:      fW,
+//       height:     fH,
+//       partyIndex: Number(selectedPartyIndex),
+//       value:      '',
+//     }]);
+//     onFieldPlaced?.();
+//   }, [readOnly, pendingFieldType, loading, canvasSize, fields, currentPage, selectedPartyIndex, onFieldsChange, onFieldPlaced]);
+
+//   // ✅ FIX: useRef দিয়ে fields track করা — stale closure সমস্যা দূর করে
+//   const fieldsRef = useRef(fields);
+//   useEffect(() => { fieldsRef.current = fields; }, [fields]);
+
+//   const updateField = useCallback((id, patch) => {
+//     onFieldsChange(fieldsRef.current.map(f => f.id === id ? { ...f, ...patch } : f));
+//   }, [onFieldsChange]);
+
+//   const removeField = useCallback((id) => {
+//     onFieldsChange(fieldsRef.current.filter(f => f.id !== id));
+//   }, [onFieldsChange]);
+
+//   return (
+//     <div ref={containerRef} className="flex-1 w-full flex flex-col items-center bg-slate-100 p-4 min-h-[800px] overflow-y-auto">
+//       {totalPages > 0 && (
+//         <div className="flex items-center gap-4 mb-4 sticky top-0 z-30 bg-white/90 backdrop-blur p-2 rounded-full shadow-md border border-slate-200">
+//           <Button variant="ghost" size="icon" className="rounded-full"
+//             disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
+//             <ChevronLeft className="w-5 h-5" />
+//           </Button>
+//           <span className="text-[10px] font-bold px-4 tracking-tighter uppercase">
+//             PAGE {currentPage} OF {totalPages}
+//           </span>
+//           <Button variant="ghost" size="icon" className="rounded-full"
+//             disabled={currentPage >= totalPages} onClick={() => onPageChange(currentPage + 1)}>
+//             <ChevronRight className="w-5 h-5" />
+//           </Button>
+//         </div>
+//       )}
+
+//       <div
+//         className="relative bg-white shadow-xl border border-slate-200 overflow-hidden mb-10"
+//         style={{ width: canvasSize.width || '100%', height: canvasSize.height || 800 }}
+//         onClick={handleContainerClick}
+//       >
+//         {loading && (
+//           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50">
+//             <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF] mb-2" />
+//             <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest italic">
+//               NexSign Syncing...
+//             </p>
+//           </div>
+//         )}
+//         <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner mx-auto" />
+
+//         {currentPageFields.map(field => {
+//           const party = parties[field.partyIndex] ?? { name: 'Signer', color: '#28ABDF' };
+//           return (
+//             <Rnd
+//               key={field.id}
+//               size={{ width: `${field.width}%`, height: `${field.height}%` }}
+//               position={{
+//                 x: (field.x / 100) * canvasSize.width,
+//                 y: (field.y / 100) * canvasSize.height,
+//               }}
+//               bounds="parent"
+//               disableDragging={readOnly}
+//               enableResizing={!readOnly ? {
+//                 top: true, right: true, bottom: true, left: true,
+//                 topRight: true, bottomRight: true, bottomLeft: true, topLeft: true
+//               } : false}
+//               className="z-20"
+//               onDragStop={(_, d) => updateField(field.id, {
+//                 x: Number(((d.x / canvasSize.width)  * 100).toFixed(4)),
+//                 y: Number(((d.y / canvasSize.height) * 100).toFixed(4)),
+//               })}
+//               onResizeStop={(_, __, ref, ___, pos) => updateField(field.id, {
+//                 width:  Number(((parseFloat(ref.style.width)  / canvasSize.width)  * 100).toFixed(4)),
+//                 height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)),
+//                 x:      Number(((pos.x / canvasSize.width)  * 100).toFixed(4)),
+//                 y:      Number(((pos.y / canvasSize.height) * 100).toFixed(4)),
+//               })}
+//             >
+//               <div
+//                 className="w-full h-full border-2 border-dashed flex items-center justify-center relative group"
+//                 style={{ borderColor: party.color, backgroundColor: `${party.color}20` }}
+//               >
+//                 <div className="text-[9px] font-black uppercase text-center pointer-events-none select-none px-1"
+//                   style={{ color: party.color }}>
+//                   {field.type}<br />{party.name}
+//                 </div>
+//                 {!readOnly && (
+//                   <button
+//                     type="button"
+//                     onClick={e => { e.stopPropagation(); e.preventDefault(); removeField(field.id); }}
+//                     onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }}
+//                     onPointerDown={e => e.stopPropagation()}
+//                     className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-125 z-50 cursor-pointer"
+//                     style={{ pointerEvents: 'all' }}
+//                   >
+//                     <Trash2 size={10} />
+//                   </button>
+//                 )}
+//               </div>
+//             </Rnd>
+//           );
+//         })}
+//       </div>
+//     </div>
+//   );
+// }
+
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
+import { buildProxyUrl } from '@/api/apiClient';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -2872,37 +3085,44 @@ export default function PdfViewer({
   const containerRef  = useRef(null);
   const renderTaskRef = useRef(null);
   const pdfDocRef     = useRef(null);
+  // ✅ FIX: track canvasSize in a ref too so Rnd callbacks never go stale
+  const canvasSizeRef = useRef({ width: 0, height: 0 });
 
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
   const [totalPages, setTotalPages] = useState(0);
+
+  // ✅ FIX: keep fields in a ref to prevent stale closures in Rnd callbacks
+  const fieldsRef = useRef(fields);
+  useEffect(() => { fieldsRef.current = fields; }, [fields]);
 
   const currentPageFields = useMemo(
     () => fields.filter(f => Number(f.page) === Number(currentPage)),
     [fields, currentPage]
   );
 
+  // ── Load PDF ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!fileUrl) return;
     let cancelled = false;
     setLoading(true);
+    setError(null);
 
     const load = async () => {
       try {
-        let url = fileUrl;
-        // blob: এবং data: URLs সরাসরি দেখাবে — proxy লাগবে না
-        if (!fileUrl.startsWith('blob:') && !fileUrl.startsWith('data:')) {
-          const parts     = fileUrl.split('/upload/');
-          const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
-          url = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
-        }
+        // ✅ FIX: use buildProxyUrl for all non-local URLs
+        const url = buildProxyUrl(fileUrl);
         const doc = await pdfjsLib.getDocument({ url, withCredentials: false }).promise;
         if (cancelled) return;
         pdfDocRef.current = doc;
         setTotalPages(doc.numPages);
         onTotalPagesChange?.(doc.numPages);
       } catch (err) {
-        if (!cancelled) console.error('PDF load error:', err.message);
+        if (!cancelled) {
+          console.error('PDF load error:', err.message);
+          setError('Failed to load PDF. Please try again.');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -2912,24 +3132,39 @@ export default function PdfViewer({
     return () => { cancelled = true; };
   }, [fileUrl, onTotalPagesChange]);
 
+  // ── Render Page ──────────────────────────────────────────────────────────
   const renderPage = useCallback(async () => {
     const doc       = pdfDocRef.current;
     const canvas    = canvasRef.current;
     const container = containerRef.current;
     if (!doc || !canvas || !container) return;
-    renderTaskRef.current?.cancel();
+
+    // Cancel any in-progress render
+    try { renderTaskRef.current?.cancel(); } catch (_) {}
+
     try {
       const page           = await doc.getPage(currentPage);
-      const containerWidth = container.clientWidth - 40;
-      const scale          = containerWidth / page.getViewport({ scale: 1 }).width;
+      const containerWidth = Math.max(container.clientWidth - 40, 300);
+      const baseViewport   = page.getViewport({ scale: 1 });
+      const scale          = containerWidth / baseViewport.width;
       const viewport       = page.getViewport({ scale });
-      canvas.width         = viewport.width;
-      canvas.height        = viewport.height;
-      setCanvasSize({ width: viewport.width, height: viewport.height });
-      renderTaskRef.current = page.render({
-        canvasContext: canvas.getContext('2d', { alpha: false }),
-        viewport,
-      });
+
+      // ✅ FIX: set canvas pixel size with devicePixelRatio for crisp rendering
+      const ratio      = window.devicePixelRatio || 1;
+      canvas.width     = viewport.width  * ratio;
+      canvas.height    = viewport.height * ratio;
+      canvas.style.width  = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.scale(ratio, ratio);
+
+      const newSize = { width: viewport.width, height: viewport.height };
+      // ✅ FIX: update both state AND ref atomically
+      canvasSizeRef.current = newSize;
+      setCanvasSize(newSize);
+
+      renderTaskRef.current = page.render({ canvasContext: ctx, viewport });
       await renderTaskRef.current.promise;
     } catch (err) {
       if (err.name !== 'RenderingCancelledException') console.error(err);
@@ -2937,37 +3172,47 @@ export default function PdfViewer({
   }, [currentPage]);
 
   useEffect(() => {
-    if (!loading) renderPage();
-    window.addEventListener('resize', renderPage);
-    return () => window.removeEventListener('resize', renderPage);
-  }, [loading, renderPage]);
+    if (!loading && !error) renderPage();
+  }, [loading, error, renderPage]);
 
+  useEffect(() => {
+    const handleResize = () => renderPage();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [renderPage]);
+
+  // ── Click to place field ─────────────────────────────────────────────────
   const handleContainerClick = useCallback((e) => {
     if (readOnly || !pendingFieldType || loading) return;
+    // ✅ FIX: only place if clicking the canvas itself, not an existing field
     if (!e.target.classList.contains('pdf-canvas')) return;
+
+    const size = canvasSizeRef.current;
+    if (!size.width || !size.height) return;
+
     const rect = canvasRef.current.getBoundingClientRect();
     const fW   = pendingFieldType === 'signature' ? 20 : 15;
     const fH   = pendingFieldType === 'signature' ? 8  : 5;
-    const xPos = ((e.clientX - rect.left)  / canvasSize.width)  * 100 - fW / 2;
-    const yPos = ((e.clientY - rect.top)   / canvasSize.height) * 100 - fH / 2;
-    onFieldsChange([...fields, {
-      id:         `field_${Date.now()}`,
+    const xPct = ((e.clientX - rect.left)  / size.width)  * 100 - fW / 2;
+    const yPct = ((e.clientY - rect.top)   / size.height) * 100 - fH / 2;
+
+    const newField = {
+      id:         `field_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       type:       pendingFieldType,
       page:       currentPage,
-      x:          Number(Math.max(0, Math.min(100 - fW, xPos)).toFixed(4)),
-      y:          Number(Math.max(0, Math.min(100 - fH, yPos)).toFixed(4)),
+      x:          Number(Math.max(0, Math.min(100 - fW, xPct)).toFixed(4)),
+      y:          Number(Math.max(0, Math.min(100 - fH, yPct)).toFixed(4)),
       width:      fW,
       height:     fH,
       partyIndex: Number(selectedPartyIndex),
       value:      '',
-    }]);
+    };
+
+    onFieldsChange([...fieldsRef.current, newField]);
     onFieldPlaced?.();
-  }, [readOnly, pendingFieldType, loading, canvasSize, fields, currentPage, selectedPartyIndex, onFieldsChange, onFieldPlaced]);
+  }, [readOnly, pendingFieldType, loading, currentPage, selectedPartyIndex, onFieldsChange, onFieldPlaced]);
 
-  // ✅ FIX: useRef দিয়ে fields track করা — stale closure সমস্যা দূর করে
-  const fieldsRef = useRef(fields);
-  useEffect(() => { fieldsRef.current = fields; }, [fields]);
-
+  // ✅ FIX: use ref for callbacks so Rnd never captures stale state
   const updateField = useCallback((id, patch) => {
     onFieldsChange(fieldsRef.current.map(f => f.id === id ? { ...f, ...patch } : f));
   }, [onFieldsChange]);
@@ -2977,82 +3222,138 @@ export default function PdfViewer({
   }, [onFieldsChange]);
 
   return (
-    <div ref={containerRef} className="flex-1 w-full flex flex-col items-center bg-slate-100 p-4 min-h-[800px] overflow-y-auto">
+    <div
+      ref={containerRef}
+      className="flex-1 w-full flex flex-col items-center bg-slate-100 p-4 min-h-[800px] overflow-y-auto"
+    >
+      {/* Page Navigation */}
       {totalPages > 0 && (
         <div className="flex items-center gap-4 mb-4 sticky top-0 z-30 bg-white/90 backdrop-blur p-2 rounded-full shadow-md border border-slate-200">
-          <Button variant="ghost" size="icon" className="rounded-full"
-            disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
+          <Button
+            variant="ghost" size="icon" className="rounded-full"
+            disabled={currentPage <= 1}
+            onClick={() => onPageChange(currentPage - 1)}
+          >
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <span className="text-[10px] font-bold px-4 tracking-tighter uppercase">
             PAGE {currentPage} OF {totalPages}
           </span>
-          <Button variant="ghost" size="icon" className="rounded-full"
-            disabled={currentPage >= totalPages} onClick={() => onPageChange(currentPage + 1)}>
+          <Button
+            variant="ghost" size="icon" className="rounded-full"
+            disabled={currentPage >= totalPages}
+            onClick={() => onPageChange(currentPage + 1)}
+          >
             <ChevronRight className="w-5 h-5" />
           </Button>
         </div>
       )}
 
+      {/* Canvas Container */}
       <div
-        className="relative bg-white shadow-xl border border-slate-200 overflow-hidden mb-10"
-        style={{ width: canvasSize.width || '100%', height: canvasSize.height || 800 }}
+        className="relative bg-white shadow-xl border border-slate-200 overflow-visible mb-10"
+        style={{
+          width:  canvasSize.width  || '100%',
+          height: canvasSize.height || 800,
+        }}
         onClick={handleContainerClick}
       >
+        {/* Loading overlay */}
         {loading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-50 rounded">
             <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF] mb-2" />
-            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest italic">
-              NexSign Syncing...
+            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
+              Loading PDF...
             </p>
           </div>
         )}
-        <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner mx-auto" />
 
-        {currentPageFields.map(field => {
-          const party = parties[field.partyIndex] ?? { name: 'Signer', color: '#28ABDF' };
+        {/* Error state */}
+        {error && !loading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-50 rounded p-8 text-center">
+            <p className="text-red-500 font-semibold mb-2">⚠️ {error}</p>
+            <p className="text-slate-400 text-xs">Check your internet connection or try re-uploading the PDF.</p>
+          </div>
+        )}
+
+        <canvas
+          ref={canvasRef}
+          className="pdf-canvas block"
+          style={{ cursor: pendingFieldType && !readOnly ? 'crosshair' : 'default' }}
+        />
+
+        {/* ✅ FIX: Rnd fields — overflow:visible on parent, correct pixel math */}
+        {!loading && canvasSize.width > 0 && currentPageFields.map(field => {
+          const party = parties?.[field.partyIndex] ?? { name: 'Signer', color: '#28ABDF' };
+
+          // Convert % → pixels for Rnd position/size
+          const px = (field.x      / 100) * canvasSize.width;
+          const py = (field.y      / 100) * canvasSize.height;
+          const pw = (field.width  / 100) * canvasSize.width;
+          const ph = (field.height / 100) * canvasSize.height;
+
           return (
             <Rnd
               key={field.id}
-              size={{ width: `${field.width}%`, height: `${field.height}%` }}
-              position={{
-                x: (field.x / 100) * canvasSize.width,
-                y: (field.y / 100) * canvasSize.height,
-              }}
+              size={{ width: pw, height: ph }}
+              position={{ x: px, y: py }}
               bounds="parent"
               disableDragging={readOnly}
-              enableResizing={!readOnly ? {
+              enableResizing={readOnly ? false : {
                 top: true, right: true, bottom: true, left: true,
-                topRight: true, bottomRight: true, bottomLeft: true, topLeft: true
-              } : false}
+                topRight: true, bottomRight: true, bottomLeft: true, topLeft: true,
+              }}
+              // ✅ FIX: minimum size so fields can't be resized to 0
+              minWidth={40}
+              minHeight={20}
               className="z-20"
-              onDragStop={(_, d) => updateField(field.id, {
-                x: Number(((d.x / canvasSize.width)  * 100).toFixed(4)),
-                y: Number(((d.y / canvasSize.height) * 100).toFixed(4)),
-              })}
-              onResizeStop={(_, __, ref, ___, pos) => updateField(field.id, {
-                width:  Number(((parseFloat(ref.style.width)  / canvasSize.width)  * 100).toFixed(4)),
-                height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)),
-                x:      Number(((pos.x / canvasSize.width)  * 100).toFixed(4)),
-                y:      Number(((pos.y / canvasSize.height) * 100).toFixed(4)),
-              })}
+              style={{ position: 'absolute' }}
+              onDragStop={(_, d) => {
+                const size = canvasSizeRef.current;
+                updateField(field.id, {
+                  x: Number(((d.x / size.width)  * 100).toFixed(4)),
+                  y: Number(((d.y / size.height) * 100).toFixed(4)),
+                });
+              }}
+              onResizeStop={(_, __, ref, ___, pos) => {
+                const size = canvasSizeRef.current;
+                updateField(field.id, {
+                  width:  Number(((parseFloat(ref.style.width)  / size.width)  * 100).toFixed(4)),
+                  height: Number(((parseFloat(ref.style.height) / size.height) * 100).toFixed(4)),
+                  x:      Number(((pos.x / size.width)  * 100).toFixed(4)),
+                  y:      Number(((pos.y / size.height) * 100).toFixed(4)),
+                });
+              }}
             >
               <div
-                className="w-full h-full border-2 border-dashed flex items-center justify-center relative group"
-                style={{ borderColor: party.color, backgroundColor: `${party.color}20` }}
+                className="w-full h-full border-2 border-dashed flex items-center justify-center relative group select-none"
+                style={{
+                  borderColor:     party.color,
+                  backgroundColor: `${party.color}22`,
+                }}
               >
-                <div className="text-[9px] font-black uppercase text-center pointer-events-none select-none px-1"
-                  style={{ color: party.color }}>
+                <div
+                  className="text-[9px] font-black uppercase text-center pointer-events-none px-1 leading-tight"
+                  style={{ color: party.color }}
+                >
                   {field.type}<br />{party.name}
                 </div>
+
+                {/* ✅ FIX: delete button — full pointer-events isolation */}
                 {!readOnly && (
                   <button
                     type="button"
-                    onClick={e => { e.stopPropagation(); e.preventDefault(); removeField(field.id); }}
-                    onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                    onPointerDown={e => e.stopPropagation()}
-                    className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-125 z-50 cursor-pointer"
-                    style={{ pointerEvents: 'all' }}
+                    className="absolute -top-3 -right-3 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-125 z-[999] cursor-pointer"
+                    style={{ pointerEvents: 'all', touchAction: 'none' }}
+                    onPointerDown={e => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      removeField(field.id);
+                    }}
                   >
                     <Trash2 size={10} />
                   </button>
