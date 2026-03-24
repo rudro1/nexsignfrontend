@@ -2859,14 +2859,15 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 
-// ১. মেইন লাইব্রেরি ইমপোর্ট
+// ১. মূল লাইব্রেরি ইমপোর্ট
 import * as pdfjsLib from 'pdfjs-dist';
 
 /** * ✅ PRODUCTION FIX: 
- * আমরা সরাসরি .mjs ফাইলটি লোড করছি যা PDF.js 5.x ভার্সনের জন্য বাধ্যতামূলক।
- * এটি সরাসরি ক্লাউডফ্লেয়ারের মডার্ন মডিউল পাথ থেকে আসবে।
+ * আমরা সরাসরি .mjs ফাইলটি লোড করছি। 
+ * লক্ষ্য করুন: ফাইলের শেষে .min.mjs ব্যবহার করা হয়েছে।
  */
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs`;
+const WORKER_URL = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
 
 export default function PdfViewer({
   fileUrl, fields, onFieldsChange, currentPage, onPageChange,
@@ -2904,8 +2905,8 @@ export default function PdfViewer({
 
         const loadingTask = pdfjsLib.getDocument({ 
           url: finalUrl,
-          // ✅ ওয়ার্কার সোর্স এখানেও বলে দেওয়া ভালো (Extra Safety)
-          workerSrc: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs`,
+          // ✅ এখানেও ওয়ার্কার সোর্সটি ইনজেক্ট করে দেওয়া হলো এক্সট্রা সেফটির জন্য
+          workerSrc: WORKER_URL,
           withCredentials: false
         });
         
@@ -2962,7 +2963,7 @@ export default function PdfViewer({
     return () => window.removeEventListener('resize', handleResize);
   }, [renderPage]);
 
-  // ফিল্ড প্লেসমেন্ট (NexSign Editor)
+  // ফিল্ড প্লেসমেন্ট হ্যান্ডলার
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading || !e.target.classList.contains('pdf-canvas')) return;
 
@@ -3009,7 +3010,7 @@ export default function PdfViewer({
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50">
             <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF] mb-2" />
-            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Loading Document...</p>
+            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest italic">NexSign Syncing...</p>
           </div>
         )}
 
@@ -3057,6 +3058,7 @@ export default function PdfViewer({
                       e.stopPropagation();
                       onFieldsChange(fields.filter(f => f.id !== field.id));
                     }}
+                    onMouseDown={(e) => e.stopPropagation()}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-md transition-all hover:scale-125 z-50"
                   >
                     <Trash2 size={10} />
