@@ -1691,7 +1691,7 @@ import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Upload, Save, Send, ArrowLeft, FileText, Loader2, Mail } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
@@ -1701,110 +1701,94 @@ import PdfViewer from '@/components/editor/PdfViewer';
 export default function DocumentEditor() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const urlParams = new URLSearchParams(window.location.search);
-  const initialDocId = urlParams.get('id');
-
-  const [docId, setDocId] = useState(initialDocId);
-  const [doc, setDoc] = useState(null);
+  
+  // States
+  const [docId, setDocId] = useState(new URLSearchParams(window.location.search).get('id'));
+  const [rawFile, setRawFile] = useState(null); // আসল ফাইলটি ধরে রাখার জন্য
   const [title, setTitle] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [fileId, setFileId] = useState(''); 
   const [parties, setParties] = useState([]);
   const [fields, setFields] = useState([]);
-  const [ccEmails, setCcEmails] = useState([]); // 🌟 CC স্টেট
+  const [ccEmails, setCcEmails] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
   const [pendingFieldType, setPendingFieldType] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
+  // এডিট মোড হলে ডাটা লোড করা
   useEffect(() => {
-    const init = async () => {
-      if (docId && docId !== 'new') {
-        try {
-          const res = await api.get(`/documents/${docId}`);
-          const d = res.data;
-          if (d) {
-            setDoc(d);
-            setTitle(d.title || '');
-            setFileUrl(d.fileUrl || '');
-            setFileId(d.fileId || ''); 
-            setParties(d.parties || []);
-            setCcEmails(d.ccEmails || []); // 🌟 CC লোড করা
-            // 🌟 ফিল্ডগুলো যদি স্ট্রিং হিসেবে আসে তবে পার্স করা
-            const parsedFields = d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || [];
-            setFields(parsedFields);
-            setTotalPages(d.totalPages || 1);
-          }
-        } catch (error) { toast.error("Failed to load document"); }
-      }
-    };
-    init();
+    if (docId && docId !== 'new') {
+      api.get(`/documents/${docId}`).then(res => {
+        const d = res.data;
+        setTitle(d.title || '');
+        setFileUrl(d.fileUrl || '');
+        setFileId(d.fileId || '');
+        setParties(d.parties || []);
+        setCcEmails(d.ccEmails || []);
+        setFields(d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || []);
+      }).catch(() => toast.error("Failed to load document"));
+    }
   }, [docId]);
 
-  const handleUpload = async (e) => {
+  // ১. ফাইল সিলেক্ট করলে সরাসরি UI তে দেখানো (Local Preview)
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file || file.type !== 'application/pdf') {
-      toast.error('Please upload a valid PDF file');
-      return;
+      return toast.error('Please upload a valid PDF file');
     }
-    setUploading(true);
+
+    setRawFile(file); // ফাইলটি স্টেটে সেভ করে রাখা হলো
+    setTitle(file.name.replace('.pdf', ''));
+    
+    // ব্রাউজারে দেখানোর জন্য একটি টেম্পোরারি ইউআরএল তৈরি
+    const localUrl = URL.createObjectURL(file);
+    setFileUrl(localUrl); 
+    setFileId('preview'); // ভিউয়ার সক্রিয় করার জন্য একটি ফ্ল্যাগ
+    
+    toast.success('PDF loaded for editing');
+  };
+
+  // ২. সেন্ড বাটনে ক্লিক করলে আপলোড এবং মেইল একসাথে (Final Action)
+  const handleSend = async () => {
+    if (!fileUrl || parties.length === 0 || fields.length === 0) {
+      return toast.error('Please add parties and place fields first');
+    }
+
+    setProcessing(true);
     const formData = new FormData();
-    formData.append('file', file);
+    
+    // যদি নতুন ফাইল হয় তবে ফাইল পাঠাবো, নয়তো শুধু আইডি
+    if (rawFile) {
+      formData.append('file', rawFile);
+    }
+    
+    formData.append('title', title);
+    formData.append('parties', JSON.stringify(parties));
+    formData.append('ccEmails', JSON.stringify(ccEmails));
+    formData.append('fields', JSON.stringify(fields.map(f => JSON.stringify(f))));
+    formData.append('totalPages', totalPages);
+
     try {
-      const res = await api.post('/documents/upload', formData, {
+      // ব্যাকএন্ডে একটি নতুন এন্ডপয়েন্ট লাগবে যা আপলোড এবং সেন্ড একসাথে করবে
+      const res = await api.post('/documents/upload-and-send', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const data = res.data;
-      const newId = data._id || data.id;
-      setDocId(newId);
-      setFileUrl(data.fileUrl);
-      setFileId(data.fileId);
-      setTitle(file.name.replace('.pdf', ''));
-      setDoc(data);
-      window.history.replaceState(null, '', `${window.location.pathname}?id=${newId}`);
-      toast.success('Document uploaded');
-    } catch (error) { toast.error('Upload failed'); } finally { setUploading(false); }
-  };
 
-  const handleSave = async () => {
-    if (!docId) return toast.error('Upload a document first');
-    setSaving(true);
-    try {
-      await api.put(`/documents/${docId}`, { 
-        title, fileUrl, fileId, parties, ccEmails, totalPages,
-        fields: fields.map(f => JSON.stringify(f)) // 🌟 সেভ করার সময় স্ট্রিং করা নিরাপদ
-      });
-      toast.success('Draft updated');
-    } catch (error) { toast.error('Failed to save'); } finally { setSaving(false); }
-  };
-
-  const handleSend = async () => {
-    if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
-      return toast.error('Please add parties and fields first');
-    }
-    setSending(true);
-    try {
-      // সেভ এবং সেন্ড
-      await api.put(`/documents/${docId}`, { 
-        title, parties, ccEmails, totalPages, 
-        fields: fields.map(f => JSON.stringify(f)) 
-      });
-      const res = await api.post('/documents/send', { id: docId });
       if (res.data.success) {
-        toast.success('Document sent!');
+        toast.success('Document uploaded and sent!');
         navigate('/dashboard');
       }
-    } catch (error) { toast.error(error.response?.data?.error || 'Failed to send'); } finally { setSending(false); }
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to process document');
+    } finally {
+      setProcessing(false);
+    }
   };
-
-  const isEditable = !doc || doc.status === 'draft';
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
@@ -1813,16 +1797,18 @@ export default function DocumentEditor() {
           <Input 
             value={title} 
             onChange={e => setTitle(e.target.value)} 
-            className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent" 
-            disabled={!isEditable} 
+            placeholder="Document Title"
+            className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent px-0" 
           />
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
-          <Button variant="outline" onClick={handleSave} disabled={saving || uploading} className="rounded-xl flex-1">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save
-          </Button>
-          <Button onClick={handleSend} disabled={sending || uploading} className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl flex-1">
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
+          <Button 
+            onClick={handleSend} 
+            disabled={processing} 
+            className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl flex-1 px-8"
+          >
+            {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} 
+            Confirm & Send
           </Button>
         </div>
       </div>
@@ -1830,11 +1816,11 @@ export default function DocumentEditor() {
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="w-full lg:w-80 space-y-6">
           {!fileId && (
-            <Card className="p-8 border-dashed border-2 flex flex-col items-center text-center">
-              <Upload className={`w-12 h-12 mb-4 ${uploading ? 'animate-bounce text-sky-500' : 'text-slate-300'}`} />
-              <Button asChild variant="secondary" disabled={uploading}>
-                <label className="cursor-pointer"> {uploading ? 'Uploading...' : 'Select File'}
-                  <input type="file" className="hidden" accept="application/pdf" onChange={handleUpload} />
+            <Card className="p-10 border-dashed border-2 flex flex-col items-center text-center bg-slate-50">
+              <Upload className="w-12 h-12 mb-4 text-slate-300" />
+              <Button asChild variant="secondary">
+                <label className="cursor-pointer"> Select PDF
+                  <input type="file" className="hidden" accept="application/pdf" onChange={handleFileSelect} />
                 </label>
               </Button>
             </Card>
@@ -1844,13 +1830,12 @@ export default function DocumentEditor() {
             <PartyManager parties={parties} onChange={setParties} /> 
           </Card>
 
-          {/* 🌟 CC Recipients Section */}
           <Card className="p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 text-sm">
               <Mail size={16} className="text-sky-500" /> CC Recipients
             </div>
             <Input 
-              placeholder="Email1, Email2..." 
+              placeholder="Emails (comma separated)" 
               value={ccEmails.join(', ')} 
               onChange={(e) => setCcEmails(e.target.value.split(',').map(email => email.trim()).filter(Boolean))}
               className="text-xs"
@@ -1872,16 +1857,22 @@ export default function DocumentEditor() {
         <div className="flex-1">
           {fileId ? (
             <PdfViewer 
-              fileId={fileId} fields={fields} onFieldsChange={setFields} 
-              currentPage={currentPage} onPageChange={setCurrentPage} 
-              totalPages={totalPages} onTotalPagesChange={setTotalPages} 
-              pendingFieldType={pendingFieldType} selectedPartyIndex={selectedPartyIndex} 
-              parties={parties} onFieldPlaced={() => setPendingFieldType(null)} 
-              readOnly={!isEditable} 
+              fileUrl={fileUrl} // সরাসরি লোকাল বা ক্লাউড ইউআরএল যাচ্ছে
+              fields={fields} 
+              onFieldsChange={setFields} 
+              currentPage={currentPage} 
+              onPageChange={setCurrentPage} 
+              totalPages={totalPages} 
+              onTotalPagesChange={setTotalPages} 
+              pendingFieldType={pendingFieldType} 
+              selectedPartyIndex={selectedPartyIndex} 
+              parties={parties} 
+              onFieldPlaced={() => setPendingFieldType(null)} 
             />
           ) : (
-            <div className="h-[600px] bg-slate-50 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-slate-400">
-              <FileText className="w-20 h-20 mb-4 opacity-10" /> <p>No document uploaded yet</p>
+            <div className="h-[600px] bg-slate-50 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-slate-300">
+              <FileText className="w-20 h-20 mb-4 opacity-10" />
+              <p>Upload a document to start</p>
             </div>
           )}
         </div>
