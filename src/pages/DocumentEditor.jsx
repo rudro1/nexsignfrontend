@@ -1743,18 +1743,29 @@ export default function DocumentEditor() {
     toast.success('PDF loaded successfully');
   };
 
-  const handleSend = async () => {
-    // ১. কড়া ভ্যালিডেশন
-    if (!rawFile && !fileUrl) return toast.error('No PDF file provided');
-    if (parties.length === 0) return toast.error('Please add at least one signer');
-    if (fields.length === 0) return toast.error('Please place signature fields on the PDF');
+const handleSend = async () => {
+  // ১. ডিবাগিং: কনসোলে চেক করুন ফাইলটি আসলে আছে কি না
+  console.log("Debug - rawFile status:", rawFile);
+  console.log("Debug - fileUrl status:", fileUrl);
 
-    setProcessing(true);
+  // ২. কড়া ভ্যালিডেশন (মেসেজটি একটু আপডেট করা হয়েছে যাতে আপনি বুঝতে পারেন কোন ভেরিয়েবল খালি)
+  if (!rawFile && !fileUrl) {
+    return toast.error('PDF file state is empty. Please re-upload the file.');
+  }
+  if (parties.length === 0) return toast.error('Please add at least one signer');
+  if (fields.length === 0) return toast.error('Please place signature fields on the PDF');
+
+  setProcessing(true);
+  
+  try {
     const formData = new FormData();
     
-    // ব্যাকএন্ডের upload.single('file') এর সাথে মিল রেখে 'file' কি ব্যবহার করা হয়েছে
-    if (rawFile) {
+    // ফাইল অ্যাপেন্ড করার আগে নিশ্চিত করা
+    if (rawFile instanceof File) {
       formData.append('file', rawFile);
+    } else {
+      // যদি ফাইল না থাকে কিন্তু ইউআরএল থাকে (এডিট মোড)
+      formData.append('fileUrl', fileUrl);
     }
     
     formData.append('title', title || 'Untitled Document');
@@ -1763,23 +1774,27 @@ export default function DocumentEditor() {
     formData.append('fields', JSON.stringify(fields)); 
     formData.append('totalPages', totalPages);
 
-    try {
-      const res = await api.post('/documents/upload-and-send', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+    // ৩. Axios রিকোয়েস্ট উইথ টাইমআউট (Vercel এর জন্য ভালো)
+    const res = await api.post('/documents/upload-and-send', formData, {
+      headers: { 
+        'Content-Type': 'multipart/form-data' 
+      },
+      timeout: 30000 // ৩০ সেকেন্ড টাইমআউট
+    });
 
-      if (res.data.success) {
-        toast.success('Document sent successfully!');
-        navigate('/dashboard');
-      }
-    } catch (error) {
-      const errorMsg = error.response?.data?.error || 'Failed to process document';
-      toast.error(errorMsg);
-      console.error("Upload Error Details:", error.response?.data);
-    } finally {
-      setProcessing(false);
+    if (res.data.success) {
+      toast.success('Document sent successfully!');
+      navigate('/dashboard');
     }
-  };
+  } catch (error) {
+    // ৪. ব্যাকএন্ডের আসল এররটি কনসোলে প্রিন্ট করুন
+    console.error("Backend Rejected Request:", error.response?.data);
+    const errorMsg = error.response?.data?.error || 'Server error: Failed to upload';
+    toast.error(errorMsg);
+  } finally {
+    setProcessing(false);
+  }
+};
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8 animate-in fade-in duration-500">
