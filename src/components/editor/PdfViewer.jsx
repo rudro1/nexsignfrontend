@@ -2860,8 +2860,9 @@ import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
-// Worker URL ফিক্স (Version mismatch এড়াতে)
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
+// ✅ PDF Worker Fix: Dynamic version matching to avoid 404
+const pdfjsVersion = pdfjsLib.version;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/legacy/build/pdf.worker.min.mjs`;
 
 export default function PdfViewer({
   fileUrl, fileId, fields, onFieldsChange, currentPage, onPageChange,
@@ -2875,13 +2876,12 @@ export default function PdfViewer({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
 
-  // বর্তমান পেইজের ফিল্ডগুলো আলাদা করা
   const currentPageFields = useMemo(() => 
     fields.filter(f => Number(f.page) === Number(currentPage)), 
     [fields, currentPage]
   );
 
-  // ১. PDF লোডিং লজিক (CORS Proxy handling updated)
+  // ১. PDF লোডিং লজিক (CORS Proxy Handling)
   useEffect(() => {
     if (!fileUrl) return;
     let isCancelled = false;
@@ -2891,12 +2891,12 @@ export default function PdfViewer({
       try {
         let finalUrl = fileUrl;
         
-        // CORS সমস্যা এড়াতে প্রক্সি ইউআরএল তৈরি
+        // Proxy logic for Cloudinary/External URLs
         if (!fileUrl.startsWith('blob:') && !fileUrl.startsWith('data:')) {
-            // ক্লাউডিনারি ইউআরএল থেকে শুধু পাথ অংশটি নেওয়া
-            const parts = fileUrl.split('/upload/');
-            const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
-            finalUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
+          const parts = fileUrl.split('/upload/');
+          const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
+          // Backend proxy route compatibility
+          finalUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
         }
 
         const loadingTask = pdfjsLib.getDocument({ 
@@ -2920,17 +2920,17 @@ export default function PdfViewer({
     return () => { isCancelled = true; };
   }, [fileUrl, onTotalPagesChange]);
 
-  // ২. রেন্ডারিং লজিক (Canvas Scaling ফিক্স)
+  // ২. রেন্ডারিং লজিক (Responsive Scaling)
   const renderPage = useCallback(async () => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
     
-    // আগের রেন্ডার টাস্ক ক্যানসেল করা (Memory leak এড়াতে)
     if (renderTaskRef.current) {
         renderTaskRef.current.cancel();
     }
     
     try {
       const page = await pdfDoc.getPage(currentPage);
+      // Responsive width: Container width minus padding
       const containerWidth = containerRef.current.clientWidth - 40; 
       const originalViewport = page.getViewport({ scale: 1 });
       const scale = containerWidth / originalViewport.width;
@@ -2957,16 +2957,14 @@ export default function PdfViewer({
     return () => window.removeEventListener('resize', renderPage);
   }, [renderPage]);
 
-  // ৩. ফিল্ড প্লেসমেন্ট (Percentage calculation improved)
+  // ৩. ফিল্ড প্লেসমেন্ট (Precision Coordinates)
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading) return;
-    
-    // চেক করা হচ্ছে ক্লিকটি ক্যানভাসের ওপর কি না
     if (!e.target.classList.contains('pdf-canvas')) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const fW = pendingFieldType === 'signature' ? 20 : 15; // Initial width in %
-    const fH = pendingFieldType === 'signature' ? 8 : 5;  // Initial height in %
+    const fW = pendingFieldType === 'signature' ? 20 : 15;
+    const fH = pendingFieldType === 'signature' ? 8 : 5;
 
     const xPos = ((e.clientX - rect.left) / canvasSize.width) * 100 - (fW / 2);
     const yPos = ((e.clientY - rect.top) / canvasSize.height) * 100 - (fH / 2);
@@ -2980,7 +2978,7 @@ export default function PdfViewer({
       width: fW, 
       height: fH,
       partyIndex: Number(selectedPartyIndex),
-      value: '' // পরে সাইন করার জন্য
+      value: '' 
     };
 
     onFieldsChange([...fields, newField]);
@@ -3004,7 +3002,7 @@ export default function PdfViewer({
 
       {/* Canvas Wrapper */}
       <div 
-        className="relative bg-white shadow-xl border border-slate-200 overflow-hidden"
+        className="relative bg-white shadow-xl border border-slate-200 overflow-hidden mb-10"
         style={{ width: canvasSize.width || '100%', height: canvasSize.height || '800px' }}
         onClick={handleContainerClick}
       >
@@ -3015,7 +3013,7 @@ export default function PdfViewer({
           </div>
         )}
 
-        <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner" />
+        <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner mx-auto" />
 
         {/* Dynamic Fields */}
         {currentPageFields.map((field) => {
@@ -3056,7 +3054,7 @@ export default function PdfViewer({
                 className="w-full h-full border-2 border-dashed flex items-center justify-center relative group backdrop-blur-[1px]"
                 style={{ borderColor: party.color, backgroundColor: `${party.color}15` }}
               >
-                <div className="text-[9px] font-black uppercase text-center pointer-events-none select-none" style={{ color: party.color }}>
+                <div className="text-[9px] font-black uppercase text-center pointer-events-none select-none px-1" style={{ color: party.color }}>
                   {field.type}<br/>{party.name}
                 </div>
 
@@ -3064,10 +3062,10 @@ export default function PdfViewer({
                   <button 
                     type="button" 
                     onClick={(e) => {
-                      e.stopPropagation();
+                      e.stopPropagation(); // ক্যানভাসে ক্লিক যাওয়া আটকাবে
                       onFieldsChange(fields.filter(f => f.id !== field.id));
                     }}
-                    onMouseDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()} // ড্র্যাগ শুরু হওয়া আটকাবে
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-md transition-all hover:scale-125 z-50"
                   >
                     <Trash2 size={10} />
