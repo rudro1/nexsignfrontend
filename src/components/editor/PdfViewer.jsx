@@ -2859,10 +2859,10 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 
-// ✅ THE FIX — non-legacy build path, exists on unpkg for v5
-pdfjsLib.GlobalWorkerOptions.workerSrc = 
-  `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// ✅ Bundled directly by Vite — no CDN, no network request
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export default function PdfViewer({
   fileUrl, fields, onFieldsChange, currentPage, onPageChange,
@@ -2883,7 +2883,6 @@ export default function PdfViewer({
     [fields, currentPage]
   );
 
-  // Load PDF
   useEffect(() => {
     if (!fileUrl) return;
     let cancelled = false;
@@ -2897,10 +2896,8 @@ export default function PdfViewer({
           const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
           url = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
         }
-
         const doc = await pdfjsLib.getDocument({ url, withCredentials: false }).promise;
         if (cancelled) return;
-
         pdfDocRef.current = doc;
         setTotalPages(doc.numPages);
         onTotalPagesChange?.(doc.numPages);
@@ -2915,7 +2912,6 @@ export default function PdfViewer({
     return () => { cancelled = true; };
   }, [fileUrl, onTotalPagesChange]);
 
-  // Render page
   const renderPage = useCallback(async () => {
     const doc       = pdfDocRef.current;
     const canvas    = canvasRef.current;
@@ -2950,7 +2946,6 @@ export default function PdfViewer({
     return () => window.removeEventListener('resize', renderPage);
   }, [loading, renderPage]);
 
-  // Field placement
   const handleContainerClick = useCallback((e) => {
     if (readOnly || !pendingFieldType || loading) return;
     if (!e.target.classList.contains('pdf-canvas')) return;
