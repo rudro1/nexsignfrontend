@@ -1699,91 +1699,74 @@ import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer from '@/components/editor/PdfViewer';
 
 export default function DocumentEditor() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user } = useAuth();
-  
-  // URL থেকে আইডি পাওয়ার সঠিক উপায়
-  const queryParams = new URLSearchParams(location.search);
-  const [docId] = useState(queryParams.get('id'));
-  
-  const [rawFile, setRawFile] = useState(null);
-  const [title, setTitle] = useState('');
-  const [fileUrl, setFileUrl] = useState('');
-  const [fileId, setFileId] = useState(''); 
-  const [parties, setParties] = useState([]);
-  const [fields, setFields] = useState([]);
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const { user }  = useAuth();
+
+  const [docId]   = useState(() => new URLSearchParams(location.search).get('id'));
+  const [rawFile, setRawFile]   = useState(null);
+  const [title, setTitle]       = useState('');
+  const [fileUrl, setFileUrl]   = useState('');
+  const [fileId, setFileId]     = useState('');
+  const [parties, setParties]   = useState([]);
+  const [fields, setFields]     = useState([]);
   const [ccEmails, setCcEmails] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage]     = useState(1);
+  const [totalPages, setTotalPages]       = useState(1);
   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
-  const [pendingFieldType, setPendingFieldType] = useState(null);
+  const [pendingFieldType, setPendingFieldType]     = useState(null);
   const [processing, setProcessing] = useState(false);
 
-  // ১. ডাটা লোডিং ফিক্স (res.data.document চেক করা হয়েছে)
   useEffect(() => {
-    if (docId && docId !== 'new') {
-      api.get(`/documents/${docId}`)
-        .then(res => {
-          // ব্যাকএন্ডে আমরা 'document' কি-তে ডাটা পাঠাচ্ছি
-          const d = res.data.document || res.data; 
-          setTitle(d.title || '');
-          setFileUrl(d.fileUrl || '');
-          setFileId(d.fileId || 'existing'); // আইডি থাকলে প্রিভিউ মোড অন হবে
-          setParties(d.parties || []);
-          setCcEmails(d.ccEmails || []);
-          // স্ট্রিং হিসেবে আসা ফিল্ডস পার্স করা
-          setFields(d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || []);
-        })
-        .catch((err) => {
-          console.error(err);
-          toast.error("Failed to load document");
-        });
-    }
+    if (!docId || docId === 'new') return;
+    api.get(`/documents/${docId}`)
+      .then(res => {
+        const d = res.data.document || res.data;
+        setTitle(d.title || '');
+        setFileUrl(d.fileUrl || '');
+        setFileId(d.fileId || 'existing');
+        setParties(d.parties || []);
+        setCcEmails(d.ccEmails || []);
+        setFields(d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || []);
+      })
+      .catch(() => toast.error('Failed to load document'));
   }, [docId]);
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
-    if (!file || file.type !== 'application/pdf') {
+    if (!file || file.type !== 'application/pdf')
       return toast.error('Please upload a valid PDF file');
-    }
     setRawFile(file);
     setTitle(file.name.replace('.pdf', ''));
-    const localUrl = URL.createObjectURL(file);
-    setFileUrl(localUrl); 
-    setFileId('preview'); 
-    toast.success('PDF loaded successfully');
+    setFileUrl(URL.createObjectURL(file));
+    setFileId('preview');
+    toast.success('PDF loaded! Now add parties and fields.');
   };
 
   const handleSend = async () => {
     if (!rawFile && !fileUrl) return toast.error('Please upload a PDF file');
-    if (parties.length === 0) return toast.error('Please add at least one signer');
-    if (fields.length === 0) return toast.error('Please place signature fields');
+    if (!parties.length)       return toast.error('Please add at least one signer');
+    if (!parties.every(p => p.name && p.email))
+      return toast.error('All parties need a name and email');
+    if (!fields.length)        return toast.error('Please place at least one signature field');
 
     setProcessing(true);
-    const formData = new FormData();
-    
-    // নতুন ফাইল হলে ফাইলে অ্যাড হবে
-    if (rawFile instanceof File) {
-      formData.append('file', rawFile);
-    }
-    
-    formData.append('title', title || 'Untitled');
-    formData.append('parties', JSON.stringify(parties));
-    formData.append('ccEmails', JSON.stringify(ccEmails));
-    formData.append('fields', JSON.stringify(fields)); 
-    formData.append('totalPages', totalPages);
-
     try {
-      // ব্যাকএন্ডের '/upload-and-send' রাউটে হিট করা
-      const res = await api.post('/documents/upload-and-send', formData);
+      const formData = new FormData();
+      if (rawFile instanceof File) formData.append('file', rawFile);
+      formData.append('title',      title || 'Untitled');
+      formData.append('parties',    JSON.stringify(parties));
+      formData.append('ccEmails',   JSON.stringify(ccEmails));
+      formData.append('fields',     JSON.stringify(fields));
+      formData.append('totalPages', String(totalPages));
 
+      const res = await api.post('/documents/upload-and-send', formData);
       if (res.data.success) {
-        toast.success('Document sent successfully!');
+        toast.success('Document sent to all parties!');
         navigate('/dashboard');
       }
     } catch (error) {
-      console.error("Upload Error:", error.response?.data);
+      console.error('Upload Error:', error.response?.data);
       toast.error(error.response?.data?.error || 'Failed to send document');
     } finally {
       setProcessing(false);
@@ -1792,96 +1775,98 @@ export default function DocumentEditor() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8">
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </Button>
           <div className="flex flex-col">
-            <Input 
-              value={title} 
-              onChange={e => setTitle(e.target.value)} 
+            <Input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
               placeholder="Document Title"
-              className="text-xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent p-0 h-auto" 
+              className="text-xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent p-0 h-auto"
             />
             <span className="text-[10px] text-[#28ABDF] font-bold uppercase tracking-widest">NeXsign Editor</span>
           </div>
         </div>
-        <div className="flex gap-3 w-full sm:w-auto">
-          <Button 
-            onClick={handleSend} 
-            disabled={processing || !fileUrl} 
-            className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-lg transition-all active:scale-95 w-full sm:w-auto"
-          >
-            {processing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />} 
-            {docId && docId !== 'new' ? 'Update & Send' : 'Confirm & Send'}
-          </Button>
-        </div>
+        <Button
+          onClick={handleSend}
+          disabled={processing || !fileUrl}
+          className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-lg transition-all active:scale-95 w-full sm:w-auto"
+        >
+          {processing
+            ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            : <Send className="w-4 h-4 mr-2" />}
+          {docId && docId !== 'new' ? 'Update & Send' : 'Confirm & Send'}
+        </Button>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Controls */}
-        <div className="w-full lg:w-80 space-y-6">
+        {/* Sidebar */}
+        <div className="w-full lg:w-80 space-y-6 lg:sticky lg:top-4 lg:self-start">
           {!fileId && (
             <Card className="p-10 border-dashed border-2 flex flex-col items-center text-center bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
               <Upload className="w-12 h-12 mb-4 text-slate-300" />
               <Button asChild variant="secondary" className="rounded-lg">
-                <label className="cursor-pointer"> Select PDF
+                <label className="cursor-pointer">
+                  Select PDF
                   <input type="file" className="hidden" accept="application/pdf" onChange={handleFileSelect} />
                 </label>
               </Button>
             </Card>
           )}
 
-          <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl"> 
-            <PartyManager parties={parties} onChange={setParties} /> 
+          <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+            <PartyManager parties={parties} onChange={setParties} />
           </Card>
 
           <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
             <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 dark:text-slate-300 text-sm">
               <Mail size={16} className="text-[#28ABDF]" /> CC Recipients
             </div>
-            <Input 
-              placeholder="Emails (comma separated)" 
-              value={ccEmails.join(', ')} 
-              onChange={(e) => setCcEmails(e.target.value.split(',').map(email => email.trim()).filter(Boolean))}
+            <Input
+              placeholder="Emails (comma separated)"
+              value={ccEmails.join(', ')}
+              onChange={e => setCcEmails(
+                e.target.value.split(',').map(email => email.trim()).filter(Boolean)
+              )}
               className="text-xs rounded-lg"
             />
           </Card>
 
           {fileId && (
             <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
-              <FieldToolbar 
-                parties={parties} 
-                selectedPartyIndex={selectedPartyIndex} 
-                onPartySelect={setSelectedPartyIndex} 
-                onAddField={(type) => setPendingFieldType(type)} 
+              <FieldToolbar
+                parties={parties}
+                selectedPartyIndex={selectedPartyIndex}
+                onPartySelect={setSelectedPartyIndex}
+                onAddField={type => setPendingFieldType(type)}
               />
             </Card>
           )}
         </div>
 
-        {/* Viewer Section */}
+        {/* PDF Viewer */}
         <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[800px]">
           {fileId ? (
-            <PdfViewer 
+            <PdfViewer
               fileUrl={fileUrl}
-              fileId={fileId}
-              fields={fields} 
-              onFieldsChange={setFields} 
-              currentPage={currentPage} 
-              onPageChange={setCurrentPage} 
-              onTotalPagesChange={setTotalPages} 
-              pendingFieldType={pendingFieldType} 
-              selectedPartyIndex={selectedPartyIndex} 
-              parties={parties} 
-              onFieldPlaced={() => setPendingFieldType(null)} 
+              fields={fields}
+              onFieldsChange={setFields}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+              onTotalPagesChange={setTotalPages}
+              pendingFieldType={pendingFieldType}
+              selectedPartyIndex={selectedPartyIndex}
+              parties={parties}
+              onFieldPlaced={() => setPendingFieldType(null)}
             />
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-300 py-40">
               <FileText className="w-20 h-20 mb-4 opacity-10" />
-              <p className="font-medium">Please upload a document to begin</p>
+              <p className="font-medium text-slate-400">Upload a PDF to begin</p>
             </div>
           )}
         </div>

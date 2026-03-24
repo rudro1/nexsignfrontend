@@ -4103,122 +4103,370 @@
 //     </div>
 //   );
 // }
+// import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+// import { useParams } from 'react-router-dom'; // URL Params থেকে টোকেন নিতে
+// import { api } from '@/api/apiClient'; 
+// import { Button } from '@/components/ui/button';
+// import { Dialog, DialogContent } from '@/components/ui/dialog';
+// import { toast } from 'sonner';
+// import { Loader2, CheckCircle2, PenTool } from 'lucide-react';
+// import SignaturePad from '../components/signing/SignaturePad';
+// import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+
+// // Worker path set
+// pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+// export default function SignerView() {
+//   const { token } = useParams(); // URL থেকে সরাসরি টোকেন পাওয়া যাবে
+
+//   const [session, setSession] = useState(null);
+//   const [docData, setDocData] = useState(null); 
+//   const [loading, setLoading] = useState(true);
+//   const [fields, setFields] = useState([]);
+//   const [activeFieldId, setActiveFieldId] = useState(null);
+//   const [showSigPad, setShowSigPad] = useState(false);
+//   const [submitting, setSubmitting] = useState(false);
+//   const [completed, setCompleted] = useState(false);
+//   const [pagesData, setPagesData] = useState([]);
+//   const containerRef = useRef(null);
+
+//   // সেশন লোড করা
+//   const loadSession = useCallback(async () => {
+//     if (!token) return setLoading(false);
+//     try {
+//       const res = await api.get(`/documents/sign/${token}`);
+//       const document = res.data;
+      
+//       setSession(document);
+//       setDocData(document);
+      
+//       // ডাটা পার্সিং এবং পার্টি ইনডেক্স খুঁজে বের করা
+//       const myParty = document.parties.find(p => p.token === token);
+//       const myIdx = document.parties.indexOf(myParty);
+      
+//       setSession(prev => ({ ...prev, myPartyIndex: myIdx }));
+
+//       const rawFields = document.fields || [];
+//       setFields(rawFields.map(f => {
+//         const obj = typeof f === 'string' ? JSON.parse(f) : f;
+//         return { 
+//           ...obj, 
+//           partyIndex: Number(obj.partyIndex ?? 0), 
+//           filled: !!obj.value 
+//         };
+//       }));
+
+//       if (document.status === 'completed' || myParty.status === 'signed') {
+//         setCompleted(true);
+//       }
+//     } catch (err) { 
+//       console.error(err);
+//       toast.error('Invalid or expired signing link.'); 
+//     } finally { 
+//       setLoading(false); 
+//     }
+//   }, [token]);
+
+//   useEffect(() => { loadSession(); }, [loadSession]);
+
+//   // PDF রেন্ডারিং লজিক
+//   useEffect(() => {
+//     if (!docData?.fileUrl) return;
+    
+//     // Proxy এর মাধ্যমে PDF লোড করা (CORS সমস্যা এড়াতে)
+//     const fileId = docData.fileUrl.split('/').pop().split('.')[0];
+//     const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${fileId}`;
+
+//     const loadingTask = pdfjsLib.getDocument({ 
+//       url: proxyUrl, 
+//       withCredentials: true 
+//     });
+
+//     loadingTask.promise.then(async (pdf) => {
+//       const containerWidth = containerRef.current?.clientWidth || 800;
+//       const pages = [];
+//       for (let i = 1; i <= pdf.numPages; i++) {
+//         const page = await pdf.getPage(i);
+//         const viewport = page.getViewport({ scale: (containerWidth - 40) / page.getViewport({ scale: 1 }).width });
+//         pages.push({ num: i, viewport, pageObj: page });
+//       }
+//       setPagesData(pages);
+//     }).catch(err => console.error("PDF Load Error:", err));
+//   }, [docData]);
+
+//   const handleSignature = (sigValue) => {
+//     setFields(prev => prev.map(f => 
+//       f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f
+//     ));
+//     setShowSigPad(false);
+//   };
+
+//   const handleSubmit = async () => {
+//     const myFields = fields.filter(f => Number(f.partyIndex) === session.myPartyIndex);
+//     const remaining = myFields.filter(f => !f.filled).length;
+
+//     if (remaining > 0) return toast.error(`Please fill all your ${remaining} fields.`);
+    
+//     setSubmitting(true);
+//     try {
+//       await api.post(`/documents/sign/submit`, { 
+//         token, 
+//         fields: fields, // সম্পূর্ণ ফিল্ড ডাটা পাঠানো হচ্ছে
+//         meta: { device: navigator.userAgent }
+//       }); 
+//       setCompleted(true);
+//       toast.success('Document signed successfully!');
+//     } catch (err) { 
+//       setSubmitting(false);
+//       toast.error('Failed to submit. Check your internet.'); 
+//     }
+//   };
+
+//   if (loading) return (
+//     <div className="h-screen flex flex-col items-center justify-center gap-4 bg-white">
+//       <Loader2 className="animate-spin text-[#28ABDF]" size={40} />
+//       <p className="text-slate-500 font-medium">Preparing Document...</p>
+//     </div>
+//   );
+
+//   if (completed) return (
+//     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
+//       <div className="bg-white p-10 rounded-3xl shadow-xl max-w-lg w-full text-center border border-slate-100">
+//         <CheckCircle2 size={70} className="text-green-500 mx-auto mb-4" />
+//         <h2 className="text-3xl font-bold text-slate-800">Done!</h2>
+//         <p className="text-slate-600 mb-8 mt-2">Your signature has been securely applied and the sender has been notified.</p>
+//         <Button className="w-full bg-[#28ABDF] hover:bg-[#2399c8] h-12 rounded-xl text-lg font-bold" onClick={() => window.close()}>Close Tab</Button>
+//       </div>
+//     </div>
+//   );
+
+//   return (
+//     <div className="min-h-screen bg-[#F8FAFC]">
+//       <header className="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b p-4 flex justify-between items-center shadow-sm px-6">
+//         <div className="flex flex-col">
+//           <h1 className="font-bold text-slate-800 text-lg truncate max-w-[250px]">{docData?.title}</h1>
+//           <span className="text-[10px] text-[#28ABDF] font-bold uppercase tracking-widest">Signer Review</span>
+//         </div>
+//         <Button onClick={handleSubmit} disabled={submitting} className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-full px-10 shadow-lg shadow-sky-100 font-bold">
+//           {submitting ? <Loader2 className="animate-spin" /> : "Finish & Submit"}
+//         </Button>
+//       </header>
+
+//       <main ref={containerRef} className="max-w-4xl mx-auto py-12 px-4">
+//         {pagesData.map((page) => (
+//           <div key={page.num} className="relative mb-10 bg-white shadow-2xl shadow-slate-200 mx-auto rounded-sm overflow-hidden" 
+//                style={{ width: page.viewport.width, height: page.viewport.height }}>
+//             <PageCanvas page={page} />
+//             {fields.filter(f => Number(f.page) === page.num).map(field => {
+//               const isMine = Number(field.partyIndex) === session.myPartyIndex;
+//               return (
+//                 <div 
+//                   key={field.id} 
+//                   onClick={() => isMine && (setActiveFieldId(field.id) || setShowSigPad(true))}
+//                   className={`absolute border-2 flex items-center justify-center rounded-lg transition-all
+//                     ${isMine && !field.filled ? 'border-sky-400 bg-sky-50/50 cursor-pointer hover:bg-sky-100 animate-pulse' : 
+//                       isMine && field.filled ? 'border-green-400 bg-white cursor-pointer hover:border-green-500' : 'border-slate-100 bg-slate-50/30 pointer-events-none'}`}
+//                   style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
+                  
+//                   {field.filled ? (
+//                     <img src={field.value} className="w-full h-full object-contain p-1" />
+//                   ) : (
+//                     <div className="flex flex-col items-center gap-1">
+//                        <PenTool size={isMine ? 20 : 14} className={isMine ? "text-sky-500" : "text-slate-300"} />
+//                        {isMine && <span className="text-[8px] font-bold uppercase text-sky-500">Sign Here</span>}
+//                     </div>
+//                   )}
+//                 </div>
+//               );
+//             })}
+//           </div>
+//         ))}
+//       </main>
+
+//       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
+//         <DialogContent className="max-w-xl p-0 bg-white border-none rounded-3xl overflow-hidden shadow-2xl">
+//           <div className="bg-[#28ABDF] p-6 text-white text-center">
+//             <h3 className="text-xl font-bold">Draw Your Signature</h3>
+//             <p className="text-sky-100 text-xs mt-1">Sign clearly inside the box below</p>
+//           </div>
+//           <div className="p-8"><SignaturePad onSignatureComplete={handleSignature} /></div>
+//         </DialogContent>
+//       </Dialog>
+//     </div>
+//   );
+// }
+
+// function PageCanvas({ page }) {
+//   const canvasRef = useRef(null);
+//   useEffect(() => {
+//     const canvas = canvasRef.current;
+//     if (!canvas) return;
+//     const ctx = canvas.getContext('2d');
+//     const ratio = window.devicePixelRatio || 1;
+//     canvas.width = page.viewport.width * ratio;
+//     canvas.height = page.viewport.height * ratio;
+//     ctx.scale(ratio, ratio);
+//     page.pageObj.render({ canvasContext: ctx, viewport: page.viewport });
+//   }, [page]);
+//   return <canvas ref={canvasRef} className="w-full h-full" />;
+// }
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams } from 'react-router-dom'; // URL Params থেকে টোকেন নিতে
-import { api } from '@/api/apiClient'; 
+import { useParams } from 'react-router-dom';
+import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, PenTool } from 'lucide-react';
-import SignaturePad from '../components/signing/SignaturePad';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+import { Loader2, CheckCircle2, PenTool, Type, ChevronDown } from 'lucide-react';
+import SignaturePad from '@/components/signing/SignaturePad';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 
-// Worker path set
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// ✅ Same worker as PdfViewer — no CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export default function SignerView() {
-  const { token } = useParams(); // URL থেকে সরাসরি টোকেন পাওয়া যাবে
+  const { token } = useParams();
 
-  const [session, setSession] = useState(null);
-  const [docData, setDocData] = useState(null); 
-  const [loading, setLoading] = useState(true);
-  const [fields, setFields] = useState([]);
-  const [activeFieldId, setActiveFieldId] = useState(null);
-  const [showSigPad, setShowSigPad] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const [pagesData, setPagesData] = useState([]);
+  const [docData, setDocData]         = useState(null);
+  const [myPartyIndex, setMyPartyIndex] = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [fields, setFields]           = useState([]);
+  const [activeField, setActiveField] = useState(null);
+  const [showSigPad, setShowSigPad]   = useState(false);
+  const [showTextInput, setShowTextInput] = useState(false);
+  const [textValue, setTextValue]     = useState('');
+  const [submitting, setSubmitting]   = useState(false);
+  const [completed, setCompleted]     = useState(false);
+  const [pagesData, setPagesData]     = useState([]);
   const containerRef = useRef(null);
 
-  // সেশন লোড করা
-  const loadSession = useCallback(async () => {
-    if (!token) return setLoading(false);
-    try {
-      const res = await api.get(`/documents/sign/${token}`);
-      const document = res.data;
-      
-      setSession(document);
-      setDocData(document);
-      
-      // ডাটা পার্সিং এবং পার্টি ইনডেক্স খুঁজে বের করা
-      const myParty = document.parties.find(p => p.token === token);
-      const myIdx = document.parties.indexOf(myParty);
-      
-      setSession(prev => ({ ...prev, myPartyIndex: myIdx }));
+  // Load session
+  useEffect(() => {
+    if (!token) { setLoading(false); return; }
+    const load = async () => {
+      try {
+        const res  = await api.get(`/documents/sign/${token}`);
+        const data = res.data;
+        setDocData(data);
+        setMyPartyIndex(data.partyIndex);
 
-      const rawFields = document.fields || [];
-      setFields(rawFields.map(f => {
-        const obj = typeof f === 'string' ? JSON.parse(f) : f;
-        return { 
-          ...obj, 
-          partyIndex: Number(obj.partyIndex ?? 0), 
-          filled: !!obj.value 
-        };
-      }));
+        const rawFields = (data.fields || []).map(f => {
+          const obj = typeof f === 'string' ? JSON.parse(f) : f;
+          return { ...obj, partyIndex: Number(obj.partyIndex ?? 0), filled: !!obj.value };
+        });
+        setFields(rawFields);
 
-      if (document.status === 'completed' || myParty.status === 'signed') {
-        setCompleted(true);
+        if (data.completed) setCompleted(true);
+      } catch (err) {
+        console.error(err);
+        toast.error('Invalid or expired signing link.');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) { 
-      console.error(err);
-      toast.error('Invalid or expired signing link.'); 
-    } finally { 
-      setLoading(false); 
-    }
+    };
+    load();
   }, [token]);
 
-  useEffect(() => { loadSession(); }, [loadSession]);
-
-  // PDF রেন্ডারিং লজিক
+  // Render PDF pages
   useEffect(() => {
     if (!docData?.fileUrl) return;
-    
-    // Proxy এর মাধ্যমে PDF লোড করা (CORS সমস্যা এড়াতে)
-    const fileId = docData.fileUrl.split('/').pop().split('.')[0];
-    const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${fileId}`;
+    const parts     = docData.fileUrl.split('/upload/');
+    const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(docData.fileUrl);
+    const proxyUrl  = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
 
-    const loadingTask = pdfjsLib.getDocument({ 
-      url: proxyUrl, 
-      withCredentials: true 
-    });
-
-    loadingTask.promise.then(async (pdf) => {
-      const containerWidth = containerRef.current?.clientWidth || 800;
-      const pages = [];
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: (containerWidth - 40) / page.getViewport({ scale: 1 }).width });
-        pages.push({ num: i, viewport, pageObj: page });
-      }
-      setPagesData(pages);
-    }).catch(err => console.error("PDF Load Error:", err));
+    pdfjsLib.getDocument({ url: proxyUrl, withCredentials: false }).promise
+      .then(async (pdf) => {
+        const containerWidth = containerRef.current?.clientWidth || 800;
+        const pages = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page     = await pdf.getPage(i);
+          const scale    = (containerWidth - 40) / page.getViewport({ scale: 1 }).width;
+          const viewport = page.getViewport({ scale });
+          pages.push({ num: i, viewport, pageObj: page });
+        }
+        setPagesData(pages);
+      })
+      .catch(err => console.error('PDF load error:', err));
   }, [docData]);
 
+  // Auto-scroll to first unsigned field
+  useEffect(() => {
+    if (!pagesData.length || myPartyIndex === null) return;
+    const firstUnsigned = fields.find(
+      f => Number(f.partyIndex) === myPartyIndex && !f.filled
+    );
+    if (!firstUnsigned) return;
+    setTimeout(() => {
+      const el = document.getElementById(`field-${firstUnsigned.id}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 600);
+  }, [pagesData, fields, myPartyIndex]);
+
+  const myFields = useMemo(
+    () => fields.filter(f => Number(f.partyIndex) === myPartyIndex),
+    [fields, myPartyIndex]
+  );
+
+  const filledCount   = myFields.filter(f => f.filled).length;
+  const totalMyFields = myFields.length;
+
+  const handleFieldClick = (field) => {
+    if (Number(field.partyIndex) !== myPartyIndex) return;
+    setActiveField(field);
+    if (field.type === 'signature') {
+      setShowSigPad(true);
+    } else {
+      setTextValue(field.value || '');
+      setShowTextInput(true);
+    }
+  };
+
   const handleSignature = (sigValue) => {
-    setFields(prev => prev.map(f => 
-      f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f
+    setFields(prev => prev.map(f =>
+      f.id === activeField.id ? { ...f, value: sigValue, filled: true } : f
     ));
     setShowSigPad(false);
+    // Auto-scroll to next unsigned field
+    const nextUnsigned = fields.find(
+      f => Number(f.partyIndex) === myPartyIndex && !f.filled && f.id !== activeField.id
+    );
+    if (nextUnsigned) {
+      setTimeout(() => {
+        document.getElementById(`field-${nextUnsigned.id}`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  };
+
+  const handleTextConfirm = () => {
+    if (!textValue.trim()) return;
+    setFields(prev => prev.map(f =>
+      f.id === activeField.id ? { ...f, value: textValue, filled: true } : f
+    ));
+    setShowTextInput(false);
+    setTextValue('');
   };
 
   const handleSubmit = async () => {
-    const myFields = fields.filter(f => Number(f.partyIndex) === session.myPartyIndex);
     const remaining = myFields.filter(f => !f.filled).length;
-
-    if (remaining > 0) return toast.error(`Please fill all your ${remaining} fields.`);
-    
+    if (remaining > 0) {
+      toast.error(`Please fill all ${remaining} remaining field(s).`);
+      return;
+    }
     setSubmitting(true);
     try {
-      await api.post(`/documents/sign/submit`, { 
-        token, 
-        fields: fields, // সম্পূর্ণ ফিল্ড ডাটা পাঠানো হচ্ছে
-        meta: { device: navigator.userAgent }
-      }); 
+      await api.post('/documents/sign/submit', {
+        token,
+        fields,
+        locationData: 'Unknown',
+      });
       setCompleted(true);
       toast.success('Document signed successfully!');
-    } catch (err) { 
+    } catch (err) {
       setSubmitting(false);
-      toast.error('Failed to submit. Check your internet.'); 
+      toast.error('Failed to submit. Please try again.');
     }
   };
 
@@ -4233,80 +4481,175 @@ export default function SignerView() {
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
       <div className="bg-white p-10 rounded-3xl shadow-xl max-w-lg w-full text-center border border-slate-100">
         <CheckCircle2 size={70} className="text-green-500 mx-auto mb-4" />
-        <h2 className="text-3xl font-bold text-slate-800">Done!</h2>
-        <p className="text-slate-600 mb-8 mt-2">Your signature has been securely applied and the sender has been notified.</p>
-        <Button className="w-full bg-[#28ABDF] hover:bg-[#2399c8] h-12 rounded-xl text-lg font-bold" onClick={() => window.close()}>Close Tab</Button>
+        <h2 className="text-3xl font-bold text-slate-800">All Done!</h2>
+        <p className="text-slate-600 mb-8 mt-2">
+          Your signature has been applied. The sender has been notified.
+        </p>
+        <Button
+          className="w-full bg-[#28ABDF] hover:bg-[#2399c8] h-12 rounded-xl text-lg font-bold"
+          onClick={() => window.close()}
+        >
+          Close Tab
+        </Button>
       </div>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
-      <header className="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b p-4 flex justify-between items-center shadow-sm px-6">
-        <div className="flex flex-col">
-          <h1 className="font-bold text-slate-800 text-lg truncate max-w-[250px]">{docData?.title}</h1>
-          <span className="text-[10px] text-[#28ABDF] font-bold uppercase tracking-widest">Signer Review</span>
+      {/* Header */}
+      <header className="sticky top-0 z-[100] bg-white/90 backdrop-blur border-b p-4 flex justify-between items-center shadow-sm px-6">
+        <div>
+          <h1 className="font-bold text-slate-800 text-lg truncate max-w-[200px] sm:max-w-xs">
+            {docData?.title}
+          </h1>
+          <span className="text-[10px] text-[#28ABDF] font-bold uppercase tracking-widest">
+            {filledCount}/{totalMyFields} fields completed
+          </span>
         </div>
-        <Button onClick={handleSubmit} disabled={submitting} className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-full px-10 shadow-lg shadow-sky-100 font-bold">
-          {submitting ? <Loader2 className="animate-spin" /> : "Finish & Submit"}
+        <Button
+          onClick={handleSubmit}
+          disabled={submitting || filledCount < totalMyFields}
+          className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-full px-6 sm:px-10 shadow-lg font-bold disabled:opacity-50"
+        >
+          {submitting ? <Loader2 className="animate-spin w-4 h-4" /> : 'Finish & Submit'}
         </Button>
       </header>
 
-      <main ref={containerRef} className="max-w-4xl mx-auto py-12 px-4">
-        {pagesData.map((page) => (
-          <div key={page.num} className="relative mb-10 bg-white shadow-2xl shadow-slate-200 mx-auto rounded-sm overflow-hidden" 
-               style={{ width: page.viewport.width, height: page.viewport.height }}>
+      {/* Progress bar */}
+      <div className="h-1 bg-slate-200">
+        <div
+          className="h-1 bg-[#28ABDF] transition-all duration-500"
+          style={{ width: totalMyFields ? `${(filledCount / totalMyFields) * 100}%` : '0%' }}
+        />
+      </div>
+
+      {/* PDF Pages */}
+      <main ref={containerRef} className="max-w-4xl mx-auto py-8 px-4">
+        {pagesData.map(page => (
+          <div
+            key={page.num}
+            className="relative mb-10 bg-white shadow-2xl mx-auto rounded overflow-hidden"
+            style={{ width: page.viewport.width, height: page.viewport.height }}
+          >
             <PageCanvas page={page} />
-            {fields.filter(f => Number(f.page) === page.num).map(field => {
-              const isMine = Number(field.partyIndex) === session.myPartyIndex;
-              return (
-                <div 
-                  key={field.id} 
-                  onClick={() => isMine && (setActiveFieldId(field.id) || setShowSigPad(true))}
-                  className={`absolute border-2 flex items-center justify-center rounded-lg transition-all
-                    ${isMine && !field.filled ? 'border-sky-400 bg-sky-50/50 cursor-pointer hover:bg-sky-100 animate-pulse' : 
-                      isMine && field.filled ? 'border-green-400 bg-white cursor-pointer hover:border-green-500' : 'border-slate-100 bg-slate-50/30 pointer-events-none'}`}
-                  style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
-                  
-                  {field.filled ? (
-                    <img src={field.value} className="w-full h-full object-contain p-1" />
-                  ) : (
-                    <div className="flex flex-col items-center gap-1">
-                       <PenTool size={isMine ? 20 : 14} className={isMine ? "text-sky-500" : "text-slate-300"} />
-                       {isMine && <span className="text-[8px] font-bold uppercase text-sky-500">Sign Here</span>}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {fields
+              .filter(f => Number(f.page) === page.num)
+              .map(field => {
+                const isMine = Number(field.partyIndex) === myPartyIndex;
+                return (
+                  <div
+                    id={`field-${field.id}`}
+                    key={field.id}
+                    onClick={() => isMine && handleFieldClick(field)}
+                    className={`absolute border-2 flex items-center justify-center rounded-lg transition-all overflow-hidden
+                      ${isMine && !field.filled
+                        ? 'border-sky-400 bg-sky-50/70 cursor-pointer hover:bg-sky-100 animate-pulse'
+                        : isMine && field.filled
+                        ? 'border-green-400 bg-white cursor-pointer hover:border-green-500'
+                        : 'border-slate-200 bg-slate-50/30 pointer-events-none opacity-40'
+                      }`}
+                    style={{
+                      left:   `${field.x}%`,
+                      top:    `${field.y}%`,
+                      width:  `${field.width}%`,
+                      height: `${field.height}%`,
+                    }}
+                  >
+                    {field.filled ? (
+                      field.type === 'signature' ? (
+                        <img src={field.value} className="w-full h-full object-contain p-1" alt="signature" />
+                      ) : (
+                        <span className="text-xs font-medium text-slate-700 px-1 truncate">{field.value}</span>
+                      )
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        {field.type === 'signature'
+                          ? <PenTool size={isMine ? 18 : 12} className={isMine ? 'text-sky-500' : 'text-slate-300'} />
+                          : <Type size={isMine ? 18 : 12} className={isMine ? 'text-sky-500' : 'text-slate-300'} />
+                        }
+                        {isMine && (
+                          <span className="text-[8px] font-bold uppercase text-sky-500">
+                            {field.type === 'signature' ? 'Sign Here' : 'Type Here'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         ))}
+
+        {/* Submit CTA at bottom */}
+        {filledCount === totalMyFields && totalMyFields > 0 && (
+          <div className="flex justify-center pb-10">
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="bg-green-500 hover:bg-green-600 text-white rounded-full px-12 h-14 shadow-xl font-bold text-lg"
+            >
+              {submitting ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2" />}
+              Submit All Signatures
+            </Button>
+          </div>
+        )}
       </main>
 
+      {/* Signature Dialog */}
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
         <DialogContent className="max-w-xl p-0 bg-white border-none rounded-3xl overflow-hidden shadow-2xl">
           <div className="bg-[#28ABDF] p-6 text-white text-center">
             <h3 className="text-xl font-bold">Draw Your Signature</h3>
-            <p className="text-sky-100 text-xs mt-1">Sign clearly inside the box below</p>
+            <p className="text-sky-100 text-xs mt-1">Sign clearly inside the box</p>
           </div>
-          <div className="p-8"><SignaturePad onSignatureComplete={handleSignature} /></div>
+          <div className="p-8">
+            <SignaturePad onSignatureComplete={handleSignature} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Text Input Dialog */}
+      <Dialog open={showTextInput} onOpenChange={setShowTextInput}>
+        <DialogContent className="max-w-md p-0 bg-white border-none rounded-3xl overflow-hidden shadow-2xl">
+          <div className="bg-[#28ABDF] p-6 text-white text-center">
+            <h3 className="text-xl font-bold">Enter Text</h3>
+          </div>
+          <div className="p-8 space-y-4">
+            <Input
+              value={textValue}
+              onChange={e => setTextValue(e.target.value)}
+              placeholder="Type here..."
+              className="h-12 rounded-xl text-base"
+              onKeyDown={e => e.key === 'Enter' && handleTextConfirm()}
+              autoFocus
+            />
+            <Button
+              onClick={handleTextConfirm}
+              disabled={!textValue.trim()}
+              className="w-full h-12 bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl font-bold"
+            >
+              Confirm
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
 
+// PDF Page Canvas renderer
 function PageCanvas({ page }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx   = canvas.getContext('2d');
     const ratio = window.devicePixelRatio || 1;
-    canvas.width = page.viewport.width * ratio;
+    canvas.width  = page.viewport.width  * ratio;
     canvas.height = page.viewport.height * ratio;
     ctx.scale(ratio, ratio);
     page.pageObj.render({ canvasContext: ctx, viewport: page.viewport });
   }, [page]);
-  return <canvas ref={canvasRef} className="w-full h-full" />;
+  return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full" />;
 }

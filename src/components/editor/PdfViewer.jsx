@@ -2861,7 +2861,6 @@ import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 
-// ✅ Bundled directly by Vite — no CDN, no network request
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export default function PdfViewer({
@@ -2886,15 +2885,16 @@ export default function PdfViewer({
   useEffect(() => {
     if (!fileUrl) return;
     let cancelled = false;
+    setLoading(true);
 
     const load = async () => {
-      setLoading(true);
       try {
         let url = fileUrl;
+        // blob: এবং data: URLs সরাসরি দেখাবে — proxy লাগবে না
         if (!fileUrl.startsWith('blob:') && !fileUrl.startsWith('data:')) {
           const parts     = fileUrl.split('/upload/');
           const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
-          url = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
+          url = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
         }
         const doc = await pdfjsLib.getDocument({ url, withCredentials: false }).promise;
         if (cancelled) return;
@@ -2917,19 +2917,15 @@ export default function PdfViewer({
     const canvas    = canvasRef.current;
     const container = containerRef.current;
     if (!doc || !canvas || !container) return;
-
     renderTaskRef.current?.cancel();
-
     try {
       const page           = await doc.getPage(currentPage);
       const containerWidth = container.clientWidth - 40;
       const scale          = containerWidth / page.getViewport({ scale: 1 }).width;
       const viewport       = page.getViewport({ scale });
-
-      canvas.width  = viewport.width;
-      canvas.height = viewport.height;
+      canvas.width         = viewport.width;
+      canvas.height        = viewport.height;
       setCanvasSize({ width: viewport.width, height: viewport.height });
-
       renderTaskRef.current = page.render({
         canvasContext: canvas.getContext('2d', { alpha: false }),
         viewport,
@@ -2949,13 +2945,11 @@ export default function PdfViewer({
   const handleContainerClick = useCallback((e) => {
     if (readOnly || !pendingFieldType || loading) return;
     if (!e.target.classList.contains('pdf-canvas')) return;
-
     const rect = canvasRef.current.getBoundingClientRect();
     const fW   = pendingFieldType === 'signature' ? 20 : 15;
     const fH   = pendingFieldType === 'signature' ? 8  : 5;
     const xPos = ((e.clientX - rect.left)  / canvasSize.width)  * 100 - fW / 2;
     const yPos = ((e.clientY - rect.top)   / canvasSize.height) * 100 - fH / 2;
-
     onFieldsChange([...fields, {
       id:         `field_${Date.now()}`,
       type:       pendingFieldType,
@@ -2970,13 +2964,17 @@ export default function PdfViewer({
     onFieldPlaced?.();
   }, [readOnly, pendingFieldType, loading, canvasSize, fields, currentPage, selectedPartyIndex, onFieldsChange, onFieldPlaced]);
 
+  // ✅ FIX: useRef দিয়ে fields track করা — stale closure সমস্যা দূর করে
+  const fieldsRef = useRef(fields);
+  useEffect(() => { fieldsRef.current = fields; }, [fields]);
+
   const updateField = useCallback((id, patch) => {
-    onFieldsChange(fields.map(f => f.id === id ? { ...f, ...patch } : f));
-  }, [fields, onFieldsChange]);
+    onFieldsChange(fieldsRef.current.map(f => f.id === id ? { ...f, ...patch } : f));
+  }, [onFieldsChange]);
 
   const removeField = useCallback((id) => {
-    onFieldsChange(fields.filter(f => f.id !== id));
-  }, [fields, onFieldsChange]);
+    onFieldsChange(fieldsRef.current.filter(f => f.id !== id));
+  }, [onFieldsChange]);
 
   return (
     <div ref={containerRef} className="flex-1 w-full flex flex-col items-center bg-slate-100 p-4 min-h-[800px] overflow-y-auto">
@@ -3009,7 +3007,6 @@ export default function PdfViewer({
             </p>
           </div>
         )}
-
         <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner mx-auto" />
 
         {currentPageFields.map(field => {
@@ -3024,7 +3021,10 @@ export default function PdfViewer({
               }}
               bounds="parent"
               disableDragging={readOnly}
-              enableResizing={!readOnly}
+              enableResizing={!readOnly ? {
+                top: true, right: true, bottom: true, left: true,
+                topRight: true, bottomRight: true, bottomLeft: true, topLeft: true
+              } : false}
               className="z-20"
               onDragStop={(_, d) => updateField(field.id, {
                 x: Number(((d.x / canvasSize.width)  * 100).toFixed(4)),
@@ -3038,8 +3038,8 @@ export default function PdfViewer({
               })}
             >
               <div
-                className="w-full h-full border-2 border-dashed flex items-center justify-center relative group backdrop-blur-[1px]"
-                style={{ borderColor: party.color, backgroundColor: `${party.color}15` }}
+                className="w-full h-full border-2 border-dashed flex items-center justify-center relative group"
+                style={{ borderColor: party.color, backgroundColor: `${party.color}20` }}
               >
                 <div className="text-[9px] font-black uppercase text-center pointer-events-none select-none px-1"
                   style={{ color: party.color }}>
@@ -3048,9 +3048,11 @@ export default function PdfViewer({
                 {!readOnly && (
                   <button
                     type="button"
-                    onClick={e => { e.stopPropagation(); removeField(field.id); }}
-                    onMouseDown={e => e.stopPropagation()}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-md transition-all hover:scale-125 z-50"
+                    onClick={e => { e.stopPropagation(); e.preventDefault(); removeField(field.id); }}
+                    onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }}
+                    onPointerDown={e => e.stopPropagation()}
+                    className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-125 z-50 cursor-pointer"
+                    style={{ pointerEvents: 'all' }}
                   >
                     <Trash2 size={10} />
                   </button>
