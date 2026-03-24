@@ -1898,7 +1898,7 @@ import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
+import { Card } from '@/components/ui/Card';
 import { toast } from 'sonner';
 import { Upload, Save, Send, ArrowLeft, FileText, Loader2 } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
