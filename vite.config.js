@@ -40,7 +40,6 @@
 //     },
 //   },
 // });
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -52,15 +51,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    // ✅ PDF.js এর মডার্ন মডিউলগুলো বিল্ডের সময় ইনক্লুড করা
+    include: ['pdfjs-dist/legacy/build/pdf', 'pdfjs-dist/legacy/build/pdf.worker.min.mjs'],
+  },
+  build: {
+    target: 'esnext',
+  },
   server: {
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://nexsignbackend.onrender.com',
-        changeOrigin: true,
-      },
-      '/uploads': {
-        target: 'https://nexsignbackend.onrender.com',
+        target: 'https://nextsignbackendfinal.vercel.app/api',
         changeOrigin: true,
       },
     },
