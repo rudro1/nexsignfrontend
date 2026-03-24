@@ -2386,13 +2386,11 @@ export default function PdfViewer({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
 
-  // ১. মেমোয়াইজড ফিল্ড ফিল্টারিং (Fast Rendering)
   const currentPageFields = useMemo(() => 
     fields.filter(f => Number(f.page) === Number(currentPage)), 
     [fields, currentPage]
   );
 
-  // ২. PDF লোড লজিক (Proxy Fix)
   useEffect(() => {
     if (!fileUrl && !fileId) return;
     let isCancelled = false;
@@ -2425,7 +2423,6 @@ export default function PdfViewer({
     return () => { isCancelled = true; };
   }, [fileUrl, fileId, onTotalPagesChange]);
 
-  // ৩. রেন্ডারিং লজিক
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;
     
@@ -2455,7 +2452,6 @@ export default function PdfViewer({
     return () => renderTaskRef.current?.cancel();
   }, [pdfDoc, currentPage]);
 
-  // ৪. ক্লিক করে ফিল্ড বসানো
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading) return;
     if (!e.target.classList.contains('pdf-canvas')) return;
@@ -2472,7 +2468,6 @@ export default function PdfViewer({
       y: Number((((e.clientY - rect.top) / canvasSize.height) * 100 - fH / 2).toFixed(4)),
       width: fW, 
       height: fH, 
-      // 🌟 ফিক্স ১: party_index এর বদলে partyIndex ব্যবহার করা হয়েছে (SignerView এর সাথে মিল রাখতে)
       partyIndex: Number(selectedPartyIndex)
     };
     
@@ -2480,10 +2475,10 @@ export default function PdfViewer({
     onFieldPlaced?.();
   };
 
-  // ৫. ডিলিট ফাংশন (Fix: stopping propagation)
+  // ডিলিট ফাংশন ফিক্সড
   const removeField = (id, e) => {
     e.preventDefault();
-    e.stopPropagation();
+    e.stopPropagation(); // ড্র্যাগিং ইভেন্ট বন্ধ করার জন্য
     onFieldsChange(fields.filter(f => f.id !== id));
   };
 
@@ -2528,7 +2523,6 @@ export default function PdfViewer({
         <canvas ref={canvasRef} className="pdf-canvas block mx-auto" />
 
         {currentPageFields.map(field => {
-          // 🌟 ফিক্স ২: party_index এর বদলে partyIndex রিড করা হচ্ছে
           const currentIdx = field.partyIndex ?? field.party_index; 
           const color = parties?.[currentIdx]?.color || PARTY_COLORS[currentIdx % PARTY_COLORS.length];
           const isHighlighted = highlightPartyIndex === null || highlightPartyIndex === currentIdx;
@@ -2563,6 +2557,7 @@ export default function PdfViewer({
               bounds="parent"
               enableResizing={!readOnly}
               disableDragging={readOnly}
+              cancel=".delete-button" // ড্র্যাগিং থেকে বাটনকে আলাদা করার জন্য
               className={`z-20 group ${isHighlighted ? 'opacity-100' : 'opacity-20 pointer-events-none'}`}
             >
               <div 
@@ -2573,7 +2568,6 @@ export default function PdfViewer({
                   className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[8px] font-black text-white uppercase" 
                   style={{ backgroundColor: color }}
                 >
-                  {/* 🌟 ফিক্স ৩: partyIndex অনুযায়ী নাম দেখানো */}
                   {parties?.[currentIdx]?.name || `Party ${currentIdx + 1}`}
                 </div>
 
@@ -2583,8 +2577,9 @@ export default function PdfViewer({
 
                 {!readOnly && (
                   <button 
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-xl transition-all hover:scale-125 z-[100] cursor-pointer"
-                    onMouseDown={(e) => removeField(field.id, e)}
+                    type="button"
+                    className="delete-button absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-xl transition-all hover:scale-125 z-[100] cursor-pointer pointer-events-auto"
+                    onMouseDown={(e) => removeField(field.id, e)} // onClick এর বদলে onMouseDown ব্যবহার করা হয়েছে
                   >
                     <Trash2 size={12} />
                   </button>

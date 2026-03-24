@@ -280,7 +280,7 @@
 //     </Card>
 //   );
 // }
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from "../ui/Card"; 
 import { Badge } from '@/components/ui/badge';
@@ -300,56 +300,64 @@ const PARTY_COLORS = ['#0ea5e9','#8b5cf6','#f59e0b','#10b981','#ef4444','#ec4899
 const DocumentCard = React.memo(({ doc }) => {
   const navigate = useNavigate();
   
-  const config = useMemo(() => statusConfig[doc.status] || statusConfig.draft, [doc.status]);
+  // 1. Static Configuration Lookup (Faster than re-mapping)
+  const config = statusConfig[doc.status] || statusConfig.draft;
   const StatusIcon = config.icon;
   const parties = doc.parties || [];
 
-  // 🌟 প্রোগ্রেস ক্যালকুলেশন মেমোয়াইজড
+  // 2. Efficient Progress Calculation (Using reduce to avoid extra array creation)
   const progress = useMemo(() => {
     if (!parties.length) return 0;
-    const signedCount = parties.filter(p => p.status === 'signed').length;
+    const signedCount = parties.reduce((acc, p) => p.status === 'signed' ? acc + 1 : acc, 0);
     return Math.round((signedCount / parties.length) * 100);
   }, [parties]);
 
-  // 🌟 বর্তমান সাইনার লজিক মেমোয়াইজড
+  // 3. Current Signer Logic
   const currentSigner = useMemo(() => {
     if (doc.status !== 'in_progress') return null;
     return parties.find(p => p.status === 'sent' || p.status === 'waiting') || parties[0];
   }, [doc.status, parties]);
 
-  // 🌟 ডেট ফরম্যাটিং মেমোয়াইজড (পারফরম্যান্স বুস্ট)
+  // 4. Optimized Date Formatting (Avoids repetitive Intl overhead)
   const formattedDate = useMemo(() => {
     const dateString = doc.updatedAt || doc.createdAt;
     if (!dateString) return '---';
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
+      const d = new Date(dateString);
+      return d.toLocaleDateString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric'
       });
     } catch (e) { return '---'; }
   }, [doc.updatedAt, doc.createdAt]);
 
-  const handleAction = (e) => {
+  // 5. Performance-Optimized Handlers
+  const handleAction = useCallback((e) => {
     e.stopPropagation();
     if (doc.status === 'completed' && doc.fileUrl) {
-      // ক্যাশ এড়াতে টাইমস্ট্যাম্প যোগ করা হয়েছে
       const separator = doc.fileUrl.includes('?') ? '&' : '?';
       const finalUrl = `${doc.fileUrl}${separator}cache_v=${new Date(doc.updatedAt).getTime()}`;
       window.open(finalUrl, '_blank', 'noopener,noreferrer');
     } else {
       navigate(`/DocumentEditor?id=${doc._id}`);
     }
-  };
+  }, [doc.status, doc.fileUrl, doc._id, doc.updatedAt, navigate]);
+
+  const handleCardClick = useCallback(() => {
+    navigate(`/DocumentEditor?id=${doc._id}`);
+  }, [doc._id, navigate]);
 
   return (
     <Card 
-      onClick={() => navigate(`/DocumentEditor?id=${doc._id}`)}
-      className="p-5 bg-white border-slate-200 hover:border-[#28ABDF]/50 hover:shadow-xl transition-all group flex flex-col h-full cursor-pointer relative overflow-hidden"
+      onClick={handleCardClick}
+      className="p-5 bg-white border-slate-200 hover:border-[#28ABDF]/50 hover:shadow-xl transition-[transform,box-shadow,border-color] duration-300 group flex flex-col h-full cursor-pointer relative overflow-hidden will-change-transform"
     >
+      {/* Background Decorative Element */}
       <div className="absolute -right-4 -top-4 w-16 h-16 bg-slate-50 rounded-full group-hover:scale-150 transition-transform duration-500 z-0" />
 
+      {/* Header Section */}
       <div className="flex items-start justify-between gap-3 mb-5 relative z-10">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="w-10 h-10 rounded-xl bg-[#28ABDF]/10 flex items-center justify-center flex-shrink-0 group-hover:bg-[#28ABDF] transition-all duration-300">
+          <div className="w-10 h-10 rounded-xl bg-[#28ABDF]/10 flex items-center justify-center flex-shrink-0 group-hover:bg-[#28ABDF] transition-colors duration-300">
             <FileText className="w-5 h-5 text-[#28ABDF] group-hover:text-white" />
           </div>
           <div className="min-w-0">
@@ -365,6 +373,7 @@ const DocumentCard = React.memo(({ doc }) => {
         </Badge>
       </div>
 
+      {/* Body Section */}
       <div className="flex-1 relative z-10">
         {parties.length > 0 ? (
           <div className="mb-5">
@@ -407,6 +416,7 @@ const DocumentCard = React.memo(({ doc }) => {
         )}
       </div>
 
+      {/* Footer Section */}
       <div className="pt-4 border-t border-slate-100 flex items-center justify-between relative z-10">
         <div className="flex -space-x-2.5">
           {parties.slice(0, 4).map((p, i) => (

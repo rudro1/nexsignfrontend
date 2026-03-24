@@ -1892,8 +1892,7 @@
 //     </div>
 //   );
 // }
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -1901,16 +1900,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '../components/ui/Card';
 import { toast } from 'sonner';
-import { Upload, Save, Send, ArrowLeft, FileText, Loader2 } from 'lucide-react';
+import { Upload, Save, Send, ArrowLeft, FileText, Loader2, Copy, Check } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer from '@/components/editor/PdfViewer';
 import CCInput from '@/components/editor/CCInput';
-import axios from 'axios'; // এটি না থাকলে যোগ করুন
+import axios from 'axios';
 
 export default function DocumentEditor() {
   const navigate = useNavigate();
-  const { user,isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const urlParams = new URLSearchParams(window.location.search);
   const initialDocId = urlParams.get('id');
 
@@ -1928,8 +1927,11 @@ export default function DocumentEditor() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
-const [generatedSignLink, setGeneratedSignLink] = useState('');
-const [ccEmails, setCcEmails] = useState([]);
+  const [generatedSignLink, setGeneratedSignLink] = useState('');
+  const [ccEmails, setCcEmails] = useState([]);
+  const [isCopied, setIsCopied] = useState(false);
+
+  // ১. ডকুমেন্ট লোড লজিক
   useEffect(() => {
     const init = async () => {
       if (docId) {
@@ -1943,7 +1945,7 @@ const [ccEmails, setCcEmails] = useState([]);
             setFileId(d.fileId || ''); 
             setParties(d.parties || []);
             setCcEmails(d.ccEmails || []);
-            // ✅ ডেটা লোড করার সময় স্ট্রিং থাকলে সেটিকে অবজেক্টে রূপান্তর
+            
             if (d.fields && Array.isArray(d.fields)) {
               const parsedFields = d.fields.map(f => {
                 if (typeof f === 'string') {
@@ -1961,226 +1963,125 @@ const [ccEmails, setCcEmails] = useState([]);
     init();
   }, [docId]);
 
-  // ✅ ব্যাকএন্ডের Cast to [string] এরর ফিক্স করতে স্ট্রিং অ্যারে তৈরি
- 
-// const getCleanPayload = () => {
-//   return {
-//     title,
-//     fileUrl,
-//     fileId,
-//     parties,
-//     fields: fields, // সরাসরি অবজেক্ট পাঠান
-//     totalPages
-//   };
-// };
+  // ২. পেলোড ক্লিন আপ লজিক (Product-Grade)
+  const getCleanPayload = useCallback(() => {
+    const formattedCCs = typeof ccEmails === 'string' 
+      ? ccEmails.split(',').map(e => e.trim()).filter(e => e !== "")
+      : ccEmails;
 
-const getCleanPayload = () => {
-  // ১. ইনপুট যদি স্ট্রিং হয় তবে কমা দিয়ে ভাগ করে ক্লিন অ্যারে তৈরি করা
-  const formattedCCs = typeof ccEmails === 'string' 
-    ? ccEmails.split(',').map(e => e.trim()).filter(e => e !== "")
-    : ccEmails;
+    return {
+      title: title || 'Untitled Document',
+      fileUrl,
+      fileId,
+      parties,
+      fields, 
+      totalPages,
+      ccEmails: Array.isArray(formattedCCs) ? formattedCCs : [], 
+      senderMeta: {
+        name: user?.full_name || user?.name || 'Document Owner',
+        email: user?.email || '',
+        time: new Date().toISOString() // ISO Format API এর জন্য ভালো
+      }
+    };
+  }, [title, fileUrl, fileId, parties, fields, totalPages, ccEmails, user]);
 
-  return {
-    title,
-    fileUrl,
-    fileId,
-    parties,
-    fields: fields, 
-    totalPages,
-    // ২. নিশ্চিত করা হচ্ছে যে এটি সবসময় একটি অ্যারে হিসেবে যাবে
-    ccEmails: Array.isArray(formattedCCs) ? formattedCCs : [], 
-    senderMeta: {
-      name: user?.full_name || user?.name || 'Document Owner',
-      email: user?.email || '',
-      time: new Date().toLocaleString('en-US', { 
-        dateStyle: 'medium', 
-        timeStyle: 'short' 
-      })
+  // ৩. ক্লাউডিনারি আপলোড (Bypassing Vercel Timeout)
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || file.type !== 'application/pdf') return toast.error("Please select a PDF file");
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'nextsign'); 
+    formData.append('folder', 'nexsign_docs');
+
+    try {
+      const cloudRes = await axios.post(
+        `https://api.cloudinary.com/v1_1/dk9v5b3zj/raw/upload`,
+        formData
+      );
+
+      const res = await api.post('/documents/upload-metadata', {
+        title: file.name.replace('.pdf', ''),
+        fileUrl: cloudRes.data.secure_url,
+        fileId: cloudRes.data.public_id
+      });
+
+      const data = res.data;
+      setDocId(data._id);
+      setFileUrl(data.fileUrl);
+      setFileId(data.fileId);
+      setTitle(data.title);
+      setDoc(data);
+      
+      window.history.replaceState(null, '', `${window.location.pathname}?id=${data._id}`);
+      toast.success('Document uploaded successfully!');
+    } catch (error) {
+      toast.error('Upload failed. Check your Cloudinary configuration.');
+    } finally {
+      setUploading(false);
     }
   };
-};
 
-//  const handleUpload = async (e) => {
-//   const file = e.target.files[0];
-  
-//   // ভ্যালিডেশন
-//   if (!file || file.type !== 'application/pdf') {
-//     toast.error('Please upload a valid PDF file');
-//     return;
-//   }
+  const handleSave = async () => {
+    if (!docId) return toast.error('Upload document first');
+    setSaving(true);
+    try {
+      await api.put(`/documents/${docId}`, getCleanPayload());
+      toast.success('Draft updated');
+    } catch (err) { toast.error('Save failed'); } finally { setSaving(false); }
+  };
 
-//   setUploading(true);
-//   const formData = new FormData();
-  
-//   // 🌟 ফিক্স: 'file' এর বদলে 'pdf' ব্যবহার করুন (ব্যাকএন্ডের সাথে মিল রেখে)
-//   formData.append('pdf', file); 
-  
-//   // ঐচ্ছিক: ব্যাকএন্ড যদি প্রারম্ভিক ডেটা চায়
-//   formData.append('title', file.name.replace('.pdf', ''));
-//   formData.append('parties', JSON.stringify([]));
-
-//   try {
-//     const res = await api.post('/documents/upload', formData, {
-//       headers: { 'Content-Type': 'multipart/form-data' }
-//     });
-    
-//     const data = res.data;
-//     if (data.fileId || data._id) {
-//       const newId = data._id || data.id;
-//       setDocId(newId);
-//       setFileUrl(data.fileUrl);
-//       setFileId(data.fileId);
-//       setTitle(file.name.replace('.pdf', ''));
-//       setDoc(data);
-      
-//       const newUrl = `${window.location.pathname}?id=${newId}`;
-//       window.history.replaceState(null, '', newUrl);
-//       toast.success('Document uploaded');
-//     }
-//   } catch (error) { 
-//     console.error("Upload Error:", error);
-//     toast.error(error.response?.data?.error || 'Upload failed'); 
-//   } finally { 
-//     setUploading(false); 
-//   }
-// };
-
-const handleUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  setUploading(true);
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', 'nextsign'); // আপনার তৈরি করা প্রিসেট নাম
-  formData.append('folder', 'nexsign_docs');
-
-  try {
-    // সরাসরি ক্লাউডিনারিতে হিট (Vercel কে বাইপাস করা হচ্ছে)
-    const cloudRes = await axios.post(
-      `https://api.cloudinary.com/v1_1/dk9v5b3zj/raw/upload`,
-      formData
-    );
-
-    // সফল হলে ব্যাকএন্ডে লিঙ্কটি পাঠানো
-    const res = await api.post('/documents/upload-metadata', {
-      title: file.name.replace('.pdf', ''),
-      fileUrl: cloudRes.data.secure_url,
-      fileId: cloudRes.data.public_id
-    });
-
-    const data = res.data;
-    setDocId(data._id);
-    setFileUrl(data.fileUrl);
-    setFileId(data.fileId);
-    setTitle(data.title);
-    setDoc(data);
-    
-    window.history.replaceState(null, '', `${window.location.pathname}?id=${data._id}`);
-    toast.success('Large document uploaded successfully!');
-  } catch (error) {
-    console.error("Upload Error:", error);
-    toast.error('Direct upload failed. Check your Cloudinary preset.');
-  } finally {
-    setUploading(false);
-  }
-};
-
-  // const handleSave = async () => {
-  //   if (!docId) return toast.error('Upload a document first');
-  //   setSaving(true);
-  //   try {
-  //     await api.put(`/documents/${docId}`, getCleanPayload());
-  //     toast.success('Draft updated');
-  //   } catch (error) { 
-  //     toast.error('Failed to save'); 
-  //   } finally { setSaving(false); }
-  // };
-const handleSave = async () => {
-  if (!docId) return toast.error('Upload document first');
-  setSaving(true);
-  try {
-    await api.put(`/documents/${docId}`, getCleanPayload());
-    toast.success('Draft updated');
-  } catch (err) { toast.error('Save failed'); } finally { setSaving(false); }
-};
-  // const handleSend = async () => {
-  //   if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
-  //     return toast.error('Please add parties and fields first');
-  //   }
-  //   setSending(true);
-  //   try {
-  //     // সেভ করার পর সেন্ড রিকোয়েস্ট
-  //     await api.put(`/documents/${docId}`, getCleanPayload());
-  //     const res = await api.post('/documents/send', { id: docId });
-  //     if (res.data.success) {
-  //       toast.success('Document sent!');
-  //       navigate('/dashboard');
-  //     }
-  //   } catch (error) { 
-  //     toast.error(error.response?.data?.details || 'Failed to send'); 
-  //   } finally { setSending(false); }
-  // };
-
-//link ashbe ui te
- const handleSend = async () => {
-  // ১. ভ্যালিডেশন চেক
-  if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
-    return toast.error('Please add parties and fields first');
-  }
-
-  setSending(true);
-  setGeneratedSignLink(''); 
-  
-  try {
-    // ২. বর্তমান ড্রাফট সেভ করা (যাতে লেটেস্ট ফিল্ডগুলো যায়)
-    await api.put(`/documents/${docId}`, getCleanPayload());
-    
-    // ৩. সেন্ড রিকোয়েস্ট পাঠানো
-    const res = await api.post('/documents/send', { id: docId });
-    
-    if (res.data.success) {
-      if (res.data.signLink) {
-        setGeneratedSignLink(res.data.signLink);
-        // ✅ আরও ইউজার ফ্রেন্ডলি মেসেজ
-        toast.success('Document ready! Link generated & email sent.');
-      } else {
-        toast.success('Document successfully sent to all signers!');
-        // ৫ সেকেন্ড পর ড্যাশবোর্ডে পাঠানো (যাতে ইউজার মেসেজটি পড়তে পারে)
-        setTimeout(() => navigate('/dashboard'), 2000);
-      }
+  const handleSend = async () => {
+    if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
+      return toast.error('Please add parties and fields first');
     }
-  } catch (error) { 
-    console.error("Sending Error:", error);
-    toast.error(error.response?.data?.error || 'Could not send the document. Please try again.'); 
-  } finally { 
-    setSending(false); 
-  }
-};
-const onPageChange = (newPage) => {
-  if (newPage >= 1 && newPage <= totalPages) {
-    setCurrentPage(newPage);
-  }
-};
+
+    setSending(true);
+    try {
+      await api.put(`/documents/${docId}`, getCleanPayload());
+      const res = await api.post('/documents/send', { id: docId });
+      
+      if (res.data.success) {
+        if (res.data.signLink) {
+          setGeneratedSignLink(res.data.signLink);
+          toast.success('Signer link generated!');
+        } else {
+          toast.success('Document sent successfully!');
+          setTimeout(() => navigate(isAdmin ? '/admin' : '/dashboard'), 2000);
+        }
+      }
+    } catch (error) { 
+      toast.error(error.response?.data?.error || 'Failed to send'); 
+    } finally { setSending(false); }
+  };
+
+  const onPageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) setCurrentPage(newPage);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(generatedSignLink);
+    setIsCopied(true);
+    toast.success("Link copied!");
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
   const isEditable = !doc || doc.status === 'draft';
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8">
-      {/* Header UI */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-4 w-full sm:w-auto">
-          {/* <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
-            <ArrowLeft className="w-5 h-5" />
-          </Button> */}
-
           <Button 
-  variant="ghost" 
-  size="icon" 
-  onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')} // ✅ ফিক্সড লজিক
-  className="rounded-full"
->
-  <ArrowLeft className="w-5 h-5" />
-</Button>
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')} 
+            className="rounded-full"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           <Input 
             value={title} 
             onChange={e => setTitle(e.target.value)} 
@@ -2193,122 +2094,72 @@ const onPageChange = (newPage) => {
           <Button variant="outline" onClick={handleSave} disabled={saving || uploading} className="rounded-xl flex-1 sm:flex-none">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save
           </Button>
-          {/* <Button onClick={handleSend} disabled={sending || uploading} className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl flex-1 sm:flex-none">
+          <Button 
+            onClick={handleSend} 
+            disabled={sending || uploading} 
+            className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl flex-1 sm:flex-none shadow-md"
+          >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
-          // </Button> */} 
-{/* workable */}
-          <Button 
-  onClick={handleSend} 
-  disabled={sending || uploading} 
-  className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl flex-1 sm:flex-none"
->
-  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
-</Button>
-        </div>
-      </div>
-{/* ✅ ঠিক এখানে বসবে আপনার সাইনার লিঙ্ক কার্ডটি */}
-  {/* {generatedSignLink && (
-    <Card className="mb-8 p-4 bg-sky-50 border-sky-200 border-2 animate-in fade-in slide-in-from-top-4 duration-500 rounded-2xl">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="p-2 bg-sky-500 rounded-lg text-white">
-            <Send className="w-5 h-5" />
-          </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-bold text-sky-900">Signer Link Ready!</p>
-            <p className="text-xs text-sky-700 truncate font-mono bg-white/60 p-1 rounded-md">
-              {generatedSignLink}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={() => {
-              navigator.clipboard.writeText(generatedSignLink);
-              toast.success("Link copied!");
-            }}
-          >
-            Copy Link
-          </Button>
-          <Button 
-            size="sm" 
-            className="bg-slate-900 text-white"
-            onClick={() => navigate('/dashboard')}
-          >
-            Done
           </Button>
         </div>
       </div>
-    </Card>
-  )} */}
 
-  {generatedSignLink && (
-  <Card className="mb-8 p-4 bg-[#28ABDF]/5 border-[#28ABDF] border-2 animate-in fade-in slide-in-from-top-4 duration-500 rounded-2xl">
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div className="flex items-center gap-3 overflow-hidden">
-        {/* ব্র্যান্ড কালার ব্যাকগ্রাউন্ডসহ আইকন */}
-        <div className="p-2 bg-[#28ABDF] rounded-lg text-white">
-          <Send className="w-5 h-5" />
-        </div>
-        <div className="overflow-hidden">
-          <p className="text-sm font-bold text-slate-900">Signer Link Ready!</p>
-          <p className="text-xs text-[#28ABDF] truncate font-mono bg-white/80 p-1.5 rounded-md border border-[#28ABDF]/20">
-            {generatedSignLink}
-          </p>
-        </div>
-      </div>
-      <div className="flex gap-2 w-full sm:w-auto">
-        <Button 
-          size="sm" 
-          variant="outline" 
-          className="border-[#28ABDF] text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white transition-colors"
-          onClick={() => {
-            navigator.clipboard.writeText(generatedSignLink);
-            toast.success("Link copied!");
-          }}
-        >
-          Copy Link
-        </Button>
-        {/* <Button 
-          size="sm" 
-          className="bg-slate-900 text-white hover:bg-slate-800"
-          onClick={() => navigate('/dashboard')}
-        >
-          Done
-        </Button> */}
-        <Button 
-  size="sm" 
-  className="bg-slate-900 text-white hover:bg-slate-800"
-onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
->
-  Done
-</Button>
-      </div>
-    </div>
-  </Card>
-)}
+      {generatedSignLink && (
+        <Card className="mb-8 p-5 bg-[#28ABDF]/5 border-[#28ABDF] border-2 animate-in fade-in slide-in-from-top-4 duration-500 rounded-2xl shadow-lg">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4 overflow-hidden">
+              <div className="p-3 bg-[#28ABDF] rounded-xl text-white shadow-inner">
+                <Send className="w-6 h-6" />
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Signer Link Ready!</p>
+                <p className="text-xs text-[#28ABDF] truncate font-mono bg-white/80 p-2 rounded-lg border border-[#28ABDF]/20 mt-1">
+                  {generatedSignLink}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="border-[#28ABDF] text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white transition-all font-bold rounded-xl"
+                onClick={copyToClipboard}
+              >
+                {isCopied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                {isCopied ? 'Copied' : 'Copy Link'}
+              </Button>
+              <Button 
+                size="sm" 
+                className="bg-slate-900 text-white hover:bg-slate-800 font-bold rounded-xl px-6"
+                onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Left Sidebar */}
         <div className="w-full lg:w-80 space-y-6">
           {!fileId && (
-            <Card className="p-8 border-dashed border-2 flex flex-col items-center text-center">
-              <Upload className={`w-12 h-12 mb-4 ${uploading ? 'animate-bounce text-sky-500' : 'text-slate-300'}`} />
-              <Button asChild variant="secondary" disabled={uploading}>
-                <label className="cursor-pointer"> {uploading ? 'Uploading...' : 'Select File'}
+            <Card className="p-8 border-dashed border-2 flex flex-col items-center text-center hover:bg-slate-50 transition-colors">
+              <Upload className={`w-12 h-12 mb-4 ${uploading ? 'animate-bounce text-[#28ABDF]' : 'text-slate-300'}`} />
+              <Button asChild variant="secondary" disabled={uploading} className="rounded-xl">
+                <label className="cursor-pointer"> {uploading ? 'Uploading...' : 'Select PDF File'}
                   <input type="file" className="hidden" accept="application/pdf" onChange={handleUpload} />
                 </label>
               </Button>
             </Card>
           )}
-          <Card className="p-5 shadow-sm"> 
+          <Card className="p-5 shadow-sm border-slate-200 rounded-2xl"> 
             <PartyManager parties={parties} onChange={setParties} /> 
-         {/* ✅ সিসি ইমেইল ইনপুট যোগ করা হলো */}
-<CCInput value={ccEmails} onChange={setCcEmails} />
+            <div className="mt-4">
+              <CCInput value={ccEmails} onChange={setCcEmails} />
+            </div>
           </Card>
           {fileId && (
-            <Card className="p-5 shadow-sm">
+            <Card className="p-5 shadow-sm border-slate-200 rounded-2xl">
               <FieldToolbar 
                 parties={parties} 
                 selectedPartyIndex={selectedPartyIndex} 
@@ -2319,26 +2170,28 @@ onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
           )}
         </div>
 
-        {/* Main Content (PDF Viewer) */}
         <div className="flex-1">
           {fileId ? (
-            <PdfViewer 
-              fileId={fileId} 
-              fields={fields} 
-              onFieldsChange={setFields} 
-              currentPage={currentPage} 
-            onPageChange={onPageChange}
-              totalPages={totalPages} 
-              onTotalPagesChange={setTotalPages} 
-              pendingFieldType={pendingFieldType} 
-              selectedPartyIndex={selectedPartyIndex} 
-              parties={parties} 
-              onFieldPlaced={() => setPendingFieldType(null)} 
-              readOnly={!isEditable} 
-            />
+            <div className="rounded-3xl overflow-hidden border border-slate-200 shadow-xl bg-white">
+              <PdfViewer 
+                fileId={fileId} 
+                fields={fields} 
+                onFieldsChange={setFields} 
+                currentPage={currentPage} 
+                onPageChange={onPageChange}
+                totalPages={totalPages} 
+                onTotalPagesChange={setTotalPages} 
+                pendingFieldType={pendingFieldType} 
+                selectedPartyIndex={selectedPartyIndex} 
+                parties={parties} 
+                onFieldPlaced={() => setPendingFieldType(null)} 
+                readOnly={!isEditable} 
+              />
+            </div>
           ) : (
             <div className="h-[600px] bg-slate-50 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-slate-400">
-              <FileText className="w-20 h-20 mb-4 opacity-10" /> <p>No document uploaded yet</p>
+              <FileText className="w-20 h-20 mb-4 opacity-10" /> 
+              <p className="font-medium">No document uploaded yet</p>
             </div>
           )}
         </div>
