@@ -111,7 +111,8 @@
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.2",
-    "vite": "^6.1.0"
+    "vite": "^6.1.0",
+    "vite-plugin-static-copy": "^4.0.0"
   },
   "description": "**Welcome to your Base44 project**",
   "main": "eslint.config.js",

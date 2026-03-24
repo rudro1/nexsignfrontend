@@ -43,18 +43,26 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { viteStaticCopy } from 'vite-plugin-static-copy'; // npm install vite-plugin-static-copy
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs',
+          dest: '',  // copies to dist/ root
+        }
+      ]
+    })
+  ],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: { '@': path.resolve(__dirname, './src') },
   },
-  // optimizeDeps: {
-  //   // ✅ PDF.js এর মডার্ন মডিউলগুলো বিল্ডের সময় ইনক্লুড করা
-  //   include: ['pdfjs-dist/legacy/build/pdf', 'pdfjs-dist/legacy/build/pdf.worker.min.mjs'],
-  // },
+  optimizeDeps: {
+    include: ['pdfjs-dist'],
+  },
   build: {
     target: 'esnext',
   },
