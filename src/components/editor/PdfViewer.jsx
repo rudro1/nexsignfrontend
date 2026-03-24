@@ -3053,11 +3053,17 @@ export default function PdfViewer({
                 </span>
                 {!readOnly && (
                   <button 
-                    onClick={(e) => { e.stopPropagation(); onFieldsChange(fields.filter(f => f.id !== field.id)); }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+  type="button" 
+  onClick={(e) => {
+    e.stopPropagation(); // ক্যানভাসে ক্লিক যাওয়া আটকাবে
+    e.preventDefault();
+    onFieldsChange(fields.filter(f => f.id !== field.id));
+  }}
+  onMouseDown={(e) => e.stopPropagation()} // ড্র্যাগ শুরু হওয়া আটকাবে
+  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-110 z-50"
+>
+  <Trash2 size={12} />
+</button>
                 )}
               </div>
             </Rnd>

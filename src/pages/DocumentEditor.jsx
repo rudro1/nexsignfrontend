@@ -1725,7 +1725,6 @@ export default function DocumentEditor() {
         setFileId(d.fileId || '');
         setParties(d.parties || []);
         setCcEmails(d.ccEmails || []);
-        // Fields ডাটাবেস থেকে আসলে সেটি পার্স করে নেওয়া হচ্ছে
         setFields(d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || []);
       }).catch(() => toast.error("Failed to load document"));
     }
@@ -1741,37 +1740,32 @@ export default function DocumentEditor() {
     const localUrl = URL.createObjectURL(file);
     setFileUrl(localUrl); 
     setFileId('preview'); 
-    toast.success('PDF loaded for editing');
+    toast.success('PDF loaded successfully');
   };
 
-  // 🌟 ফিক্সড হ্যান্ডেল সেন্ড ফাংশন
   const handleSend = async () => {
-    // ১. ভ্যালিডেশন চেক
-    if (!fileUrl) return toast.error('Please select a PDF file first');
-    if (parties.length === 0) return toast.error('Add at least one signer (Party)');
-    if (fields.length === 0) return toast.error('Place at least one signature field on the document');
+    // ১. কড়া ভ্যালিডেশন
+    if (!rawFile && !fileUrl) return toast.error('No PDF file provided');
+    if (parties.length === 0) return toast.error('Please add at least one signer');
+    if (fields.length === 0) return toast.error('Please place signature fields on the PDF');
 
     setProcessing(true);
     const formData = new FormData();
     
-    // ব্যাকএন্ডে 'file' নামে রিসিভ করা হচ্ছে, তাই এটি নিশ্চিত করুন
+    // ব্যাকএন্ডের upload.single('file') এর সাথে মিল রেখে 'file' কি ব্যবহার করা হয়েছে
     if (rawFile) {
       formData.append('file', rawFile);
     }
     
     formData.append('title', title || 'Untitled Document');
-    
-    // ২. গুরুত্বপূর্ণ: ডাটাগুলো সরাসরি JSON string হিসেবে একবারই পাঠান
     formData.append('parties', JSON.stringify(parties));
     formData.append('ccEmails', JSON.stringify(ccEmails));
-    formData.append('fields', JSON.stringify(fields)); // এখানে ম্যাপ করার দরকার নেই
+    formData.append('fields', JSON.stringify(fields)); 
     formData.append('totalPages', totalPages);
 
     try {
       const res = await api.post('/documents/upload-and-send', formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data' 
-        }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       if (res.data.success) {
@@ -1779,10 +1773,9 @@ export default function DocumentEditor() {
         navigate('/dashboard');
       }
     } catch (error) {
-      // ব্যাকএন্ডের আসল এরর মেসেজটি দেখার জন্য
-      const msg = error.response?.data?.error || 'Failed to process document';
-      toast.error(msg);
-      console.error("Upload Error:", error.response?.data);
+      const errorMsg = error.response?.data?.error || 'Failed to process document';
+      toast.error(errorMsg);
+      console.error("Upload Error Details:", error.response?.data);
     } finally {
       setProcessing(false);
     }
@@ -1790,27 +1783,26 @@ export default function DocumentEditor() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8 animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl shadow-sm border">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
         <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-slate-100">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </Button>
           <div className="flex flex-col">
             <Input 
               value={title} 
               onChange={e => setTitle(e.target.value)} 
-              placeholder="Enter document title..."
+              placeholder="Document Title"
               className="text-xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent p-0 h-auto" 
             />
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">NeXsign Editor</span>
+            <span className="text-[10px] text-[#28ABDF] font-bold uppercase tracking-widest">NeXsign Editor</span>
           </div>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
           <Button 
             onClick={handleSend} 
             disabled={processing || !fileUrl} 
-            className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-md transition-all active:scale-95"
+            className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-lg transition-all active:scale-95"
           >
             {processing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />} 
             Confirm & Send
@@ -1819,13 +1811,11 @@ export default function DocumentEditor() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Left Sidebar */}
         <div className="w-full lg:w-80 space-y-6">
           {!fileId && (
-            <Card className="p-10 border-dashed border-2 flex flex-col items-center text-center bg-sky-50/30 border-sky-200">
-              <Upload className="w-12 h-12 mb-4 text-sky-300" />
-              <p className="text-sm text-slate-500 mb-4 font-medium">Select a PDF to start signing process</p>
-              <Button asChild variant="default" className="bg-sky-500 hover:bg-sky-600 rounded-lg">
+            <Card className="p-10 border-dashed border-2 flex flex-col items-center text-center bg-slate-50 border-slate-200">
+              <Upload className="w-12 h-12 mb-4 text-slate-300" />
+              <Button asChild variant="secondary" className="rounded-lg">
                 <label className="cursor-pointer"> Select PDF
                   <input type="file" className="hidden" accept="application/pdf" onChange={handleFileSelect} />
                 </label>
@@ -1833,24 +1823,24 @@ export default function DocumentEditor() {
             </Card>
           )}
 
-          <Card className="p-5 shadow-sm border-slate-100 rounded-2xl overflow-hidden"> 
+          <Card className="p-5 shadow-sm border-slate-100 rounded-2xl"> 
             <PartyManager parties={parties} onChange={setParties} /> 
           </Card>
 
           <Card className="p-5 shadow-sm border-slate-100 rounded-2xl">
             <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 text-sm">
-              <Mail size={16} className="text-sky-500" /> CC Recipients
+              <Mail size={16} className="text-[#28ABDF]" /> CC Recipients
             </div>
             <Input 
-              placeholder="Emails (separated by commas)" 
+              placeholder="Emails (comma separated)" 
               value={ccEmails.join(', ')} 
               onChange={(e) => setCcEmails(e.target.value.split(',').map(email => email.trim()).filter(Boolean))}
-              className="text-xs rounded-lg border-slate-200"
+              className="text-xs rounded-lg"
             />
           </Card>
 
           {fileId && (
-            <Card className="p-5 shadow-sm border-slate-100 rounded-2xl bg-white">
+            <Card className="p-5 shadow-sm border-slate-100 rounded-2xl">
               <FieldToolbar 
                 parties={parties} 
                 selectedPartyIndex={selectedPartyIndex} 
@@ -1861,8 +1851,7 @@ export default function DocumentEditor() {
           )}
         </div>
 
-        {/* Editor Main Area */}
-        <div className="flex-1 bg-white rounded-3xl shadow-inner border border-slate-100 overflow-hidden min-h-[800px]">
+        <div className="flex-1 bg-slate-50 rounded-3xl border border-slate-100 overflow-hidden min-h-[800px]">
           {fileId ? (
             <PdfViewer 
               fileUrl={fileUrl}
@@ -1878,12 +1867,9 @@ export default function DocumentEditor() {
               onFieldPlaced={() => setPendingFieldType(null)} 
             />
           ) : (
-            <div className="h-[800px] flex flex-col items-center justify-center text-slate-300">
-              <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                <FileText className="w-12 h-12 opacity-20" />
-              </div>
-              <p className="font-medium">Upload a document to start editing</p>
-              <p className="text-xs mt-1">PDF files up to 15MB are supported</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-300 py-40">
+              <FileText className="w-20 h-20 mb-4 opacity-10" />
+              <p className="font-medium">Please upload a document to begin</p>
             </div>
           )}
         </div>
