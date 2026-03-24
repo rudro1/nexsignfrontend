@@ -194,30 +194,40 @@ export default function Dashboard() {
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const LIMIT = 6; 
 
   const fetchDocuments = useCallback(async (pageNum = 1, isInitial = false) => {
-    if (isInitial) {
-      setIsLoading(true);
-      const cached = localStorage.getItem('nexsign_cache');
-      if (cached) setDocuments(JSON.parse(cached));
-    } else {
-      setIsFetchingMore(true);
-    }
-    
     try {
-      const res = await api.get(`/documents?page=${pageNum}&limit=${LIMIT}`);
-      const rawData = Array.isArray(res.data) ? res.data : (res.data.documents || []);
+      if (isInitial) {
+        setIsLoading(true);
+        const cached = localStorage.getItem('nexsign_cache');
+        if (cached) setDocuments(JSON.parse(cached));
+      } else {
+        setIsFetchingMore(true);
+      }
+      
+      const res = await api.get(`/documents`, {
+        params: { page: pageNum, limit: LIMIT }
+      });
+
+      // ব্যাকএন্ড ডাটা এক্সট্রাক্ট করা
+      const rawData = res.data.documents || (Array.isArray(res.data) ? res.data : []);
+      const serverHasMore = res.data.hasMore ?? rawData.length === LIMIT;
       
       if (isInitial) {
         setDocuments(rawData);
         localStorage.setItem('nexsign_cache', JSON.stringify(rawData.slice(0, 4)));
       } else {
-        setDocuments(prev => [...prev, ...rawData]);
+        setDocuments(prev => {
+          // ডুপ্লিকেট এড়াতে আইডি চেক করে নতুন ডাটা অ্যাপেন্ড করা
+          const existingIds = new Set(prev.map(d => d._id));
+          const uniqueNewDocs = rawData.filter(d => !existingIds.has(d._id));
+          return [...prev, ...uniqueNewDocs];
+        });
       }
-      setHasMore(rawData.length === LIMIT);
+      setHasMore(serverHasMore);
     } catch (err) {
       console.error("Dashboard Fetch Error:", err);
     } finally {
@@ -264,7 +274,7 @@ export default function Dashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             Welcome, {user?.full_name?.split(' ')[0] || 'User'} 👋
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Manage your documents efficiently.</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Manage your documents efficiently.</p>
         </div>
         <Link to="/DocumentEditor?id=new">
           <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl gap-2 shadow-lg px-6 py-6 transition-all">
@@ -283,7 +293,12 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center">
         <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl" />
+          <Input 
+            placeholder="Search documents..." 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            className="pl-10 rounded-xl" 
+          />
         </div>
         <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
           <TabsList className="bg-slate-100 rounded-xl p-1">
@@ -304,9 +319,14 @@ export default function Dashboard() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map(doc => <DocumentCard key={doc._id} doc={doc} />)}
           </div>
-          {hasMore && filtered.length >= LIMIT && (
+          {hasMore && (
             <div className="flex justify-center mt-12">
-              <Button variant="outline" onClick={handleLoadMore} disabled={isFetchingMore} className="rounded-full border-[#28ABDF] text-[#28ABDF]">
+              <Button 
+                variant="outline" 
+                onClick={handleLoadMore} 
+                disabled={isFetchingMore} 
+                className="rounded-full border-[#28ABDF] text-[#28ABDF]"
+              >
                 {isFetchingMore ? <Loader2 className="animate-spin mr-2" /> : <ChevronDown className="mr-2" />}
                 Load More
               </Button>
