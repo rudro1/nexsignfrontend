@@ -2364,238 +2364,125 @@
 //     </div>
 //   );
 // }
-import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
-import { Rnd } from 'react-rnd';
+import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+import { X, Move } from 'lucide-react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
-const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#6366f1', '#14b8a6'];
-
-export default function PdfViewer({
-  fileUrl, fileId, fields, onFieldsChange, currentPage, onPageChange,
-  onTotalPagesChange, pendingFieldType, selectedPartyIndex,
-  parties, onFieldPlaced, readOnly = false
+export default function PdfViewer({ 
+  fileUrl, fields, onFieldsChange, parties, 
+  currentPage, onPageChange, pendingFieldType, 
+  selectedPartyIndex, onFieldPlaced, onDeleteField 
 }) {
-  const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  const renderTaskRef = useRef(null);
-  const [pdfDoc, setPdfDoc] = useState(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-  const [loading, setLoading] = useState(true);
+  const [pdf, setPdf] = useState(null);
+  const [pages, setPages] = useState([]);
 
-  const currentPageFields = useMemo(() => 
-    fields.filter(f => Number(f.page) === Number(currentPage)), 
-    [fields, currentPage]
-  );
-
+  // PDF লোড করা
   useEffect(() => {
     if (!fileUrl) return;
-    let isCancelled = false;
+    const loadingTask = pdfjsLib.getDocument(fileUrl);
+    loadingTask.promise.then(loadedPdf => {
+      setPdf(loadedPdf);
+      renderAllPages(loadedPdf);
+    });
+  }, [fileUrl]);
 
-    const loadPdfDoc = async () => {
-      setLoading(true);
-      try {
-        let finalUrl;
-        if (fileUrl.startsWith('blob:')) {
-          finalUrl = fileUrl;
-        } else {
-          let cloudPath = fileId || (fileUrl.includes('upload/') 
-            ? fileUrl.split('upload/')[1].split('/').slice(1).join('/') 
-            : fileUrl);
-          finalUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${encodeURIComponent(cloudPath)}`;
-        }
+  const renderAllPages = async (pdfDoc) => {
+    const renderedPages = [];
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      renderedPages.push(page);
+    }
+    setPages(renderedPages);
+  };
 
-        const loadingTask = pdfjsLib.getDocument({ 
-          url: finalUrl, 
-          withCredentials: !fileUrl.startsWith('blob:'),
-          ignoreEncryption: true 
-        });
-        
-        const doc = await loadingTask.promise;
-        if (!isCancelled) {
-          setPdfDoc(doc);
-          onTotalPagesChange?.(doc.numPages);
-        }
-      } catch (err) { 
-        console.error("PDF Loading Error:", err); 
-      } finally { 
-        if (!isCancelled) setLoading(false); 
-      }
-    };
+  // 🚀 নতুন ফিল্ড বসানোর লজিক
+  const handlePageClick = (e, pageNum) => {
+    if (!pendingFieldType) return;
 
-    loadPdfDoc();
-    return () => { isCancelled = true; };
-  }, [fileUrl, fileId, onTotalPagesChange]);
-
-  useEffect(() => {
-    if (!pdfDoc || !canvasRef.current) return;
-    
-    const renderPage = async () => {
-      if (renderTaskRef.current) renderTaskRef.current.cancel();
-      
-      try {
-        const page = await pdfDoc.getPage(currentPage);
-        const containerWidth = containerRef.current?.clientWidth || 700;
-        const baseViewport = page.getViewport({ scale: 1 });
-        const scale = (containerWidth - 48) / baseViewport.width;
-        const viewport = page.getViewport({ scale });
-
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d', { alpha: false });
-        
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        setCanvasSize({ width: viewport.width, height: viewport.height });
-
-        renderTaskRef.current = page.render({ canvasContext: context, viewport });
-        await renderTaskRef.current.promise;
-      } catch (err) { 
-        if (err.name !== 'RenderingCancelledException') console.error("Render Error:", err);
-      }
-    };
-
-    renderPage();
-    return () => renderTaskRef.current?.cancel();
-  }, [pdfDoc, currentPage]);
-
-  const handleContainerClick = (e) => {
-    if (readOnly || !pendingFieldType || loading) return;
-    
-    // 🌟 নিশ্চিত করা যে ক্লিকটি ক্যানভাসের উপরই পড়েছে
-    if (!e.target.classList.contains('pdf-canvas')) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const fW = pendingFieldType === 'signature' ? 24 : 18;
-    const fH = pendingFieldType === 'signature' ? 10 : 6;
-
-    const xPercent = ((e.clientX - rect.left) / canvasSize.width) * 100 - fW / 2;
-    const yPercent = ((e.clientY - rect.top) / canvasSize.height) * 100 - fH / 2;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
 
     const newField = {
-      id: `field_${Date.now()}`,
+      id: `f_${Math.random().toString(36).substr(2, 9)}`,
       type: pendingFieldType,
-      page: currentPage,
-      x: Number(xPercent.toFixed(4)),
-      y: Number(yPercent.toFixed(4)),
-      width: fW, 
-      height: fH, 
-      partyIndex: Number(selectedPartyIndex)
+      page: pageNum,
+      x: x - 5, // সেন্টার করার জন্য
+      y: y - 2,
+      width: 15,
+      height: 6,
+      partyIndex: selectedPartyIndex,
+      value: ""
     };
 
     onFieldsChange([...fields, newField]);
-    onFieldPlaced?.();
-  };
-
-  // 🌟 ফিক্সড ডিলিট ফাংশন
-  const removeField = (e, id) => {
-    e.preventDefault(); 
-    e.stopPropagation(); // ক্যানভাসে নতুন ফিল্ড তৈরি হওয়া বন্ধ করবে
-    const updatedFields = fields.filter(f => f.id !== id);
-    onFieldsChange(updatedFields);
+    onFieldPlaced(); // টুলবার রিসেট
   };
 
   return (
-    <div ref={containerRef} className="flex-1 w-full overflow-hidden p-6 bg-slate-50/50">
-      {pdfDoc && pdfDoc.numPages > 1 && (
-        <div className="flex items-center justify-center gap-6 mb-6">
-          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)} className="rounded-xl shadow-sm border-slate-200">
-            <ChevronLeft className="w-4 h-4 mr-1" /> Prev
-          </Button>
-          <span className="text-xs font-bold text-slate-600 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
-            PAGE {currentPage} / {pdfDoc.numPages}
-          </span>
-          <Button variant="outline" size="sm" disabled={currentPage >= pdfDoc.numPages} onClick={() => onPageChange(currentPage + 1)} className="rounded-xl shadow-sm border-slate-200">
-            Next <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-        </div>
-      )}
-
-      <div 
-        className="canvas-container relative mx-auto shadow-2xl border-4 border-white bg-white rounded-lg overflow-hidden transition-all duration-300" 
-        style={{ 
-          width: canvasSize.width || '100%', 
-          height: canvasSize.height || '600px', 
-          cursor: pendingFieldType ? 'crosshair' : 'default' 
-        }} 
-        onClick={handleContainerClick}
-      >
-        {loading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50 backdrop-blur-sm">
-            <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF]" />
-            <p className="text-xs font-bold text-slate-400 mt-4 uppercase tracking-widest">Loading Document...</p>
-          </div>
-        )}
-
-        <canvas ref={canvasRef} className="pdf-canvas block mx-auto" />
-
-        {currentPageFields.map(field => {
-          const currentIdx = field.partyIndex ?? field.party_index ?? 0; 
-          const color = parties?.[currentIdx]?.color || PARTY_COLORS[currentIdx % PARTY_COLORS.length];
+    <div ref={containerRef} className="flex flex-col items-center p-4 gap-6 bg-slate-200 overflow-y-auto h-full">
+      {pages.map((page, idx) => (
+        <div 
+          key={idx} 
+          className="relative bg-white shadow-2xl border border-slate-300"
+          onClick={(e) => handlePageClick(e, idx + 1)}
+          style={{ width: '800px', minHeight: '1100px' }}
+        >
+          <PageCanvas page={page} />
           
-          return (
-            <Rnd 
-              key={field.id} 
-              size={{ 
-                width: (field.width / 100) * canvasSize.width, 
-                height: (field.height / 100) * canvasSize.height 
-              }} 
-              position={{ 
-                x: (field.x / 100) * canvasSize.width, 
-                y: (field.y / 100) * canvasSize.height 
-              }} 
-              onDragStop={(e, d) => {
-                onFieldsChange(fields.map(f => f.id === field.id ? { 
-                  ...f, 
-                  x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
-                  y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
-                } : f));
-              }} 
-              onResizeStop={(e, dir, ref, delta, pos) => {
-                onFieldsChange(fields.map(f => f.id === field.id ? { 
-                  ...f, 
-                  width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)), 
-                  height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)), 
-                  x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)), 
-                  y: Number(((pos.y / canvasSize.height) * 100).toFixed(4)) 
-                } : f));
-              }} 
-              bounds="parent" 
-              enableResizing={!readOnly} 
-              disableDragging={readOnly} 
-              className="z-20 group"
+          {/* ফিল্ডগুলো রেন্ডার করা */}
+          {fields.filter(f => f.page === idx + 1).map(field => (
+            <div
+              key={field.id}
+              className="absolute border-2 flex items-center justify-center group"
+              style={{
+                left: `${field.x}%`,
+                top: `${field.y}%`,
+                width: `${field.width}%`,
+                height: `${field.height}%`,
+                borderColor: getPartyColor(field.partyIndex),
+                backgroundColor: `${getPartyColor(field.partyIndex)}20`
+              }}
             >
-              <div 
-                className="w-full h-full border-2 flex flex-col items-center justify-center relative bg-white/40 backdrop-blur-[1px] rounded-sm transition-colors" 
-                style={{ borderColor: color }}
+              <span className="text-[10px] font-bold uppercase">{field.type}</span>
+              
+              {/* 🚀 ডিলিট বাটন ফিক্স (Stop Propagation ব্যবহার করা হয়েছে) */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); // ক্লিক যেন PDF এ না লাগে
+                  onFieldsChange(fields.filter(f => f.id !== field.id));
+                }}
+                className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
               >
-                <div 
-                  className="absolute -top-5 left-0 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase tracking-tighter" 
-                  style={{ backgroundColor: color }}
-                >
-                  {parties?.[currentIdx]?.name || `Party ${currentIdx + 1}`}
-                </div>
-
-                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color }}>{field.type}</span>
-
-                {!readOnly && (
-                  <button 
-                    type="button" 
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-110 z-[60]" 
-                    // 🌟 onClick এবং onMouseDown উভয় ক্ষেত্রেই ইভেন্ট থামানো হয়েছে
-                    onClick={(e) => removeField(e, field.id)}
-                    onMouseDown={(e) => e.stopPropagation()} 
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                )}
-              </div>
-            </Rnd>
-          );
-        })}
-      </div>
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
+}
+
+// পার্টি অনুযায়ী কালার ডিনামিক করা
+function getPartyColor(index) {
+  const colors = ['#28ABDF', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+  return colors[index % colors.length];
+}
+
+function PageCanvas({ page }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    page.render({ canvasContext: context, viewport });
+  }, [page]);
+
+  return <canvas ref={canvasRef} className="w-full h-auto" />;
 }

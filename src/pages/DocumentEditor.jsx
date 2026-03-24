@@ -1922,12 +1922,11 @@ export default function DocumentEditor() {
   const [sending, setSending] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
 
-  // 🌟 নতুন স্টেটসমূহ
   const [pendingFieldType, setPendingFieldType] = useState(null);
   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
 
+  // 🚀 ১. ডাটা লোড করার সময় JSON পার্সিং ফিক্স
   useEffect(() => {
     if (initialDocId && initialDocId !== 'new') {
       api.get(`/documents/${initialDocId}`).then(res => {
@@ -1937,10 +1936,25 @@ export default function DocumentEditor() {
         setFileId(d.fileId || ''); 
         setParties(d.parties || []);
         setCcEmails(d.ccEmails || []);
-        if (d.fields) setFields(d.fields.map(f => typeof f === 'string' ? JSON.parse(f) : f));
+        if (d.fields) {
+          // ডাটাবেস থেকে আসা স্ট্রিং ফিল্ডগুলোকে অবজেক্টে রূপান্তর
+          const parsedFields = d.fields.map(f => typeof f === 'string' ? JSON.parse(f) : f);
+          setFields(parsedFields);
+        }
       }).catch(() => toast.error("Error loading document"));
     }
   }, [initialDocId]);
+
+  // 🚀 ২. ফিল্ড ডিলিট লজিক (যা আপনার কাজ করছিল না)
+  const handleDeleteField = useCallback((fieldId) => {
+    setFields(prev => prev.filter(f => f.id !== fieldId));
+    toast.success("Field removed");
+  }, []);
+
+  // 🚀 ৩. ফিল্ড আপডেট লজিক (পজিশন বা সাইজ চেঞ্জ হলে)
+  const handleUpdateField = useCallback((fieldId, updates) => {
+    setFields(prev => prev.map(f => f.id === fieldId ? { ...f, ...updates } : f));
+  }, []);
 
   const handleLocalUpload = (e) => {
     const file = e.target.files[0];
@@ -1960,11 +1974,11 @@ export default function DocumentEditor() {
   };
 
   const preparePayload = (overrides = {}) => ({
-    id: initialDocId !== 'new' ? initialDocId : undefined,
     title: title || 'Untitled',
     fileUrl: overrides.fileUrl || fileUrl,
     fileId: overrides.fileId || fileId,
     parties,
+    // ব্যাকএন্ডে পাঠানোর আগে স্ট্রিং করে পাঠানো নিরাপদ
     fields: fields.map(f => JSON.stringify(f)),
     ccEmails,
     senderMeta: { name: user?.full_name, email: user?.email },
@@ -1977,34 +1991,51 @@ export default function DocumentEditor() {
     try {
       let finalFile = { url: fileUrl, id: fileId };
       if (fileId === 'local_preview') finalFile = await uploadToCloudinary();
-      await api.post('/documents/upload-metadata', preparePayload({ fileUrl: finalFile.url, fileId: finalFile.id }));
+      
+      const payload = preparePayload({ fileUrl: finalFile.url, fileId: finalFile.id });
+      
+      // ডাইনামিক রুট (নতুন না এডিট)
+      if (initialDocId && initialDocId !== 'new') {
+        await api.put(`/documents/${initialDocId}`, payload);
+      } else {
+        await api.post('/documents/upload-metadata', payload);
+      }
+      
       toast.success("Draft saved!");
       navigate('/dashboard');
     } catch (err) { toast.error("Save failed"); } finally { setSaving(false); }
   };
 
   const handleSend = async () => {
-    if (!fileUrl || parties.length === 0 || fields.length === 0) return toast.error("Complete all steps");
+    if (!fileUrl || parties.length === 0 || fields.length === 0) {
+      return toast.error("Please add parties and place fields first");
+    }
     setSending(true);
     try {
       let finalFile = { url: fileUrl, id: fileId };
       if (fileId === 'local_preview') finalFile = await uploadToCloudinary();
-      await api.post('/documents/send', preparePayload({ fileUrl: finalFile.url, fileId: finalFile.id }));
-      toast.success("Sent!");
+      
+      await api.post('/documents/send', preparePayload({ 
+        id: initialDocId !== 'new' ? initialDocId : undefined,
+        fileUrl: finalFile.url, 
+        fileId: finalFile.id 
+      }));
+      
+      toast.success("Document sent for signing!");
       navigate('/dashboard');
     } catch (err) { toast.error("Send failed"); } finally { setSending(false); }
   };
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8">
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate(-1)}><ArrowLeft /></Button>
           <Input 
             value={title} 
             onChange={e => setTitle(e.target.value)} 
-            className="text-xl font-bold border-none bg-transparent focus-visible:ring-0" 
+            className="text-xl font-bold border-none bg-transparent focus-visible:ring-0 w-64" 
           />
         </div>
         <div className="flex gap-3">
@@ -2018,12 +2049,12 @@ export default function DocumentEditor() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Controls */}
+        {/* Left Sidebar */}
         <div className="w-full lg:w-80 space-y-6">
           {!fileUrl && (
             <Card className="p-8 border-dashed border-2 text-center bg-slate-50/50">
               <Upload className="mx-auto mb-4 text-slate-400" />
-              <label className="cursor-pointer bg-[#28ABDF] text-white px-4 py-2 rounded-lg font-medium inline-block hover:bg-[#1e8db8] transition-colors"> 
+              <label className="cursor-pointer bg-[#28ABDF] text-white px-4 py-2 rounded-lg font-medium inline-block transition-transform active:scale-95"> 
                 Select PDF
                 <input type="file" className="hidden" accept="application/pdf" onChange={handleLocalUpload} />
               </label>
@@ -2048,24 +2079,24 @@ export default function DocumentEditor() {
           )}
         </div>
 
-        {/* PDF Viewer Canvas */}
-        <div className="flex-1 min-h-[800px] bg-white border rounded-3xl overflow-hidden shadow-inner">
+        {/* Center Canvas */}
+        <div className="flex-1 min-h-[800px] bg-white border rounded-3xl overflow-hidden shadow-inner relative">
           {fileUrl ? (
             <PdfViewer 
               fileUrl={fileUrl} 
-              fileId={fileId}
               fields={fields} 
               onFieldsChange={setFields} 
+              onUpdateField={handleUpdateField} // 🌟 নতুন
+              onDeleteField={handleDeleteField} // 🌟 নতুন
               parties={parties}
               currentPage={currentPage}
               onPageChange={setCurrentPage}
-              onTotalPagesChange={setTotalPages}
               pendingFieldType={pendingFieldType}
               selectedPartyIndex={selectedPartyIndex}
-              onFieldPlaced={() => setPendingFieldType(null)} // প্লেস করার পর রিসেট
+              onFieldPlaced={() => setPendingFieldType(null)}
             />
           ) : (
-            <div className="py-40 text-center text-slate-400 font-medium">
+            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-medium">
               Upload a PDF to start adding fields
             </div>
           )}
