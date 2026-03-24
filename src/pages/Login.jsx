@@ -241,12 +241,12 @@ import { FcGoogle } from "react-icons/fc";
 
 export default function Login({ toggle }) {
   const navigate = useNavigate();
-  const { login, googleLogin, user } = useAuth(); 
+  const { login, googleLogin, user, resetPassword} = useAuth(); 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-    // 🔹 Redirect immediately if user already logged in
+    //  Redirect immediately if user already logged in
   useEffect(() => {
     if (user) {
       navigate('/dashboard', { replace: true });
@@ -258,24 +258,75 @@ export default function Login({ toggle }) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const payload = { email: formData.email.toLowerCase().trim(), password: formData.password };
-      const res = await api.post('/auth/login', payload);
-      if (res.data.token) {
-        login(res.data.user, res.data.token); 
-        toast.success('Successfully loging!');
-        const userRole = res.data.user.role;
-        navigate(userRole === 'super_admin' || userRole === 'admin' ? '/admin' : '/dashboard');
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'লগইন করতে সমস্যা হয়েছে।');
-    } finally {
-      setLoading(false);
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setLoading(true);
+  //   try {
+  //     const payload = { email: formData.email.toLowerCase().trim(), password: formData.password };
+  //     const res = await api.post('/auth/login', payload);
+  //     if (res.data.token) {
+  //       login(res.data.user, res.data.token); 
+  //       toast.success('Successfully loging!');
+  //       const userRole = res.data.user.role;
+  //       navigate(userRole === 'super_admin' || userRole === 'admin' ? '/admin' : '/dashboard');
+  //     }
+  //   } catch (err) {
+  //     toast.error(err.response?.data?.message || 'লগইন করতে সমস্যা হয়েছে।');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+
+
+// Login.jsx এর handleSubmit ফাংশনটি এটি দিয়ে রিপ্লেস করুন
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+
+  const email = formData.email.toLowerCase().trim();
+  const password = formData.password;
+
+  try {
+    // ১. সাধারণ লগইন চেষ্টা
+    const res = await api.post('/auth/login', { email, password });
+    if (res.data.token) {
+      login(res.data.user, res.data.token);
+      toast.success('Successfully logged in!');
+      navigate(res.data.user.role === 'admin' || res.data.user.role === 'super_admin' ? '/admin' : '/dashboard');
     }
-  };
+  } catch (err) {
+    // ২. যদি 401 আসে (পাসওয়ার্ড ভুল বা রিসেট করা হয়েছে)
+    if (err.response?.status === 401) {
+      try {
+        const { signInWithEmailAndPassword } = await import("firebase/auth");
+        const { auth } = await import("../firebase.config.js");
+        
+        // Firebase এ চেক করুন
+        const firebaseResult = await signInWithEmailAndPassword(auth, email, password);
+        
+        if (firebaseResult.user) {
+          // ৩. Firebase ঠিক থাকলে DB সিঙ্ক করুন
+          const syncRes = await api.post('/auth/sync-password', { email, password });
+          if (syncRes.data.token) {
+            login(syncRes.data.user, syncRes.data.token);
+            toast.success("Password Updated & Logged In!");
+            navigate(syncRes.data.user.role === 'admin' ? '/admin' : '/dashboard');
+          }
+        }
+      } catch (error) {
+        toast.error("Invalid email or password.");
+      }
+    } else {
+      toast.error(err.response?.data?.message || 'লগইন ফেইল করেছে।');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
+//google login
 
   const handleGoogleLogin = async () => {
     try {
@@ -283,7 +334,8 @@ export default function Login({ toggle }) {
       const result = await googleLogin();
       const user = result.user;
       const res = await api.post("/auth/google", {
-        name: user.displayName, email: user.email, photoURL: user.photoURL,
+        name: user.displayName,
+         email: user.email 
       });
       if (res.status === 200 || res.status === 201) {
         login(res.data.user, res.data.token); 
@@ -299,6 +351,20 @@ export default function Login({ toggle }) {
       setLoading(false);
     }
   };
+
+  //fortgot password
+const handleForgotPassword = async () => {
+    if (!formData.email) {
+      toast.error("Please enter your email first.");
+      return;
+    }
+    try {
+      await resetPassword(formData.email);
+    } catch (err) {
+      // Error handles inside resetPassword via toast
+    }
+  };
+
 
   return (
     <div className="w-full h-full p-8 flex flex-col justify-center bg-white dark:bg-slate-900">
@@ -316,10 +382,21 @@ export default function Login({ toggle }) {
           <Input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="name@example.com" className="h-10 rounded-xl" required />
         </div>
         <div className="space-y-1">
-          <div className="flex justify-between items-center">
+          {/* <div className="flex justify-between items-center">
             <Label className="text-sm">Password</Label>
             <Link to="/forgot-password" size="sm" className="text-xs text-sky-500 hover:underline">Forgot password?</Link>
-          </div>
+          </div> */}
+
+          <div className="flex justify-between items-center">
+      <Label className="text-sm">Password</Label>
+      <button 
+        type="button" 
+        onClick={handleForgotPassword} 
+        className="text-xs text-sky-500 hover:underline bg-transparent border-none cursor-pointer"
+      >
+        Forgot password?
+      </button>
+    </div>
           <div className="relative">
             <Input name="password" type={showPassword ? "text" : "password"} value={formData.password} onChange={handleChange} placeholder="••••••••" className="h-10 rounded-xl pr-10" required />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">

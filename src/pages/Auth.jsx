@@ -11,7 +11,7 @@ export default function Auth({ initialMode = "login" }) {
   }, [initialMode]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 p-4 ">
       {/* Main Container */}
       <div className="relative w-full max-w-4xl h-[650px] bg-white dark:bg-slate-900 shadow-2xl rounded-[40px] overflow-hidden flex">
         

@@ -93,7 +93,7 @@
 // src/lib/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { auth, googleProvider } from "../firebase.config.js";
-import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { toast } from "sonner";
 
 const AuthContext = createContext();
@@ -170,7 +170,7 @@ const registerWithEmail = async (email, password) => {
    
     const result = await createUserWithEmailAndPassword(auth, email, password);
     
-   
+   //verification mail
     await sendEmailVerification(result.user);
     
     setLoading(false);
@@ -185,6 +185,7 @@ const registerWithEmail = async (email, password) => {
   }
 };
 
+
 const checkEmailVerified = async (firebaseUser) => {
   if (firebaseUser) {
     await firebaseUser.reload(); // এটিই মেইন কাজ করে, স্ট্যাটাস রিফ্রেশ করে
@@ -194,6 +195,32 @@ const checkEmailVerified = async (firebaseUser) => {
 };
 
 
+//forgot password
+const resetPassword = async (email) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    toast.success("Password reset email sent! Check your inbox.");
+  } catch (error) {
+    console.error("Reset password error:", error);
+    toast.error(error.message || "Failed to send reset email.");
+    throw error;
+  }
+};
+
+
+
+
+const loginWithEmail = async (email, password) => {
+  setLoading(true);
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    setLoading(false);
+    return result;
+  } catch (error) {
+    setLoading(false);
+    throw error;
+  }
+};
 
   return (
     <AuthContext.Provider
@@ -206,6 +233,8 @@ const checkEmailVerified = async (firebaseUser) => {
         googleLogin,
         registerWithEmail, 
         checkEmailVerified,
+        resetPassword,
+      loginWithEmail ,
         isAdmin: user?.role === "admin" || user?.role === "super_admin",
         isSuperAdmin: user?.role === "super_admin",
         isAuthenticated: !!user,
