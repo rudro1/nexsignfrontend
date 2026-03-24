@@ -2860,9 +2860,10 @@ import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
-// ✅ PDF Worker Fix: Dynamic version matching to avoid 404
-const pdfjsVersion = pdfjsLib.version;
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/legacy/build/pdf.worker.min.mjs`;
+// ✅ PDF Worker Fix: সরাসরি node_modules থেকে ওয়ার্কার লোড করা (Vite compatible)
+// এটি 404 (Not Found) এরর সমাধান করবে
+import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export default function PdfViewer({
   fileUrl, fileId, fields, onFieldsChange, currentPage, onPageChange,
@@ -2881,7 +2882,7 @@ export default function PdfViewer({
     [fields, currentPage]
   );
 
-  // ১. PDF লোডিং লজিক (CORS Proxy Handling)
+  // ১. PDF লোডিং লজিক
   useEffect(() => {
     if (!fileUrl) return;
     let isCancelled = false;
@@ -2895,13 +2896,15 @@ export default function PdfViewer({
         if (!fileUrl.startsWith('blob:') && !fileUrl.startsWith('data:')) {
           const parts = fileUrl.split('/upload/');
           const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
-          // Backend proxy route compatibility
+          // আপনার ব্যাকএন্ড প্রক্সি রুট
           finalUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
         }
 
         const loadingTask = pdfjsLib.getDocument({ 
           url: finalUrl, 
-          withCredentials: false
+          withCredentials: false,
+          disableAutoFetch: false,
+          disableStream: false
         });
         
         const doc = await loadingTask.promise;
@@ -2924,13 +2927,13 @@ export default function PdfViewer({
   const renderPage = useCallback(async () => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
     
+    // আগের রেন্ডারিং টাস্ক থাকলে ক্যানসেল করা
     if (renderTaskRef.current) {
         renderTaskRef.current.cancel();
     }
     
     try {
       const page = await pdfDoc.getPage(currentPage);
-      // Responsive width: Container width minus padding
       const containerWidth = containerRef.current.clientWidth - 40; 
       const originalViewport = page.getViewport({ scale: 1 });
       const scale = containerWidth / originalViewport.width;
@@ -2953,11 +2956,12 @@ export default function PdfViewer({
 
   useEffect(() => {
     renderPage();
-    window.addEventListener('resize', renderPage);
-    return () => window.removeEventListener('resize', renderPage);
+    const handleResize = () => renderPage();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [renderPage]);
 
-  // ৩. ফিল্ড প্লেসমেন্ট (Precision Coordinates)
+  // ৩. ফিল্ড প্লেসমেন্ট লজিক
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading) return;
     if (!e.target.classList.contains('pdf-canvas')) return;
@@ -2993,7 +2997,7 @@ export default function PdfViewer({
           <Button variant="ghost" size="icon" className="rounded-full" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
             <ChevronLeft className="w-5 h-5" />
           </Button>
-          <span className="text-xs font-bold px-4">PAGE {currentPage} OF {pdfDoc.numPages}</span>
+          <span className="text-[10px] font-bold px-4 tracking-tighter">PAGE {currentPage} OF {pdfDoc.numPages}</span>
           <Button variant="ghost" size="icon" className="rounded-full" disabled={currentPage >= pdfDoc.numPages} onClick={() => onPageChange(currentPage + 1)}>
             <ChevronRight className="w-5 h-5" />
           </Button>
@@ -3009,26 +3013,20 @@ export default function PdfViewer({
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50">
             <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF] mb-2" />
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">Loading PDF...</p>
+            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Loading PDF...</p>
           </div>
         )}
 
         <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner mx-auto" />
 
-        {/* Dynamic Fields */}
+        {/* Dynamic Fields (Rnd) */}
         {currentPageFields.map((field) => {
           const party = parties[field.partyIndex] || { name: 'Signer', color: '#28ABDF' };
           return (
             <Rnd
               key={field.id}
-              size={{ 
-                width: `${field.width}%`, 
-                height: `${field.height}%` 
-              }}
-              position={{ 
-                x: (field.x / 100) * canvasSize.width, 
-                y: (field.y / 100) * canvasSize.height 
-              }}
+              size={{ width: `${field.width}%`, height: `${field.height}%` }}
+              position={{ x: (field.x / 100) * canvasSize.width, y: (field.y / 100) * canvasSize.height }}
               onDragStop={(e, d) => {
                 onFieldsChange(fields.map(f => f.id === field.id ? { 
                   ...f, 
@@ -3062,10 +3060,10 @@ export default function PdfViewer({
                   <button 
                     type="button" 
                     onClick={(e) => {
-                      e.stopPropagation(); // ক্যানভাসে ক্লিক যাওয়া আটকাবে
+                      e.stopPropagation();
                       onFieldsChange(fields.filter(f => f.id !== field.id));
                     }}
-                    onMouseDown={(e) => e.stopPropagation()} // ড্র্যাগ শুরু হওয়া আটকাবে
+                    onMouseDown={(e) => e.stopPropagation()}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-md transition-all hover:scale-125 z-50"
                   >
                     <Trash2 size={10} />
