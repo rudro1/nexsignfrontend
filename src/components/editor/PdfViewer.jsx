@@ -2364,201 +2364,147 @@
 //     </div>
 //   );
 // }
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '@/api/apiClient';
-import { useAuth } from '@/lib/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/Card';
-import { toast } from 'sonner';
-import { Upload, Save, Send, ArrowLeft, Loader2 } from 'lucide-react';
-import PartyManager from '@/components/editor/PartyManager';
-import FieldToolbar from '@/components/editor/FieldToolbar';
-import PdfViewer from '@/components/editor/PdfViewer';
-import axios from 'axios';
+import React, { useState, useEffect, useRef } from 'react';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+import { X, GripHorizontal } from 'lucide-react';
+import { Rnd } from 'react-rnd'; // ড্র্যাগ এবং রিসাইজের জন্য এটি সেরা
 
-export default function DocumentEditor() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const urlParams = new URLSearchParams(window.location.search);
-  const initialDocId = urlParams.get('id');
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
-  const [title, setTitle] = useState('');
-  const [fileUrl, setFileUrl] = useState('');
-  const [fileId, setFileId] = useState(''); 
-  const [parties, setParties] = useState([]);
-  const [fields, setFields] = useState([]);
-  const [ccEmails, setCcEmails] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [pendingFile, setPendingFile] = useState(null);
+export default function PdfViewer({ 
+  fileUrl, fields, onFieldsChange, parties, 
+  pendingFieldType, selectedPartyIndex, onFieldPlaced 
+}) {
+  const [pages, setPages] = useState([]);
+  const containerRef = useRef(null);
 
-  const [pendingFieldType, setPendingFieldType] = useState(null);
-  const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-
-  // 🚀 ডাটা লোড লজিক ফিক্স (JSON parse handling)
   useEffect(() => {
-    if (initialDocId && initialDocId !== 'new') {
-      api.get(`/documents/${initialDocId}`).then(res => {
-        const d = res.data;
-        setTitle(d.title || '');
-        setFileUrl(d.fileUrl || '');
-        setFileId(d.fileId || ''); 
-        setParties(d.parties || []);
-        setCcEmails(d.ccEmails || []);
-        if (d.fields) {
-          const parsed = d.fields.map(f => typeof f === 'string' ? JSON.parse(f) : f);
-          setFields(parsed);
-        }
-      }).catch(() => toast.error("Error loading document"));
-    }
-  }, [initialDocId]);
-
-  const handleLocalUpload = (e) => {
-    const file = e.target.files[0];
-    if (file?.type !== 'application/pdf') return toast.error("Select a PDF");
-    setPendingFile(file);
-    setFileUrl(URL.createObjectURL(file));
-    setFileId('local_preview');
-    setTitle(file.name.replace('.pdf', ''));
-  };
-
-  const uploadToCloudinary = async () => {
-    const formData = new FormData();
-    formData.append('file', pendingFile);
-    formData.append('upload_preset', 'nextsign'); 
-    const res = await axios.post(`https://api.cloudinary.com/v1_1/dk9v5b3zj/raw/upload`, formData);
-    return { url: res.data.secure_url, id: res.data.public_id };
-  };
-
-  // 🚀 Payload লজিক ফিক্স (Update/Save dynamic)
-  const preparePayload = (overrides = {}) => ({
-    title: title || 'Untitled',
-    fileUrl: overrides.fileUrl || fileUrl,
-    fileId: overrides.fileId || fileId,
-    parties,
-    fields: fields.map(f => JSON.stringify(f)),
-    ccEmails,
-    senderMeta: { name: user?.full_name, email: user?.email },
-    ...overrides
-  });
-
-  const handleSave = async () => {
-    if (!fileUrl) return toast.error("Upload PDF first");
-    setSaving(true);
-    try {
-      let finalFile = { url: fileUrl, id: fileId };
-      if (fileId === 'local_preview') finalFile = await uploadToCloudinary();
-      
-      const payload = preparePayload({ fileUrl: finalFile.url, fileId: finalFile.id });
-      
-      if (initialDocId && initialDocId !== 'new') {
-        await api.put(`/documents/${initialDocId}`, payload);
-      } else {
-        await api.post('/documents/upload-metadata', payload);
+    if (!fileUrl) return;
+    const loadingTask = pdfjsLib.getDocument(fileUrl);
+    loadingTask.promise.then(async (pdf) => {
+      const renderedPages = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        renderedPages.push(page);
       }
-      
-      toast.success("Draft saved!");
-      navigate('/dashboard');
-    } catch (err) { toast.error("Save failed"); } finally { setSaving(false); }
-  };
+      setPages(renderedPages);
+    });
+  }, [fileUrl]);
 
-  const handleSend = async () => {
-    if (!fileUrl || parties.length === 0 || fields.length === 0) return toast.error("Complete all steps");
-    setSending(true);
-    try {
-      let finalFile = { url: fileUrl, id: fileId };
-      if (fileId === 'local_preview') finalFile = await uploadToCloudinary();
-      
-      await api.post('/documents/send', preparePayload({ 
-        id: initialDocId !== 'new' ? initialDocId : undefined,
-        fileUrl: finalFile.url, 
-        fileId: finalFile.id 
-      }));
-      toast.success("Sent!");
-      navigate('/dashboard');
-    } catch (err) { toast.error("Send failed"); } finally { setSending(false); }
+  // ১. নতুন ফিল্ড অ্যাড করা (Party Wise)
+  const handlePageClick = (e, pageNum) => {
+    if (!pendingFieldType) return;
+    if (e.target !== e.currentTarget) return; // ফিল্ডের ওপর ক্লিক করলে যেন নতুন ফিল্ড না বসে
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const newField = {
+      id: `f_${Date.now()}`,
+      type: pendingFieldType,
+      page: pageNum,
+      x: x - 5, 
+      y: y - 2,
+      width: 15,
+      height: 6,
+      partyIndex: selectedPartyIndex, // এখানে পার্টি সিলেক্ট হচ্ছে
+      value: ""
+    };
+
+    onFieldsChange([...fields, newField]);
+    onFieldPlaced();
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-8">
-      {/* Header Section */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(-1)}><ArrowLeft /></Button>
-          <Input 
-            value={title} 
-            onChange={e => setTitle(e.target.value)} 
-            className="text-xl font-bold border-none bg-transparent focus-visible:ring-0" 
-          />
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={handleSave} disabled={saving || sending}>
-            {saving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Draft
-          </Button>
-          <Button onClick={handleSend} disabled={sending || saving} className="bg-[#28ABDF] text-white hover:bg-[#1e8db8]">
-            {sending ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2" />} Send Now
-          </Button>
-        </div>
-      </div>
+    <div ref={containerRef} className="flex flex-col items-center p-6 gap-8 bg-slate-100 overflow-y-auto h-full">
+      {pages.map((page, idx) => (
+        <div 
+          key={idx} 
+          className="relative bg-white shadow-xl border border-slate-200"
+          onClick={(e) => handlePageClick(e, idx + 1)}
+          style={{ width: '800px', minHeight: '1100px' }}
+        >
+          <PageCanvas page={page} />
+          
+          {fields.filter(f => f.page === idx + 1).map((field) => (
+            <Rnd
+              key={field.id}
+              size={{ width: `${field.width}%`, height: `${field.height}%` }}
+              position={{ 
+                x: (field.x * 800) / 100, 
+                y: (field.y * 1100) / 100 
+              }}
+              // ২. ড্র্যাগিং ফিক্স
+              onDragStop={(e, d) => {
+                const newX = (d.x / 800) * 100;
+                const newY = (d.y / 1100) * 100;
+                onFieldsChange(fields.map(f => f.id === field.id ? { ...f, x: newX, y: newY } : f));
+              }}
+              // ৩. রিসাইজিং ফিক্স
+              onResizeStop={(e, direction, ref, delta, position) => {
+                onFieldsChange(fields.map(f => f.id === field.id ? { 
+                  ...f, 
+                  width: (parseInt(ref.style.width) / 800) * 100,
+                  height: (parseInt(ref.style.height) / 1100) * 100,
+                  x: (position.x / 800) * 100,
+                  y: (position.y / 1100) * 100
+                } : f));
+              }}
+              bounds="parent"
+              enableResizing={{ bottomRight: true }}
+            >
+              <div 
+                className="w-full h-full border-2 flex flex-col items-center justify-center rounded relative group transition-colors"
+                style={{ 
+                  borderColor: getPartyColor(field.partyIndex),
+                  backgroundColor: `${getPartyColor(field.partyIndex)}15`
+                }}
+              >
+                {/* ৪. সাইনারের নাম শো করা */}
+                <div 
+                  className="absolute -top-5 left-0 text-[9px] font-bold px-1 rounded text-white"
+                  style={{ backgroundColor: getPartyColor(field.partyIndex) }}
+                >
+                  {parties[field.partyIndex]?.name || `Signer ${field.partyIndex + 1}`}
+                </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Controls */}
-        <div className="w-full lg:w-80 space-y-6">
-          {/* আপনার আগের PDF আপলোড UI */}
-          {!fileUrl && (
-            <Card className="p-8 border-dashed border-2 text-center bg-slate-50/50">
-              <Upload className="mx-auto mb-4 text-slate-400" />
-              <label className="cursor-pointer bg-[#28ABDF] text-white px-4 py-2 rounded-lg font-medium inline-block hover:bg-[#1e8db8] transition-colors"> 
-                Select PDF
-                <input type="file" className="hidden" accept="application/pdf" onChange={handleLocalUpload} />
-              </label>
-            </Card>
-          )}
-
-          <Card className="p-5">
-            <PartyManager parties={parties} onChange={setParties} />
-          </Card>
-
-          {fileUrl && (
-            <Card className="p-5">
-              <FieldToolbar 
-                parties={parties} 
-                onAddField={(type, partyIdx) => {
-                  setPendingFieldType(type);
-                  setSelectedPartyIndex(partyIdx);
-                  toast.info(`Click on PDF to place ${type}`);
-                }} 
-              />
-            </Card>
-          )}
+                <span className="text-[10px] font-bold uppercase text-slate-700">{field.type}</span>
+                
+                {/* ৫. ডিলিট বাটন */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFieldsChange(fields.filter(f => f.id !== field.id));
+                  }}
+                  className="absolute -top-2 -right-2 bg-white border border-slate-200 text-red-500 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-50"
+                >
+                  <X size={10} />
+                </button>
+                <div className="absolute bottom-0 right-0 cursor-se-resize opacity-0 group-hover:opacity-100"><GripHorizontal size={10} className="rotate-45 text-slate-400" /></div>
+              </div>
+            </Rnd>
+          ))}
         </div>
-
-        {/* PDF Viewer Canvas */}
-        <div className="flex-1 min-h-[800px] bg-white border rounded-3xl overflow-hidden shadow-inner">
-          {fileUrl ? (
-            <PdfViewer 
-              fileUrl={fileUrl} 
-              fields={fields} 
-              onFieldsChange={setFields} 
-              parties={parties}
-              currentPage={currentPage}
-              onPageChange={setCurrentPage}
-              onTotalPagesChange={setTotalPages}
-              pendingFieldType={pendingFieldType}
-              selectedPartyIndex={selectedPartyIndex}
-              onFieldPlaced={() => setPendingFieldType(null)} 
-            />
-          ) : (
-            <div className="py-40 text-center text-slate-400 font-medium">
-              Upload a PDF to start adding fields
-            </div>
-          )}
-        </div>
-      </div>
+      ))}
     </div>
   );
+}
+
+function getPartyColor(index) {
+  const colors = ['#28ABDF', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+  return colors[index % colors.length];
+}
+
+function PageCanvas({ page }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    page.render({ canvasContext: context, viewport });
+  }, [page]);
+  return <canvas ref={canvasRef} className="w-full h-auto" />;
 }
