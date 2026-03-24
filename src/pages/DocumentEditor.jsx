@@ -1743,61 +1743,42 @@ export default function DocumentEditor() {
     toast.success('PDF loaded successfully');
   };
 
-const handleSend = async () => {
-  // ১. ডিবাগিং: কনসোলে চেক করুন ফাইলটি আসলে আছে কি না
-  console.log("Debug - rawFile status:", rawFile);
-  console.log("Debug - fileUrl status:", fileUrl);
+  const handleSend = async () => {
+    if (!rawFile && !fileUrl) return toast.error('Please upload a PDF file');
+    if (parties.length === 0) return toast.error('Please add at least one signer');
+    if (fields.length === 0) return toast.error('Please place signature fields');
 
-  // ২. কড়া ভ্যালিডেশন (মেসেজটি একটু আপডেট করা হয়েছে যাতে আপনি বুঝতে পারেন কোন ভেরিয়েবল খালি)
-  if (!rawFile && !fileUrl) {
-    return toast.error('PDF file state is empty. Please re-upload the file.');
-  }
-  if (parties.length === 0) return toast.error('Please add at least one signer');
-  if (fields.length === 0) return toast.error('Please place signature fields on the PDF');
-
-  setProcessing(true);
-  
-  try {
+    setProcessing(true);
     const formData = new FormData();
     
-    // ফাইল অ্যাপেন্ড করার আগে নিশ্চিত করা
     if (rawFile instanceof File) {
       formData.append('file', rawFile);
-    } else {
-      // যদি ফাইল না থাকে কিন্তু ইউআরএল থাকে (এডিট মোড)
-      formData.append('fileUrl', fileUrl);
     }
     
-    formData.append('title', title || 'Untitled Document');
+    formData.append('title', title || 'Untitled');
     formData.append('parties', JSON.stringify(parties));
     formData.append('ccEmails', JSON.stringify(ccEmails));
     formData.append('fields', JSON.stringify(fields)); 
     formData.append('totalPages', totalPages);
 
-    // ৩. Axios রিকোয়েস্ট উইথ টাইমআউট (Vercel এর জন্য ভালো)
-    const res = await api.post('/documents/upload-and-send', formData, {
-      headers: { 
-        'Content-Type': 'multipart/form-data' 
-      },
-      timeout: 30000 // ৩০ সেকেন্ড টাইমআউট
-    });
+    try {
+      // ✅ হেডার এখানে দেওয়ার দরকার নেই,ApiClient নিজে থেকে হ্যান্ডেল করবে
+      const res = await api.post('/documents/upload-and-send', formData);
 
-    if (res.data.success) {
-      toast.success('Document sent successfully!');
-      navigate('/dashboard');
+      if (res.data.success) {
+        toast.success('Document sent successfully!');
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error("Upload Error:", error.response?.data);
+      toast.error(error.response?.data?.error || 'Failed to send document');
+    } finally {
+      setProcessing(false);
     }
-  } catch (error) {
-    // ৪. ব্যাকএন্ডের আসল এররটি কনসোলে প্রিন্ট করুন
-    console.error("Backend Rejected Request:", error.response?.data);
-    const errorMsg = error.response?.data?.error || 'Server error: Failed to upload';
-    toast.error(errorMsg);
-  } finally {
-    setProcessing(false);
-  }
-};
+  };
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-8 animate-in fade-in duration-500">
+    <div className="max-w-[1400px] mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
