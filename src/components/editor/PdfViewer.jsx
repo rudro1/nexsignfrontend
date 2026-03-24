@@ -2865,9 +2865,10 @@ import * as pdfjsLib from 'pdfjs-dist';
 /** * ✅ PRODUCTION FIX: 
  * আমরা সরাসরি .mjs ফাইলটি লোড করছি। 
  * লক্ষ্য করুন: ফাইলের শেষে .min.mjs ব্যবহার করা হয়েছে।
- */
-const WORKER_URL = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs`;
-pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+//  */
+// const WORKER_URL = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs`;
+// pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
 export default function PdfViewer({
   fileUrl, fields, onFieldsChange, currentPage, onPageChange,
