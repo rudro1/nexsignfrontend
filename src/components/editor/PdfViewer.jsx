@@ -2866,7 +2866,7 @@ import * as pdfjsLib from 'pdfjs-dist';
  * আমরা সরাসরি .mjs ফাইলটি লোড করছি। 
  * লক্ষ্য করুন: ফাইলের শেষে .min.mjs ব্যবহার করা হয়েছে।
 //  */
-// const WORKER_URL = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs`;
+const WORKER_URL =` https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;;
 // pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
