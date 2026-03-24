@@ -1686,7 +1686,7 @@
 //   );
 // }
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -1700,9 +1700,13 @@ import PdfViewer from '@/components/editor/PdfViewer';
 
 export default function DocumentEditor() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   
-  const [docId, setDocId] = useState(new URLSearchParams(window.location.search).get('id'));
+  // URL থেকে আইডি পাওয়ার সঠিক উপায়
+  const queryParams = new URLSearchParams(location.search);
+  const [docId] = useState(queryParams.get('id'));
+  
   const [rawFile, setRawFile] = useState(null);
   const [title, setTitle] = useState('');
   const [fileUrl, setFileUrl] = useState('');
@@ -1716,17 +1720,25 @@ export default function DocumentEditor() {
   const [pendingFieldType, setPendingFieldType] = useState(null);
   const [processing, setProcessing] = useState(false);
 
+  // ১. ডাটা লোডিং ফিক্স (res.data.document চেক করা হয়েছে)
   useEffect(() => {
     if (docId && docId !== 'new') {
-      api.get(`/documents/${docId}`).then(res => {
-        const d = res.data;
-        setTitle(d.title || '');
-        setFileUrl(d.fileUrl || '');
-        setFileId(d.fileId || '');
-        setParties(d.parties || []);
-        setCcEmails(d.ccEmails || []);
-        setFields(d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || []);
-      }).catch(() => toast.error("Failed to load document"));
+      api.get(`/documents/${docId}`)
+        .then(res => {
+          // ব্যাকএন্ডে আমরা 'document' কি-তে ডাটা পাঠাচ্ছি
+          const d = res.data.document || res.data; 
+          setTitle(d.title || '');
+          setFileUrl(d.fileUrl || '');
+          setFileId(d.fileId || 'existing'); // আইডি থাকলে প্রিভিউ মোড অন হবে
+          setParties(d.parties || []);
+          setCcEmails(d.ccEmails || []);
+          // স্ট্রিং হিসেবে আসা ফিল্ডস পার্স করা
+          setFields(d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || []);
+        })
+        .catch((err) => {
+          console.error(err);
+          toast.error("Failed to load document");
+        });
     }
   }, [docId]);
 
@@ -1751,6 +1763,7 @@ export default function DocumentEditor() {
     setProcessing(true);
     const formData = new FormData();
     
+    // নতুন ফাইল হলে ফাইলে অ্যাড হবে
     if (rawFile instanceof File) {
       formData.append('file', rawFile);
     }
@@ -1762,7 +1775,7 @@ export default function DocumentEditor() {
     formData.append('totalPages', totalPages);
 
     try {
-      // ✅ হেডার এখানে দেওয়ার দরকার নেই,ApiClient নিজে থেকে হ্যান্ডেল করবে
+      // ব্যাকএন্ডের '/upload-and-send' রাউটে হিট করা
       const res = await api.post('/documents/upload-and-send', formData);
 
       if (res.data.success) {
@@ -1779,7 +1792,8 @@ export default function DocumentEditor() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -1798,18 +1812,19 @@ export default function DocumentEditor() {
           <Button 
             onClick={handleSend} 
             disabled={processing || !fileUrl} 
-            className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-lg transition-all active:scale-95"
+            className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-lg transition-all active:scale-95 w-full sm:w-auto"
           >
             {processing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />} 
-            Confirm & Send
+            {docId && docId !== 'new' ? 'Update & Send' : 'Confirm & Send'}
           </Button>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar Controls */}
         <div className="w-full lg:w-80 space-y-6">
           {!fileId && (
-            <Card className="p-10 border-dashed border-2 flex flex-col items-center text-center bg-slate-50 border-slate-200">
+            <Card className="p-10 border-dashed border-2 flex flex-col items-center text-center bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
               <Upload className="w-12 h-12 mb-4 text-slate-300" />
               <Button asChild variant="secondary" className="rounded-lg">
                 <label className="cursor-pointer"> Select PDF
@@ -1819,12 +1834,12 @@ export default function DocumentEditor() {
             </Card>
           )}
 
-          <Card className="p-5 shadow-sm border-slate-100 rounded-2xl"> 
+          <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl"> 
             <PartyManager parties={parties} onChange={setParties} /> 
           </Card>
 
-          <Card className="p-5 shadow-sm border-slate-100 rounded-2xl">
-            <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 text-sm">
+          <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+            <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 dark:text-slate-300 text-sm">
               <Mail size={16} className="text-[#28ABDF]" /> CC Recipients
             </div>
             <Input 
@@ -1836,7 +1851,7 @@ export default function DocumentEditor() {
           </Card>
 
           {fileId && (
-            <Card className="p-5 shadow-sm border-slate-100 rounded-2xl">
+            <Card className="p-5 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
               <FieldToolbar 
                 parties={parties} 
                 selectedPartyIndex={selectedPartyIndex} 
@@ -1847,7 +1862,8 @@ export default function DocumentEditor() {
           )}
         </div>
 
-        <div className="flex-1 bg-slate-50 rounded-3xl border border-slate-100 overflow-hidden min-h-[800px]">
+        {/* Viewer Section */}
+        <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[800px]">
           {fileId ? (
             <PdfViewer 
               fileUrl={fileUrl}

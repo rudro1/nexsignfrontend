@@ -189,6 +189,7 @@ import { useAuth } from '@/lib/AuthContext';
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, isAdmin, loading: authLoading } = useAuth();
+  
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [documents, setDocuments] = useState([]);
@@ -196,12 +197,14 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  
   const LIMIT = 6; 
 
   const fetchDocuments = useCallback(async (pageNum = 1, isInitial = false) => {
     try {
       if (isInitial) {
         setIsLoading(true);
+        // ক্যাশ থেকে ডাটা লোড করা (Optional কিন্তু ভালো UX দেয়)
         const cached = localStorage.getItem('nexsign_cache');
         if (cached) setDocuments(JSON.parse(cached));
       } else {
@@ -212,16 +215,16 @@ export default function Dashboard() {
         params: { page: pageNum, limit: LIMIT }
       });
 
-      // ব্যাকএন্ড ডাটা এক্সট্রাক্ট করা
-      const rawData = res.data.documents || (Array.isArray(res.data) ? res.data : []);
-      const serverHasMore = res.data.hasMore ?? rawData.length === LIMIT;
+      // ফিক্স: ব্যাকএন্ড থেকে আসা ডাটা স্ট্রাকচার চেক করা
+      const rawData = res.data.documents || [];
+      const serverHasMore = res.data.hasMore;
       
       if (isInitial) {
         setDocuments(rawData);
+        // প্রথম ৪টি ফাইল ক্যাশ করে রাখা
         localStorage.setItem('nexsign_cache', JSON.stringify(rawData.slice(0, 4)));
       } else {
         setDocuments(prev => {
-          // ডুপ্লিকেট এড়াতে আইডি চেক করে নতুন ডাটা অ্যাপেন্ড করা
           const existingIds = new Set(prev.map(d => d._id));
           const uniqueNewDocs = rawData.filter(d => !existingIds.has(d._id));
           return [...prev, ...uniqueNewDocs];
@@ -236,19 +239,25 @@ export default function Dashboard() {
     }
   }, []);
 
+  // ইউজার অথেন্টিকেশন চেক এবং প্রথমবার ডাটা লোড
   useEffect(() => {
     if (!authLoading) {
-      if (isAdmin) navigate('/admin', { replace: true });
-      else fetchDocuments(1, true);
+      if (isAdmin) {
+        navigate('/admin', { replace: true });
+      } else {
+        fetchDocuments(1, true);
+      }
     }
   }, [isAdmin, authLoading, navigate, fetchDocuments]);
 
+  // ফিক্স: লোড মোর ফাংশন
   const handleLoadMore = () => {
     const nextPage = page + 1;
-    setPage(nextPage);
-    fetchDocuments(nextPage, false);
+    setPage(nextPage); // স্টেট আপডেট
+    fetchDocuments(nextPage, false); // সরাসরি পরবর্তী পেজ কল করা
   };
 
+  // স্ট্যাটাস পরিসংখ্যান
   const stats = useMemo(() => ({
     total: documents.filter(d => !d.isTemplate).length,
     inProgress: documents.filter(d => d.status === 'in_progress' && !d.isTemplate).length,
@@ -256,11 +265,17 @@ export default function Dashboard() {
     templates: documents.filter(d => d.isTemplate === true).length,
   }), [documents]);
 
+  // ফিল্টারিং লজিক
   const filtered = useMemo(() => {
     return documents.filter(doc => {
-      const titleMatch = doc.title?.toLowerCase().includes(search.toLowerCase());
-      if (statusFilter === 'templates') return titleMatch && doc.isTemplate === true;
+      const titleMatch = (doc.title || '').toLowerCase().includes(search.toLowerCase());
+      
+      if (statusFilter === 'templates') {
+        return titleMatch && doc.isTemplate === true;
+      }
+      
       const statusMatch = statusFilter === 'all' || doc.status === statusFilter;
+      // ড্যাশবোর্ডে আমরা টেমপ্লেট ছাড়া বাকি ফাইল দেখাব যদি না টেমপ্লেট ট্যাব সিলেক্ট করা হয়
       return titleMatch && statusMatch && !doc.isTemplate;
     });
   }, [documents, search, statusFilter]);
@@ -269,20 +284,22 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             Welcome, {user?.full_name?.split(' ')[0] || 'User'} 👋
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Manage your documents efficiently.</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Manage your documents and signatures.</p>
         </div>
         <Link to="/DocumentEditor?id=new">
-          <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl gap-2 shadow-lg px-6 py-6 transition-all">
+          <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl gap-2 shadow-lg px-6 py-6 transition-all active:scale-95">
             <Plus className="w-5 h-5" /> New Document
           </Button>
         </Link>
       </div>
 
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatsCard label="Total Docs" value={stats.total} icon={FileText} color="sky" />
         <StatsCard label="Active" value={stats.inProgress} icon={Send} color="amber" />
@@ -290,6 +307,7 @@ export default function Dashboard() {
         <StatsCard label="Templates" value={stats.templates} icon={Layout} color="violet" />
       </div>
 
+      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center">
         <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -297,11 +315,11 @@ export default function Dashboard() {
             placeholder="Search documents..." 
             value={search} 
             onChange={e => setSearch(e.target.value)} 
-            className="pl-10 rounded-xl" 
+            className="pl-10 rounded-xl border-slate-200 focus:border-[#28ABDF] focus:ring-[#28ABDF]" 
           />
         </div>
         <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
-          <TabsList className="bg-slate-100 rounded-xl p-1">
+          <TabsList className="bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
             <TabsTrigger value="in_progress">Active</TabsTrigger>
@@ -310,25 +328,39 @@ export default function Dashboard() {
         </Tabs>
       </div>
 
+      {/* Documents Grid */}
       {isLoading && documents.length === 0 ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}
+          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-56 rounded-2xl" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+          <FileText className="w-12 h-12 mx-auto text-slate-300 mb-4" />
+          <p className="text-slate-500">No documents found matching your criteria.</p>
         </div>
       ) : (
         <>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map(doc => <DocumentCard key={doc._id} doc={doc} />)}
+            {filtered.map(doc => (
+              <DocumentCard key={doc._id} doc={doc} />
+            ))}
           </div>
+          
+          {/* Pagination Button */}
           {hasMore && (
             <div className="flex justify-center mt-12">
               <Button 
                 variant="outline" 
                 onClick={handleLoadMore} 
                 disabled={isFetchingMore} 
-                className="rounded-full border-[#28ABDF] text-[#28ABDF]"
+                className="rounded-full border-[#28ABDF] text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white px-8 transition-all"
               >
-                {isFetchingMore ? <Loader2 className="animate-spin mr-2" /> : <ChevronDown className="mr-2" />}
-                Load More
+                {isFetchingMore ? (
+                  <Loader2 className="animate-spin mr-2 w-4 h-4" />
+                ) : (
+                  <ChevronDown className="mr-2 w-4 h-4" />
+                )}
+                Load More Documents
               </Button>
             </div>
           )}

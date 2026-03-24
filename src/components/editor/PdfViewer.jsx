@@ -2854,17 +2854,14 @@
 //     </div>
 //   );
 // }
-
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
-// Worker URL (Version mismatch এড়াতে সরাসরি ডাইনামিক ইমপোর্ট ভালো)
+// Worker URL ফিক্স (Version mismatch এড়াতে)
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
-
-const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#6366f1', '#14b8a6'];
 
 export default function PdfViewer({
   fileUrl, fileId, fields, onFieldsChange, currentPage, onPageChange,
@@ -2878,12 +2875,13 @@ export default function PdfViewer({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
 
+  // বর্তমান পেইজের ফিল্ডগুলো আলাদা করা
   const currentPageFields = useMemo(() => 
     fields.filter(f => Number(f.page) === Number(currentPage)), 
     [fields, currentPage]
   );
 
-  // ১. PDF লোড করার লজিক (Proxy handling fixed)
+  // ১. PDF লোডিং লজিক (CORS Proxy handling updated)
   useEffect(() => {
     if (!fileUrl) return;
     let isCancelled = false;
@@ -2893,16 +2891,17 @@ export default function PdfViewer({
       try {
         let finalUrl = fileUrl;
         
-        // যদি Blob না হয়, তবে ব্যাকএন্ড প্রক্সি ব্যবহার করবে CORS এড়াতে
+        // CORS সমস্যা এড়াতে প্রক্সি ইউআরএল তৈরি
         if (!fileUrl.startsWith('blob:') && !fileUrl.startsWith('data:')) {
-          const cloudPath = fileUrl.split('upload/')[1];
-          finalUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${encodeURIComponent(cloudPath)}`;
+            // ক্লাউডিনারি ইউআরএল থেকে শুধু পাথ অংশটি নেওয়া
+            const parts = fileUrl.split('/upload/');
+            const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
+            finalUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
         }
 
         const loadingTask = pdfjsLib.getDocument({ 
           url: finalUrl, 
-          withCredentials: false,
-          ignoreEncryption: true 
+          withCredentials: false
         });
         
         const doc = await loadingTask.promise;
@@ -2921,16 +2920,21 @@ export default function PdfViewer({
     return () => { isCancelled = true; };
   }, [fileUrl, onTotalPagesChange]);
 
-  // ২. রেন্ডারিং লজিক (Resize support added)
+  // ২. রেন্ডারিং লজিক (Canvas Scaling ফিক্স)
   const renderPage = useCallback(async () => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
     
-    if (renderTaskRef.current) renderTaskRef.current.cancel();
+    // আগের রেন্ডার টাস্ক ক্যানসেল করা (Memory leak এড়াতে)
+    if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+    }
     
     try {
       const page = await pdfDoc.getPage(currentPage);
-      const containerWidth = containerRef.current.clientWidth - 48; // Padding বাদ দিয়ে
-      const viewport = page.getViewport({ scale: containerWidth / page.getViewport({ scale: 1 }).width });
+      const containerWidth = containerRef.current.clientWidth - 40; 
+      const originalViewport = page.getViewport({ scale: 1 });
+      const scale = containerWidth / originalViewport.width;
+      const viewport = page.getViewport({ scale });
 
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d', { alpha: false });
@@ -2939,7 +2943,8 @@ export default function PdfViewer({
       canvas.height = viewport.height;
       setCanvasSize({ width: viewport.width, height: viewport.height });
 
-      renderTaskRef.current = page.render({ canvasContext: context, viewport });
+      const renderContext = { canvasContext: context, viewport };
+      renderTaskRef.current = page.render(renderContext);
       await renderTaskRef.current.promise;
     } catch (err) { 
       if (err.name !== 'RenderingCancelledException') console.error(err);
@@ -2952,16 +2957,16 @@ export default function PdfViewer({
     return () => window.removeEventListener('resize', renderPage);
   }, [renderPage]);
 
-  // ৩. ফিল্ড প্লেসমেন্ট (Z-index conflict fixed)
+  // ৩. ফিল্ড প্লেসমেন্ট (Percentage calculation improved)
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading) return;
     
-    // শুধুমাত্র ক্যানভাসে ক্লিক করলে ফিল্ড বসবে, Rnd এর ওপর নয়
+    // চেক করা হচ্ছে ক্লিকটি ক্যানভাসের ওপর কি না
     if (!e.target.classList.contains('pdf-canvas')) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const fW = pendingFieldType === 'signature' ? 20 : 15;
-    const fH = pendingFieldType === 'signature' ? 8 : 5;
+    const fW = pendingFieldType === 'signature' ? 20 : 15; // Initial width in %
+    const fH = pendingFieldType === 'signature' ? 8 : 5;  // Initial height in %
 
     const xPos = ((e.clientX - rect.left) / canvasSize.width) * 100 - (fW / 2);
     const yPos = ((e.clientY - rect.top) / canvasSize.height) * 100 - (fH / 2);
@@ -2972,8 +2977,10 @@ export default function PdfViewer({
       page: currentPage,
       x: Number(Math.max(0, Math.min(100 - fW, xPos)).toFixed(4)),
       y: Number(Math.max(0, Math.min(100 - fH, yPos)).toFixed(4)),
-      width: fW, height: fH,
-      partyIndex: Number(selectedPartyIndex)
+      width: fW, 
+      height: fH,
+      partyIndex: Number(selectedPartyIndex),
+      value: '' // পরে সাইন করার জন্য
     };
 
     onFieldsChange([...fields, newField]);
@@ -2981,43 +2988,44 @@ export default function PdfViewer({
   };
 
   return (
-    <div ref={containerRef} className="flex-1 w-full flex flex-col items-center bg-slate-100 p-4 min-h-screen overflow-y-auto">
-      {/* Page Control */}
+    <div ref={containerRef} className="flex-1 w-full flex flex-col items-center bg-slate-100 p-4 min-h-[800px] overflow-y-auto">
+      {/* Pagination Bar */}
       {pdfDoc && (
-        <div className="flex items-center gap-4 mb-4 sticky top-0 z-30 bg-white/80 backdrop-blur p-2 rounded-full shadow-lg border">
-          <Button variant="ghost" size="icon" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
+        <div className="flex items-center gap-4 mb-4 sticky top-0 z-30 bg-white/90 backdrop-blur p-2 rounded-full shadow-md border border-slate-200">
+          <Button variant="ghost" size="icon" className="rounded-full" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
             <ChevronLeft className="w-5 h-5" />
           </Button>
-          <span className="text-sm font-bold w-20 text-center">Page {currentPage} / {pdfDoc.numPages}</span>
-          <Button variant="ghost" size="icon" disabled={currentPage >= pdfDoc.numPages} onClick={() => onPageChange(currentPage + 1)}>
+          <span className="text-xs font-bold px-4">PAGE {currentPage} OF {pdfDoc.numPages}</span>
+          <Button variant="ghost" size="icon" className="rounded-full" disabled={currentPage >= pdfDoc.numPages} onClick={() => onPageChange(currentPage + 1)}>
             <ChevronRight className="w-5 h-5" />
           </Button>
         </div>
       )}
 
-      {/* Main Canvas Area */}
+      {/* Canvas Wrapper */}
       <div 
-        className="relative bg-white shadow-2xl rounded-sm"
+        className="relative bg-white shadow-xl border border-slate-200 overflow-hidden"
         style={{ width: canvasSize.width || '100%', height: canvasSize.height || '800px' }}
         onClick={handleContainerClick}
       >
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-50">
-            <Loader2 className="w-8 h-8 animate-spin text-sky-500" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50">
+            <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF] mb-2" />
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">Loading PDF...</p>
           </div>
         )}
 
-        <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair mx-auto" />
+        <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner" />
 
-        {/* Fields Overlay */}
+        {/* Dynamic Fields */}
         {currentPageFields.map((field) => {
-          const party = parties[field.partyIndex] || { name: 'Signer', color: '#000' };
+          const party = parties[field.partyIndex] || { name: 'Signer', color: '#28ABDF' };
           return (
             <Rnd
               key={field.id}
               size={{ 
-                width: (field.width / 100) * canvasSize.width, 
-                height: (field.height / 100) * canvasSize.height 
+                width: `${field.width}%`, 
+                height: `${field.height}%` 
               }}
               position={{ 
                 x: (field.x / 100) * canvasSize.width, 
@@ -3026,17 +3034,17 @@ export default function PdfViewer({
               onDragStop={(e, d) => {
                 onFieldsChange(fields.map(f => f.id === field.id ? { 
                   ...f, 
-                  x: (d.x / canvasSize.width) * 100, 
-                  y: (d.y / canvasSize.height) * 100 
+                  x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
+                  y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
                 } : f));
               }}
               onResizeStop={(e, dir, ref, delta, pos) => {
                 onFieldsChange(fields.map(f => f.id === field.id ? { 
                   ...f, 
-                  width: (parseFloat(ref.style.width) / canvasSize.width) * 100, 
-                  height: (parseFloat(ref.style.height) / canvasSize.height) * 100,
-                  x: (pos.x / canvasSize.width) * 100,
-                  y: (pos.y / canvasSize.height) * 100
+                  width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)), 
+                  height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)),
+                  x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)),
+                  y: Number(((pos.y / canvasSize.height) * 100).toFixed(4))
                 } : f));
               }}
               bounds="parent"
@@ -3045,25 +3053,25 @@ export default function PdfViewer({
               className="z-20"
             >
               <div 
-                className="w-full h-full border-2 border-dashed flex items-center justify-center relative group"
-                style={{ borderColor: party.color, backgroundColor: `${party.color}20` }}
+                className="w-full h-full border-2 border-dashed flex items-center justify-center relative group backdrop-blur-[1px]"
+                style={{ borderColor: party.color, backgroundColor: `${party.color}15` }}
               >
-                <span className="text-[10px] font-bold uppercase truncate px-1" style={{ color: party.color }}>
-                  {field.type} - {party.name}
-                </span>
+                <div className="text-[9px] font-black uppercase text-center pointer-events-none select-none" style={{ color: party.color }}>
+                  {field.type}<br/>{party.name}
+                </div>
+
                 {!readOnly && (
                   <button 
-  type="button" 
-  onClick={(e) => {
-    e.stopPropagation(); // ক্যানভাসে ক্লিক যাওয়া আটকাবে
-    e.preventDefault();
-    onFieldsChange(fields.filter(f => f.id !== field.id));
-  }}
-  onMouseDown={(e) => e.stopPropagation()} // ড্র্যাগ শুরু হওয়া আটকাবে
-  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-110 z-50"
->
-  <Trash2 size={12} />
-</button>
+                    type="button" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFieldsChange(fields.filter(f => f.id !== field.id));
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-md transition-all hover:scale-125 z-50"
+                  >
+                    <Trash2 size={10} />
+                  </button>
                 )}
               </div>
             </Rnd>
