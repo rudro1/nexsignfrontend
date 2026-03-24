@@ -145,16 +145,21 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+    
+    // ১. টোকেন থাকলে সেটি হেডার-এ সেট করা
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // ✅ FormData থাকলে ব্রাউজারকে বাউন্ডারি সেট করতে দিন
+    // ২. Content-Type হ্যান্ডলিং (CORS ফ্রেন্ডলি)
     if (config.data instanceof FormData) {
+      // FormData হলে হেডার ডিলিট করা জরুরি যাতে ব্রাউজার সঠিক boundary সেট করতে পারে
       delete config.headers['Content-Type'];
-    } else {
+    } else if (!config.headers['Content-Type']) {
+      // শুধু ডাটা থাকলে ডিফল্ট JSON সেট করা
       config.headers['Content-Type'] = 'application/json';
     }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -163,9 +168,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // ৩. নেটওয়ার্ক এরর বা টাইমআউট হ্যান্ডলিং
+    if (!error.response) {
+      console.error("Network Error: Please check your backend CORS settings or Internet.");
+    }
+
+    // ৪. অথেন্টিকেশন এরর (Expired Token)
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login?expired=true';
+      const isLoginPage = window.location.pathname === '/login';
+      if (!isLoginPage) {
+        localStorage.removeItem('token');
+        // ইউজার যেন বারবার রিডাইরেক্ট না হয় তাই চেক করা
+        window.location.href = '/login?expired=true';
+      }
     }
     return Promise.reject(error);
   }
