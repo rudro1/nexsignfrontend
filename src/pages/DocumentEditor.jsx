@@ -1685,226 +1685,18 @@
 //     </div>
 //   );
 // }
-
-// import React, { useState, useEffect } from 'react';
-// import { useNavigate } from 'react-router-dom';
-// import { api } from '@/api/apiClient';
-// import { useAuth } from '@/lib/AuthContext';
-// import { Button } from '@/components/ui/button';
-// import { Input } from '@/components/ui/input';
-// import { Card } from '@/components/ui/card';
-// import { toast } from 'sonner';
-// import { Upload, Save, Send, ArrowLeft, FileText, Loader2, AlertCircle } from 'lucide-react';
-// import PartyManager from '@/components/editor/PartyManager';
-// import FieldToolbar from '@/components/editor/FieldToolbar';
-// import PdfViewer from '@/components/editor/PdfViewer';
-
-// export default function DocumentEditor() {
-//   const navigate = useNavigate();
-//   const { user } = useAuth();
-//   const urlParams = new URLSearchParams(window.location.search);
-//   const initialDocId = urlParams.get('id');
-
-//   const [docId, setDocId] = useState(initialDocId);
-//   const [doc, setDoc] = useState(null);
-//   const [title, setTitle] = useState('');
-//   const [fileUrl, setFileUrl] = useState('');
-//   const [fileId, setFileId] = useState(''); 
-//   const [parties, setParties] = useState([]);
-//   const [fields, setFields] = useState([]);
-//   const [currentPage, setCurrentPage] = useState(1);
-//   const [totalPages, setTotalPages] = useState(1);
-//   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
-//   const [pendingFieldType, setPendingFieldType] = useState(null);
-//   const [uploading, setUploading] = useState(false);
-//   const [saving, setSaving] = useState(false);
-//   const [sending, setSending] = useState(false);
-
-//   useEffect(() => {
-//     const init = async () => {
-//       if (docId) {
-//         try {
-//           const res = await api.get(`/documents/${docId}`);
-//           const d = res.data;
-//           if (d) {
-//             setDoc(d);
-//             setTitle(d.title || '');
-//             setFileUrl(d.fileUrl || '');
-//             setFileId(d.fileId || ''); 
-//             setParties(d.parties || []);
-//             setFields(d.fields || []);
-//             setTotalPages(d.totalPages || 1);
-//           }
-//         } catch (error) { toast.error("Failed to load document"); }
-//       }
-//     };
-//     init();
-//   }, [docId]);
-
-//   const handleUpload = async (e) => {
-//     const file = e.target.files[0];
-//     if (!file || file.type !== 'application/pdf') {
-//       toast.error('Please upload a valid PDF file');
-//       return;
-//     }
-//     setUploading(true);
-//     const formData = new FormData();
-//     formData.append('file', file);
-//     try {
-//       const res = await api.post('/documents/upload', formData, {
-//         headers: { 'Content-Type': 'multipart/form-data' }
-//       });
-//       const data = res.data;
-//       if (data.fileId || data._id) {
-//         const newId = data._id || data.id;
-//         setDocId(newId);
-//         setFileUrl(data.fileUrl);
-//         setFileId(data.fileId);
-//         setTitle(file.name.replace('.pdf', ''));
-//         setDoc(data);
-//         const newUrl = `${window.location.pathname}?id=${newId}`;
-//         window.history.replaceState(null, '', newUrl);
-//         toast.success('Document uploaded');
-//       }
-//     } catch (error) { toast.error('Upload failed'); } finally { setUploading(false); }
-//   };
-
-//   const handleSave = async () => {
-//     if (!docId) return toast.error('Upload a document first');
-//     setSaving(true);
-//     try {
-//       await api.put(`/documents/${docId}`, { 
-//         title, 
-//         fileUrl, 
-//         fileId, 
-//         parties, 
-//         fields, 
-//         totalPages 
-//       });
-//       toast.success('Draft updated');
-//     } catch (error) { 
-//       toast.error('Failed to save'); 
-//     } finally { 
-//       setSaving(false); 
-//     }
-//   };
-
-//   const handleSend = async () => {
-//     if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
-//       return toast.error('Please add parties and fields first');
-//     }
-//     setSending(true);
-//     try {
-//       // সেভ এবং সেন্ড একসাথেই হবে
-//       await api.put(`/documents/${docId}`, { title, parties, fields, totalPages });
-      
-//       const res = await api.post('/documents/send', { id: docId });
-//       if (res.data.success) {
-//         toast.success('Document sent!');
-//         navigate('/dashboard');
-//       }
-//     } catch (error) { 
-//       const errorMsg = error.response?.data?.error || 'Failed to send';
-//       toast.error(errorMsg); 
-//     } finally { 
-//       setSending(false); 
-//     }
-//   };
-
-//   const isEditable = !doc || doc.status === 'draft';
-
-//   return (
-//     <div className="max-w-[1400px] mx-auto px-4 py-8">
-//       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
-//         <div className="flex items-center gap-4 w-full sm:w-auto">
-//           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
-//             <ArrowLeft className="w-5 h-5" />
-//           </Button>
-//           <Input 
-//             value={title} 
-//             onChange={e => setTitle(e.target.value)} 
-//             placeholder="Document title" 
-//             className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent" 
-//             disabled={!isEditable} 
-//           />
-//         </div>
-//         <div className="flex gap-3 w-full sm:w-auto">
-//           <Button variant="outline" onClick={handleSave} disabled={saving || uploading} className="rounded-xl flex-1 sm:flex-none">
-//             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save
-//           </Button>
-//           <Button onClick={handleSend} disabled={sending || uploading} className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl flex-1 sm:flex-none">
-//             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
-//           </Button>
-//         </div>
-//       </div>
-
-//       <div className="flex flex-col lg:flex-row gap-8">
-//         <div className="w-full lg:w-80 space-y-6">
-//           {!fileId && (
-//             <Card className="p-8 border-dashed border-2 flex flex-col items-center text-center">
-//               <Upload className={`w-12 h-12 mb-4 ${uploading ? 'animate-bounce text-sky-500' : 'text-slate-300'}`} />
-//               <Button asChild variant="secondary" disabled={uploading}>
-//                 <label className="cursor-pointer"> {uploading ? 'Uploading...' : 'Select File'}
-//                   <input type="file" className="hidden" accept="application/pdf" onChange={handleUpload} />
-//                 </label>
-//               </Button>
-//             </Card>
-//           )}
-//           <Card className="p-5 shadow-sm"> 
-//             <PartyManager parties={parties} onChange={setParties} /> 
-//           </Card>
-//           {fileId && (
-//             <Card className="p-5 shadow-sm">
-//               <FieldToolbar 
-//                 parties={parties} 
-//                 selectedPartyIndex={selectedPartyIndex} 
-//                 onPartySelect={setSelectedPartyIndex} 
-//                 onAddField={(type) => setPendingFieldType(type)} 
-//               />
-//               {pendingFieldType && <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">Click on PDF to place {pendingFieldType}</div>}
-//             </Card>
-//           )}
-//         </div>
-
-//         <div className="flex-1">
-//           {fileId ? (
-//             <PdfViewer 
-//               fileId={fileId} 
-//               fields={fields} 
-//               onFieldsChange={setFields} 
-//               currentPage={currentPage} 
-//               onPageChange={setCurrentPage} 
-//               totalPages={totalPages} 
-//               onTotalPagesChange={setTotalPages} 
-//               pendingFieldType={pendingFieldType} 
-//               selectedPartyIndex={selectedPartyIndex} 
-//               parties={parties} 
-//               onFieldPlaced={() => setPendingFieldType(null)} 
-//               readOnly={!isEditable} 
-//             />
-//           ) : (
-//             <div className="h-[600px] bg-slate-50 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-slate-400">
-//               <FileText className="w-20 h-20 mb-4 opacity-10" /> <p>No document uploaded yet</p>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Upload, Save, Send, ArrowLeft, Loader2 } from 'lucide-react';
+import { Upload, Save, Send, ArrowLeft, FileText, Loader2, Mail } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer from '@/components/editor/PdfViewer';
-import axios from 'axios';
 
 export default function DocumentEditor() {
   const navigate = useNavigate();
@@ -1912,177 +1704,184 @@ export default function DocumentEditor() {
   const urlParams = new URLSearchParams(window.location.search);
   const initialDocId = urlParams.get('id');
 
+  const [docId, setDocId] = useState(initialDocId);
+  const [doc, setDoc] = useState(null);
   const [title, setTitle] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [fileId, setFileId] = useState(''); 
   const [parties, setParties] = useState([]);
   const [fields, setFields] = useState([]);
-  const [ccEmails, setCcEmails] = useState([]);
+  const [ccEmails, setCcEmails] = useState([]); // 🌟 CC স্টেট
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
+  const [pendingFieldType, setPendingFieldType] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
-  const [pendingFile, setPendingFile] = useState(null);
 
-  const [pendingFieldType, setPendingFieldType] = useState(null);
-  const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-
-  // 🚀 ডাটা লোড লজিক ফিক্স (JSON parse handling)
   useEffect(() => {
-    if (initialDocId && initialDocId !== 'new') {
-      api.get(`/documents/${initialDocId}`).then(res => {
-        const d = res.data;
-        setTitle(d.title || '');
-        setFileUrl(d.fileUrl || '');
-        setFileId(d.fileId || ''); 
-        setParties(d.parties || []);
-        setCcEmails(d.ccEmails || []);
-        if (d.fields) {
-          const parsed = d.fields.map(f => typeof f === 'string' ? JSON.parse(f) : f);
-          setFields(parsed);
-        }
-      }).catch(() => toast.error("Error loading document"));
-    }
-  }, [initialDocId]);
+    const init = async () => {
+      if (docId && docId !== 'new') {
+        try {
+          const res = await api.get(`/documents/${docId}`);
+          const d = res.data;
+          if (d) {
+            setDoc(d);
+            setTitle(d.title || '');
+            setFileUrl(d.fileUrl || '');
+            setFileId(d.fileId || ''); 
+            setParties(d.parties || []);
+            setCcEmails(d.ccEmails || []); // 🌟 CC লোড করা
+            // 🌟 ফিল্ডগুলো যদি স্ট্রিং হিসেবে আসে তবে পার্স করা
+            const parsedFields = d.fields?.map(f => typeof f === 'string' ? JSON.parse(f) : f) || [];
+            setFields(parsedFields);
+            setTotalPages(d.totalPages || 1);
+          }
+        } catch (error) { toast.error("Failed to load document"); }
+      }
+    };
+    init();
+  }, [docId]);
 
-  const handleLocalUpload = (e) => {
+  const handleUpload = async (e) => {
     const file = e.target.files[0];
-    if (file?.type !== 'application/pdf') return toast.error("Select a PDF");
-    setPendingFile(file);
-    setFileUrl(URL.createObjectURL(file));
-    setFileId('local_preview');
-    setTitle(file.name.replace('.pdf', ''));
-  };
-
-  const uploadToCloudinary = async () => {
+    if (!file || file.type !== 'application/pdf') {
+      toast.error('Please upload a valid PDF file');
+      return;
+    }
+    setUploading(true);
     const formData = new FormData();
-    formData.append('file', pendingFile);
-    formData.append('upload_preset', 'nextsign'); 
-    const res = await axios.post(`https://api.cloudinary.com/v1_1/dk9v5b3zj/raw/upload`, formData);
-    return { url: res.data.secure_url, id: res.data.public_id };
+    formData.append('file', file);
+    try {
+      const res = await api.post('/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const data = res.data;
+      const newId = data._id || data.id;
+      setDocId(newId);
+      setFileUrl(data.fileUrl);
+      setFileId(data.fileId);
+      setTitle(file.name.replace('.pdf', ''));
+      setDoc(data);
+      window.history.replaceState(null, '', `${window.location.pathname}?id=${newId}`);
+      toast.success('Document uploaded');
+    } catch (error) { toast.error('Upload failed'); } finally { setUploading(false); }
   };
-
-  // 🚀 Payload লজিক ফিক্স (Update/Save dynamic)
-  const preparePayload = (overrides = {}) => ({
-    title: title || 'Untitled',
-    fileUrl: overrides.fileUrl || fileUrl,
-    fileId: overrides.fileId || fileId,
-    parties,
-    fields: fields.map(f => JSON.stringify(f)),
-    ccEmails,
-    senderMeta: { name: user?.full_name, email: user?.email },
-    ...overrides
-  });
 
   const handleSave = async () => {
-    if (!fileUrl) return toast.error("Upload PDF first");
+    if (!docId) return toast.error('Upload a document first');
     setSaving(true);
     try {
-      let finalFile = { url: fileUrl, id: fileId };
-      if (fileId === 'local_preview') finalFile = await uploadToCloudinary();
-      
-      const payload = preparePayload({ fileUrl: finalFile.url, fileId: finalFile.id });
-      
-      if (initialDocId && initialDocId !== 'new') {
-        await api.put(`/documents/${initialDocId}`, payload);
-      } else {
-        await api.post('/documents/upload-metadata', payload);
-      }
-      
-      toast.success("Draft saved!");
-      navigate('/dashboard');
-    } catch (err) { toast.error("Save failed"); } finally { setSaving(false); }
+      await api.put(`/documents/${docId}`, { 
+        title, fileUrl, fileId, parties, ccEmails, totalPages,
+        fields: fields.map(f => JSON.stringify(f)) // 🌟 সেভ করার সময় স্ট্রিং করা নিরাপদ
+      });
+      toast.success('Draft updated');
+    } catch (error) { toast.error('Failed to save'); } finally { setSaving(false); }
   };
 
   const handleSend = async () => {
-    if (!fileUrl || parties.length === 0 || fields.length === 0) return toast.error("Complete all steps");
+    if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
+      return toast.error('Please add parties and fields first');
+    }
     setSending(true);
     try {
-      let finalFile = { url: fileUrl, id: fileId };
-      if (fileId === 'local_preview') finalFile = await uploadToCloudinary();
-      
-      await api.post('/documents/send', preparePayload({ 
-        id: initialDocId !== 'new' ? initialDocId : undefined,
-        fileUrl: finalFile.url, 
-        fileId: finalFile.id 
-      }));
-      toast.success("Sent!");
-      navigate('/dashboard');
-    } catch (err) { toast.error("Send failed"); } finally { setSending(false); }
+      // সেভ এবং সেন্ড
+      await api.put(`/documents/${docId}`, { 
+        title, parties, ccEmails, totalPages, 
+        fields: fields.map(f => JSON.stringify(f)) 
+      });
+      const res = await api.post('/documents/send', { id: docId });
+      if (res.data.success) {
+        toast.success('Document sent!');
+        navigate('/dashboard');
+      }
+    } catch (error) { toast.error(error.response?.data?.error || 'Failed to send'); } finally { setSending(false); }
   };
+
+  const isEditable = !doc || doc.status === 'draft';
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8">
-      {/* Header Section */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(-1)}><ArrowLeft /></Button>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           <Input 
             value={title} 
             onChange={e => setTitle(e.target.value)} 
-            className="text-xl font-bold border-none bg-transparent focus-visible:ring-0" 
+            className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent" 
+            disabled={!isEditable} 
           />
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={handleSave} disabled={saving || sending}>
-            {saving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Draft
+        <div className="flex gap-3 w-full sm:w-auto">
+          <Button variant="outline" onClick={handleSave} disabled={saving || uploading} className="rounded-xl flex-1">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save
           </Button>
-          <Button onClick={handleSend} disabled={sending || saving} className="bg-[#28ABDF] text-white hover:bg-[#1e8db8]">
-            {sending ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2" />} Send Now
+          <Button onClick={handleSend} disabled={sending || uploading} className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl flex-1">
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
           </Button>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Controls */}
         <div className="w-full lg:w-80 space-y-6">
-          {/* আপনার আগের PDF আপলোড UI */}
-          {!fileUrl && (
-            <Card className="p-8 border-dashed border-2 text-center bg-slate-50/50">
-              <Upload className="mx-auto mb-4 text-slate-400" />
-              <label className="cursor-pointer bg-[#28ABDF] text-white px-4 py-2 rounded-lg font-medium inline-block hover:bg-[#1e8db8] transition-colors"> 
-                Select PDF
-                <input type="file" className="hidden" accept="application/pdf" onChange={handleLocalUpload} />
-              </label>
+          {!fileId && (
+            <Card className="p-8 border-dashed border-2 flex flex-col items-center text-center">
+              <Upload className={`w-12 h-12 mb-4 ${uploading ? 'animate-bounce text-sky-500' : 'text-slate-300'}`} />
+              <Button asChild variant="secondary" disabled={uploading}>
+                <label className="cursor-pointer"> {uploading ? 'Uploading...' : 'Select File'}
+                  <input type="file" className="hidden" accept="application/pdf" onChange={handleUpload} />
+                </label>
+              </Button>
             </Card>
           )}
 
-          <Card className="p-5">
-            <PartyManager parties={parties} onChange={setParties} />
+          <Card className="p-5 shadow-sm"> 
+            <PartyManager parties={parties} onChange={setParties} /> 
           </Card>
 
-          {fileUrl && (
-            <Card className="p-5">
+          {/* 🌟 CC Recipients Section */}
+          <Card className="p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 text-sm">
+              <Mail size={16} className="text-sky-500" /> CC Recipients
+            </div>
+            <Input 
+              placeholder="Email1, Email2..." 
+              value={ccEmails.join(', ')} 
+              onChange={(e) => setCcEmails(e.target.value.split(',').map(email => email.trim()).filter(Boolean))}
+              className="text-xs"
+            />
+          </Card>
+
+          {fileId && (
+            <Card className="p-5 shadow-sm">
               <FieldToolbar 
                 parties={parties} 
-                onAddField={(type, partyIdx) => {
-                  setPendingFieldType(type);
-                  setSelectedPartyIndex(partyIdx);
-                  toast.info(`Click on PDF to place ${type}`);
-                }} 
+                selectedPartyIndex={selectedPartyIndex} 
+                onPartySelect={setSelectedPartyIndex} 
+                onAddField={(type) => setPendingFieldType(type)} 
               />
             </Card>
           )}
         </div>
 
-        {/* PDF Viewer Canvas */}
-        <div className="flex-1 min-h-[800px] bg-white border rounded-3xl overflow-hidden shadow-inner">
-          {fileUrl ? (
+        <div className="flex-1">
+          {fileId ? (
             <PdfViewer 
-              fileUrl={fileUrl} 
-              fields={fields} 
-              onFieldsChange={setFields} 
-              parties={parties}
-              currentPage={currentPage}
-              onPageChange={setCurrentPage}
-              onTotalPagesChange={setTotalPages}
-              pendingFieldType={pendingFieldType}
-              selectedPartyIndex={selectedPartyIndex}
-              onFieldPlaced={() => setPendingFieldType(null)} 
+              fileId={fileId} fields={fields} onFieldsChange={setFields} 
+              currentPage={currentPage} onPageChange={setCurrentPage} 
+              totalPages={totalPages} onTotalPagesChange={setTotalPages} 
+              pendingFieldType={pendingFieldType} selectedPartyIndex={selectedPartyIndex} 
+              parties={parties} onFieldPlaced={() => setPendingFieldType(null)} 
+              readOnly={!isEditable} 
             />
           ) : (
-            <div className="py-40 text-center text-slate-400 font-medium">
-              Upload a PDF to start adding fields
+            <div className="h-[600px] bg-slate-50 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-slate-400">
+              <FileText className="w-20 h-20 mb-4 opacity-10" /> <p>No document uploaded yet</p>
             </div>
           )}
         </div>
