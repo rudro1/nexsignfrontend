@@ -2860,8 +2860,11 @@ import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
-// ✅ PDF Worker Fix: সরাসরি node_modules থেকে ওয়ার্কার লোড করা (Vite compatible)
-// এটি 404 (Not Found) এরর সমাধান করবে
+/**
+ * ✅ PRODUCTION FIX: 
+ * External CDN (cdnjs/unpkg) অনেক সময় ৪MD এরর দেয়। 
+ * তাই সরাসরি প্রজেক্টের অ্যাসেট থেকে ওয়ার্কার লোড করা হচ্ছে।
+ */
 import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -2877,12 +2880,13 @@ export default function PdfViewer({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
 
+  // মেমোরি অপ্টিমাইজেশনের জন্য ফিল্টার করা ফিল্ডস
   const currentPageFields = useMemo(() => 
     fields.filter(f => Number(f.page) === Number(currentPage)), 
     [fields, currentPage]
   );
 
-  // ১. PDF লোডিং লজিক
+  // ১. PDF লোডিং এবং প্রক্সি লজিক
   useEffect(() => {
     if (!fileUrl) return;
     let isCancelled = false;
@@ -2892,16 +2896,16 @@ export default function PdfViewer({
       try {
         let finalUrl = fileUrl;
         
-        // Proxy logic for Cloudinary/External URLs
+        // Cloudinary এবং CORS সমস্যা এড়াতে প্রক্সি ব্যবহার
         if (!fileUrl.startsWith('blob:') && !fileUrl.startsWith('data:')) {
           const parts = fileUrl.split('/upload/');
           const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
-          // আপনার ব্যাকএন্ড প্রক্সি রুট
+          // আপনার ব্যাকএন্ডের সঠিক প্রক্সি ইউআরএল
           finalUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${cloudPath.replace(/\//g, '_')}`;
         }
 
         const loadingTask = pdfjsLib.getDocument({ 
-          url: finalUrl, 
+          url: finalUrl,
           withCredentials: false,
           disableAutoFetch: false,
           disableStream: false
@@ -2913,7 +2917,7 @@ export default function PdfViewer({
           onTotalPagesChange?.(doc.numPages);
         }
       } catch (err) { 
-        console.error("PDF Load Error:", err); 
+        console.error("PDF Production Load Error:", err.message); 
       } finally { 
         if (!isCancelled) setLoading(false); 
       }
@@ -2923,11 +2927,11 @@ export default function PdfViewer({
     return () => { isCancelled = true; };
   }, [fileUrl, onTotalPagesChange]);
 
-  // ২. রেন্ডারিং লজিক (Responsive Scaling)
+  // ২. হাই-রেজোলিউশন রেন্ডারিং লজিক
   const renderPage = useCallback(async () => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
     
-    // আগের রেন্ডারিং টাস্ক থাকলে ক্যানসেল করা
+    // আগের রেন্ডারিং প্রসেস থাকলে ক্লিন করা (মেমোরি লিক রোধে)
     if (renderTaskRef.current) {
         renderTaskRef.current.cancel();
     }
@@ -2937,6 +2941,8 @@ export default function PdfViewer({
       const containerWidth = containerRef.current.clientWidth - 40; 
       const originalViewport = page.getViewport({ scale: 1 });
       const scale = containerWidth / originalViewport.width;
+      
+      // প্রোডাকশনে শার্প টেক্সটের জন্য স্কেল ঠিক রাখা
       const viewport = page.getViewport({ scale });
 
       const canvas = canvasRef.current;
@@ -2961,7 +2967,7 @@ export default function PdfViewer({
     return () => window.removeEventListener('resize', handleResize);
   }, [renderPage]);
 
-  // ৩. ফিল্ড প্লেসমেন্ট লজিক
+  // ৩. প্রিসিশন ফিল্ড প্লেসমেন্ট
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading) return;
     if (!e.target.classList.contains('pdf-canvas')) return;
@@ -2970,6 +2976,7 @@ export default function PdfViewer({
     const fW = pendingFieldType === 'signature' ? 20 : 15;
     const fH = pendingFieldType === 'signature' ? 8 : 5;
 
+    // ক্যানভাস সাইজের ওপর ভিত্তি করে পার্সেন্টেজ ক্যালকুলেশন
     const xPos = ((e.clientX - rect.left) / canvasSize.width) * 100 - (fW / 2);
     const yPos = ((e.clientY - rect.top) / canvasSize.height) * 100 - (fH / 2);
 
@@ -2991,7 +2998,7 @@ export default function PdfViewer({
 
   return (
     <div ref={containerRef} className="flex-1 w-full flex flex-col items-center bg-slate-100 p-4 min-h-[800px] overflow-y-auto">
-      {/* Pagination Bar */}
+      {/* Pagination UI */}
       {pdfDoc && (
         <div className="flex items-center gap-4 mb-4 sticky top-0 z-30 bg-white/90 backdrop-blur p-2 rounded-full shadow-md border border-slate-200">
           <Button variant="ghost" size="icon" className="rounded-full" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
@@ -3004,7 +3011,7 @@ export default function PdfViewer({
         </div>
       )}
 
-      {/* Canvas Wrapper */}
+      {/* Main Canvas Area */}
       <div 
         className="relative bg-white shadow-xl border border-slate-200 overflow-hidden mb-10"
         style={{ width: canvasSize.width || '100%', height: canvasSize.height || '800px' }}
@@ -3013,13 +3020,13 @@ export default function PdfViewer({
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50">
             <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF] mb-2" />
-            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Loading PDF...</p>
+            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Loading Document...</p>
           </div>
         )}
 
         <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner mx-auto" />
 
-        {/* Dynamic Fields (Rnd) */}
+        {/* Dynamic Interactive Fields */}
         {currentPageFields.map((field) => {
           const party = parties[field.partyIndex] || { name: 'Signer', color: '#28ABDF' };
           return (
