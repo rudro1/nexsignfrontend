@@ -51,20 +51,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  optimizeDeps: {
-    // ✅ PDF.js এর মডার্ন মডিউলগুলো বিল্ডের সময় ইনক্লুড করা
-    include: ['pdfjs-dist/legacy/build/pdf', 'pdfjs-dist/legacy/build/pdf.worker.min.mjs'],
-  },
   build: {
-    target: 'esnext',
+    target: 'esnext', // PDF.js 5.x এর আধুনিক মডিউল সাপোর্টের জন্য
   },
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'https://nextsignbackendfinal.vercel.app/api',
-        changeOrigin: true,
-      },
-    },
+  optimizeDeps: {
+    include: ['pdfjs-dist'], 
   },
 });
