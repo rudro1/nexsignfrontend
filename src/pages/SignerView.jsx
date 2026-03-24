@@ -4108,7 +4108,7 @@ import { api } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Lock, PenTool, Mail, Check } from 'lucide-react';
+import { Loader2, CheckCircle2, PenTool, Mail } from 'lucide-react';
 import SignaturePad from '../components/signing/SignaturePad';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
@@ -4138,24 +4138,16 @@ export default function SignerView() {
     return { done, total, remaining: total - done };
   }, [fields, myPartyIndex]);
 
-  // 🚀 ১. PDF রেন্ডারিং ফাস্ট করার জন্য লজিক (প্রথম পেজ আগে লোড হবে)
   const renderPdfPages = useCallback(async (pdf) => {
     const containerWidth = containerRef.current?.clientWidth || 800;
     const pages = [];
-    
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const originalViewport = page.getViewport({ scale: 1 });
       const scale = (containerWidth - 20) / originalViewport.width;
       const viewport = page.getViewport({ scale });
-      
-      const pageInfo = { num: i, viewport, pageObj: page };
-      pages.push(pageInfo);
-      
-      // প্রতি ১টি বা ৩টি পেজ অন্তর স্টেট আপডেট হবে যাতে ইউজার স্ক্রিন খালি না দেখে
-      if (i === 1 || i % 3 === 0) {
-        setPagesData([...pages]);
-      }
+      pages.push({ num: i, viewport, pageObj: page });
+      if (i === 1 || i % 3 === 0) setPagesData([...pages]);
     }
     setPagesData(pages);
   }, []);
@@ -4166,24 +4158,19 @@ export default function SignerView() {
       const res = await api.get(`/documents/sign/${token}`);
       setSession(res.data);
       setDocData(res.data.document);
-      
       const rawFields = res.data.document.fields || [];
       setFields(rawFields.map(f => {
         const obj = typeof f === 'string' ? JSON.parse(f) : f;
         return { 
           ...obj, 
-          id: obj.id || `f_${Math.random()}`, 
-          partyIndex: Number(obj.signerIndex ?? obj.partyIndex ?? 0), 
+          partyIndex: Number(obj.partyIndex ?? 0), 
           filled: !!obj.value 
         };
       }));
-
       if (res.data.document.status === 'completed' || res.data.party.status === 'signed') {
         setCompleted(true);
       }
-    } catch (err) { 
-      toast.error('Invalid link.'); 
-    } finally { setLoading(false); }
+    } catch (err) { toast.error('Invalid link.'); } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
@@ -4191,101 +4178,70 @@ export default function SignerView() {
   useEffect(() => {
     if (!docData?.fileId) return;
     const proxyUrl = `${import.meta.env.VITE_API_BASE_URL}/documents/proxy/${encodeURIComponent(docData.fileId)}`;
-    
     const loadingTask = pdfjsLib.getDocument({ url: proxyUrl, withCredentials: true });
     loadingTask.promise.then(renderPdfPages).catch(err => console.error("PDF Load Error:", err));
   }, [docData, renderPdfPages]);
 
-  // 🚀 ২. Finish ক্লিক করলে সাথে সাথে Success দেখানোর লজিক (Optimistic UI)
   const handleSubmit = async () => {
-    if (stats.remaining > 0) {
-      toast.error(`Please complete ${stats.remaining} more fields.`);
-      return;
-    }
-
-    // UI-তে সাথে সাথে সাকসেস স্টেট সেট করা
-    setCompleted(true); 
+    if (stats.remaining > 0) return toast.error(`Please complete ${stats.remaining} more fields.`);
+    
     setSubmitting(true);
-
     try {
-      // ব্যাকগ্রাউন্ডে এপিআই কল হচ্ছে
+      // 🌟 ফিক্স: সরাসরি লেটেস্ট fields অ্যারে পাঠানো হচ্ছে
       await api.post(`/documents/sign/submit`, { 
         token, 
-        fields,
-        auditData: { location: "Browser Session", postalCode: "N/A" }
+        fields: fields, 
+        auditData: { location: "Browser Session" }
       }); 
-      toast.success('Signature synchronized!');
+      setCompleted(true);
+      toast.success('Document signed successfully!');
     } catch (err) { 
-      // রিকোয়েস্ট ফেল করলে আগের স্টেটে ফেরত নিয়ে আসা
-      setCompleted(false);
       setSubmitting(false);
       toast.error('Sync failed. Please check your connection.'); 
     }
   };
 
-  const handleFieldClick = (e, field) => {
-    if (Number(field.partyIndex) !== Number(myPartyIndex)) return;
-    setActiveFieldId(field.id);
-    setShowSigPad(true);
-  };
-
   const handleSignature = (sigValue) => {
+    // 🌟 ফিক্স: ইমেজ ভ্যালু স্টেটে সেট করা
     setFields(prev => prev.map(f => f.id === activeFieldId ? { ...f, value: sigValue, filled: true } : f));
     setShowSigPad(false);
   };
 
-  if (loading) return (
-    <div className="h-screen flex flex-col items-center justify-center bg-white gap-4">
-      <Loader2 className="animate-spin text-sky-500" size={40} />
-      <p className="text-slate-500 font-medium">Loading Document...</p>
-    </div>
-  );
+  if (loading) return <div className="h-screen flex flex-col items-center justify-center gap-4"><Loader2 className="animate-spin text-sky-500" size={40} /><p>Loading Document...</p></div>;
 
   if (completed) return (
-    <div className="h-screen flex flex-col items-center justify-center bg-slate-50 text-center p-6 animate-in fade-in duration-500">
-      <div className="bg-white p-10 rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full flex flex-col items-center">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
-          <CheckCircle2 size={50} className="text-green-600" />
-        </div>
-        <h2 className="text-3xl font-extrabold text-slate-800 mb-2">Success!</h2>
-        <p className="text-slate-600 mb-6">Your signature has been securely submitted.</p>
-        <div className="bg-blue-50 p-4 rounded-xl flex gap-3 text-left border border-blue-100 mb-6">
-          <Mail className="text-blue-500 shrink-0" size={20} />
-          <p className="text-xs text-blue-700">A copy of the signed document will be sent to your email once everyone has signed.</p>
-        </div>
-        <Button className="w-full py-6 rounded-xl font-bold bg-slate-800" onClick={() => window.close()}>Close Window</Button>
+    <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
+      <div className="bg-white p-10 rounded-3xl shadow-xl max-w-lg w-full text-center">
+        <CheckCircle2 size={60} className="text-green-500 mx-auto mb-4" />
+        <h2 className="text-3xl font-bold mb-2">Success!</h2>
+        <p className="text-slate-600 mb-6">Signature submitted securely.</p>
+        <Button className="w-full bg-slate-800" onClick={() => window.close()}>Close Window</Button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-200">
-      <header className="sticky top-0 z-[100] bg-white/90 backdrop-blur-md border-b p-3 flex justify-between items-center shadow-sm">
-        <div className="ml-2">
-          <h1 className="font-bold text-slate-800 text-sm truncate max-w-[150px]">{docData?.title}</h1>
-          <div className="flex items-center gap-2">
-             <div className="h-1 w-20 bg-slate-100 rounded-full"><div className="h-full bg-green-500" style={{ width: `${(stats.done/stats.total)*100}%` }} /></div>
-             <span className="text-[10px] font-bold text-slate-500">{stats.done}/{stats.total} DONE</span>
-          </div>
-        </div>
-        <Button onClick={handleSubmit} className="rounded-full bg-sky-600 px-10 font-bold hover:bg-sky-700 h-10 shadow-lg active:scale-95 transition-all">
-          Finish
+    <div className="min-h-screen bg-slate-100">
+      <header className="sticky top-0 z-[100] bg-white border-b p-4 flex justify-between items-center shadow-sm">
+        <h1 className="font-bold truncate max-w-[200px]">{docData?.title}</h1>
+        <Button onClick={handleSubmit} disabled={submitting} className="bg-sky-600 hover:bg-sky-700 rounded-full px-8">
+          {submitting ? <Loader2 className="animate-spin mr-2" /> : "Finish"}
         </Button>
       </header>
 
-      <main ref={containerRef} className="max-w-4xl mx-auto py-6 px-4">
+      <main ref={containerRef} className="max-w-4xl mx-auto py-8">
         {pagesData.map((page) => (
-          <div key={page.num} className="relative mb-6 bg-white shadow-xl mx-auto overflow-hidden border border-slate-300" style={{ width: page.viewport.width, height: page.viewport.height }}>
+          <div key={page.num} className="relative mb-8 bg-white shadow-lg mx-auto" style={{ width: page.viewport.width, height: page.viewport.height }}>
             <PageCanvas page={page} />
             {fields.filter(f => Number(f.page) === page.num).map(field => {
               const isMine = Number(field.partyIndex) === Number(myPartyIndex);
               return (
-                <div key={field.id} onClick={(e) => handleFieldClick(e, field)}
+                <div key={field.id} onClick={() => isMine && (setActiveFieldId(field.id) || setShowSigPad(true))}
                   className={`absolute border-2 flex items-center justify-center rounded transition-all cursor-pointer
-                    ${isMine && !field.filled ? 'border-sky-500 bg-sky-400/10 animate-pulse' : 
-                      isMine && field.filled ? 'border-green-500 bg-transparent' : 'border-slate-200 bg-slate-100/50 pointer-events-none'}`}
+                    ${isMine && !field.filled ? 'border-sky-500 bg-sky-50 animate-pulse' : 
+                      isMine && field.filled ? 'border-green-500 bg-white' : 'border-slate-200 bg-slate-50/50 pointer-events-none'}`}
                   style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}%`, height: `${field.height}%` }}>
-                  {field.filled ? <img src={field.value} className="w-[90%] h-[90%] object-contain" /> : <PenTool size={14} className={isMine ? "text-sky-500" : "text-slate-300"} />}
+                  {field.filled ? <img src={field.value} className="w-full h-full object-contain p-1" /> : <PenTool size={16} className={isMine ? "text-sky-500" : "text-slate-300"} />}
                 </div>
               );
             })}
@@ -4294,8 +4250,8 @@ export default function SignerView() {
       </main>
 
       <Dialog open={showSigPad} onOpenChange={setShowSigPad}>
-        <DialogContent className="max-w-lg p-0 bg-white rounded-2xl overflow-hidden">
-          <div className="bg-sky-600 p-4 text-white"><DialogTitle className="font-bold">Sign Document</DialogTitle></div>
+        <DialogContent className="max-w-lg p-0 bg-white overflow-hidden">
+          <div className="bg-sky-600 p-4 text-white font-bold text-center">Draw Your Signature</div>
           <div className="p-6"><SignaturePad onSignatureComplete={handleSignature} /></div>
         </DialogContent>
       </Dialog>
@@ -4313,10 +4269,7 @@ function PageCanvas({ page }) {
     canvas.width = page.viewport.width * ratio;
     canvas.height = page.viewport.height * ratio;
     ctx.scale(ratio, ratio);
-    
-    // পেজ রেন্ডারিং টাস্ক
     page.pageObj.render({ canvasContext: ctx, viewport: page.viewport });
   }, [page]);
-
   return <canvas ref={canvasRef} className="w-full h-full" />;
 }
