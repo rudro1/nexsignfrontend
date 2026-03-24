@@ -193,7 +193,6 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -202,7 +201,6 @@ export default function Dashboard() {
   const fetchDocuments = useCallback(async (pageNum = 1, isInitial = false) => {
     if (isInitial) {
       setIsLoading(true);
-      // ক্যাশ থেকে লোড করা যাতে ইউজার দ্রুত কিছু দেখতে পায়
       const cached = localStorage.getItem('nexsign_cache');
       if (cached) setDocuments(JSON.parse(cached));
     } else {
@@ -210,20 +208,15 @@ export default function Dashboard() {
     }
     
     try {
-      // ব্যাকএন্ড থেকে লিমিট এবং পেজ অনুযায়ী ডাটা আনা
       const res = await api.get(`/documents?page=${pageNum}&limit=${LIMIT}`);
       const rawData = Array.isArray(res.data) ? res.data : (res.data.documents || []);
       
       if (isInitial) {
         setDocuments(rawData);
-        // প্রথম ৪টি ফাইল ক্যাশে রাখা
         localStorage.setItem('nexsign_cache', JSON.stringify(rawData.slice(0, 4)));
-        setPage(1); // পেজ রিসেট
       } else {
         setDocuments(prev => [...prev, ...rawData]);
       }
-
-      // যদি ডাটা লিমিটের চেয়ে কম আসে, তারমানে আর ডাটা নেই
       setHasMore(rawData.length === LIMIT);
     } catch (err) {
       console.error("Dashboard Fetch Error:", err);
@@ -235,11 +228,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (isAdmin) {
-        navigate('/admin', { replace: true });
-      } else {
-        fetchDocuments(1, true);
-      }
+      if (isAdmin) navigate('/admin', { replace: true });
+      else fetchDocuments(1, true);
     }
   }, [isAdmin, authLoading, navigate, fetchDocuments]);
 
@@ -249,7 +239,6 @@ export default function Dashboard() {
     fetchDocuments(nextPage, false);
   };
 
-  // স্ট্যাটাস কার্ডের জন্য মেমোরাইজড ক্যালকুলেশন
   const stats = useMemo(() => ({
     total: documents.filter(d => !d.isTemplate).length,
     inProgress: documents.filter(d => d.status === 'in_progress' && !d.isTemplate).length,
@@ -257,17 +246,11 @@ export default function Dashboard() {
     templates: documents.filter(d => d.isTemplate === true).length,
   }), [documents]);
 
-  // ফিল্টারিং লজিক (Search + Status + Template switch)
   const filtered = useMemo(() => {
     return documents.filter(doc => {
       const titleMatch = doc.title?.toLowerCase().includes(search.toLowerCase());
-      
-      if (statusFilter === 'templates') {
-        return titleMatch && doc.isTemplate === true;
-      }
-      
+      if (statusFilter === 'templates') return titleMatch && doc.isTemplate === true;
       const statusMatch = statusFilter === 'all' || doc.status === statusFilter;
-      // সাধারণ ট্যাবে শুধু non-templates দেখাবে
       return titleMatch && statusMatch && !doc.isTemplate;
     });
   }, [documents, search, statusFilter]);
@@ -276,22 +259,20 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             Welcome, {user?.full_name?.split(' ')[0] || 'User'} 👋
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Manage your documents and sign on the go.</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Manage your documents efficiently.</p>
         </div>
-        <Link to="/DocumentEditor">
+        <Link to="/DocumentEditor?id=new">
           <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl gap-2 shadow-lg px-6 py-6 transition-all">
             <Plus className="w-5 h-5" /> New Document
           </Button>
         </Link>
       </div>
 
-      {/* Stats Section */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatsCard label="Total Docs" value={stats.total} icon={FileText} color="sky" />
         <StatsCard label="Active" value={stats.inProgress} icon={Send} color="amber" />
@@ -299,71 +280,39 @@ export default function Dashboard() {
         <StatsCard label="Templates" value={stats.templates} icon={Layout} color="violet" />
       </div>
 
-      {/* Controls Section */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center">
         <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input 
-            placeholder="Search by title..." 
-            value={search} 
-            onChange={e => setSearch(e.target.value)}
-            className="pl-10 rounded-xl border-slate-200 focus:ring-[#28ABDF]" 
-          />
+          <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl" />
         </div>
         <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
-          <TabsList className="bg-slate-100 dark:bg-slate-900 rounded-xl p-1 border">
-            <TabsTrigger value="all" className="rounded-lg">All</TabsTrigger>
-            <TabsTrigger value="templates" className="rounded-lg">Templates</TabsTrigger>
-            <TabsTrigger value="in_progress" className="rounded-lg">Active</TabsTrigger>
-            <TabsTrigger value="completed" className="rounded-lg">Done</TabsTrigger>
+          <TabsList className="bg-slate-100 rounded-xl p-1">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="in_progress">Active</TabsTrigger>
+            <TabsTrigger value="completed">Done</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {/* Document Grid */}
       {isLoading && documents.length === 0 ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}
         </div>
-      ) : filtered.length > 0 ? (
+      ) : (
         <>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map(doc => <DocumentCard key={doc._id} doc={doc} />)}
           </div>
-
-          {/* Load More Button */}
-          {hasMore && (
+          {hasMore && filtered.length >= LIMIT && (
             <div className="flex justify-center mt-12">
-              <Button 
-                variant="outline" 
-                onClick={handleLoadMore} 
-                disabled={isFetchingMore}
-                className="rounded-full border-[#28ABDF] text-[#28ABDF] hover:bg-sky-50 px-10 py-5 transition-all"
-              >
-                {isFetchingMore ? (
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 mr-2" />
-                )}
-                {isFetchingMore ? 'Loading Data...' : 'Load More Documents'}
+              <Button variant="outline" onClick={handleLoadMore} disabled={isFetchingMore} className="rounded-full border-[#28ABDF] text-[#28ABDF]">
+                {isFetchingMore ? <Loader2 className="animate-spin mr-2" /> : <ChevronDown className="mr-2" />}
+                Load More
               </Button>
             </div>
           )}
         </>
-      ) : (
-        <div className="text-center py-24 bg-slate-50 dark:bg-slate-900/50 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
-          <div className="bg-white dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-            <FileText className="w-8 h-8 text-slate-300" />
-          </div>
-          <p className="text-slate-500 font-medium">No documents match your filter.</p>
-          <Button 
-            variant="link" 
-            onClick={() => {setSearch(''); setStatusFilter('all');}}
-            className="text-[#28ABDF] mt-2"
-          >
-            Clear all filters
-          </Button>
-        </div>
       )}
     </div>
   );

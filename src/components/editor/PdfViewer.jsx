@@ -2370,7 +2370,6 @@ import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
-// Worker path update
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
 const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#6366f1', '#14b8a6'];
@@ -2403,7 +2402,6 @@ export default function PdfViewer({
         if (fileUrl.startsWith('blob:')) {
           finalUrl = fileUrl;
         } else {
-          // ✅ আপনার লেটেস্ট ব্যাকএন্ড ইউআরএল অনুযায়ী প্রক্সি সেটআপ
           let cloudPath = fileId || (fileUrl.includes('upload/') 
             ? fileUrl.split('upload/')[1].split('/').slice(1).join('/') 
             : fileUrl);
@@ -2413,7 +2411,6 @@ export default function PdfViewer({
         const loadingTask = pdfjsLib.getDocument({ 
           url: finalUrl, 
           withCredentials: !fileUrl.startsWith('blob:'),
-          // Encryption হ্যান্ডেল করার জন্য
           ignoreEncryption: true 
         });
         
@@ -2466,6 +2463,8 @@ export default function PdfViewer({
 
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading) return;
+    
+    // 🌟 নিশ্চিত করা যে ক্লিকটি ক্যানভাসের উপরই পড়েছে
     if (!e.target.classList.contains('pdf-canvas')) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
@@ -2490,15 +2489,16 @@ export default function PdfViewer({
     onFieldPlaced?.();
   };
 
-  const removeField = (id, e) => {
+  // 🌟 ফিক্সড ডিলিট ফাংশন
+  const removeField = (e, id) => {
     e.preventDefault(); 
-    e.stopPropagation();
-    onFieldsChange(fields.filter(f => f.id !== id));
+    e.stopPropagation(); // ক্যানভাসে নতুন ফিল্ড তৈরি হওয়া বন্ধ করবে
+    const updatedFields = fields.filter(f => f.id !== id);
+    onFieldsChange(updatedFields);
   };
 
   return (
     <div ref={containerRef} className="flex-1 w-full overflow-hidden p-6 bg-slate-50/50">
-      {/* Page Navigation */}
       {pdfDoc && pdfDoc.numPages > 1 && (
         <div className="flex items-center justify-center gap-6 mb-6">
           <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)} className="rounded-xl shadow-sm border-slate-200">
@@ -2513,7 +2513,6 @@ export default function PdfViewer({
         </div>
       )}
 
-      {/* PDF Surface */}
       <div 
         className="canvas-container relative mx-auto shadow-2xl border-4 border-white bg-white rounded-lg overflow-hidden transition-all duration-300" 
         style={{ 
@@ -2547,18 +2546,22 @@ export default function PdfViewer({
                 x: (field.x / 100) * canvasSize.width, 
                 y: (field.y / 100) * canvasSize.height 
               }} 
-              onDragStop={(e, d) => onFieldsChange(fields.map(f => f.id === field.id ? { 
-                ...f, 
-                x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
-                y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
-              } : f))} 
-              onResizeStop={(e, dir, ref, delta, pos) => onFieldsChange(fields.map(f => f.id === field.id ? { 
-                ...f, 
-                width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)), 
-                height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)), 
-                x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)), 
-                y: Number(((pos.y / canvasSize.height) * 100).toFixed(4)) 
-              } : f))} 
+              onDragStop={(e, d) => {
+                onFieldsChange(fields.map(f => f.id === field.id ? { 
+                  ...f, 
+                  x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
+                  y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
+                } : f));
+              }} 
+              onResizeStop={(e, dir, ref, delta, pos) => {
+                onFieldsChange(fields.map(f => f.id === field.id ? { 
+                  ...f, 
+                  width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)), 
+                  height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)), 
+                  x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)), 
+                  y: Number(((pos.y / canvasSize.height) * 100).toFixed(4)) 
+                } : f));
+              }} 
               bounds="parent" 
               enableResizing={!readOnly} 
               disableDragging={readOnly} 
@@ -2568,7 +2571,6 @@ export default function PdfViewer({
                 className="w-full h-full border-2 flex flex-col items-center justify-center relative bg-white/40 backdrop-blur-[1px] rounded-sm transition-colors" 
                 style={{ borderColor: color }}
               >
-                {/* Party Label */}
                 <div 
                   className="absolute -top-5 left-0 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase tracking-tighter" 
                   style={{ backgroundColor: color }}
@@ -2581,8 +2583,10 @@ export default function PdfViewer({
                 {!readOnly && (
                   <button 
                     type="button" 
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-110 z-50" 
-                    onMouseDown={(e) => removeField(field.id, e)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-110 z-[60]" 
+                    // 🌟 onClick এবং onMouseDown উভয় ক্ষেত্রেই ইভেন্ট থামানো হয়েছে
+                    onClick={(e) => removeField(e, field.id)}
+                    onMouseDown={(e) => e.stopPropagation()} 
                   >
                     <Trash2 size={12} />
                   </button>
