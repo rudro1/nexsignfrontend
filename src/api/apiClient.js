@@ -1,239 +1,165 @@
-// // // import axios from 'axios';
+// // import axios from 'axios';
 
-// // // export const api = axios.create({
-// // //   baseURL: 'http://localhost:5001/api',
-// // //   withCredentials: true,
-// // //   headers: { 'Content-Type': 'application/json' }
-// // // });
+// // export const api = axios.create({
+// //   baseURL: 'http://localhost:5001/api',
+// //   withCredentials: true,
+// //   headers: { 'Content-Type': 'application/json' }
+// // });
 
-// // // api.interceptors.request.use((config) => {
-// // //   const token = localStorage.getItem('token');
-// // //   if (token) config.headers['Authorization'] = `Bearer ${token}`;
-// // //   return config;
-// // // });
+// // api.interceptors.request.use((config) => {
+// //   const token = localStorage.getItem('token');
+// //   if (token) config.headers['Authorization'] = `Bearer ${token}`;
+// //   return config;
+// // });
 
-// // // api.interceptors.response.use(
-// // //   (response) => response,
-// // //   (error) => {
-// // //     // লগিং এবং অথরাইজেশন এরর এক জায়গায় হ্যান্ডেল করা
-// // //     if (error.response) {
-// // //       console.error('API Error:', error.response.status, error.response.data);
-// // //       if (error.response.status === 401) {
-// // //         localStorage.removeItem('token');
-// // //         localStorage.removeItem('user');
-// // //         window.location.href = '/login';
-// // //       }
-// // //     }
-// // //     return Promise.reject(error);
-// // //   }
-// // // );
+// // api.interceptors.response.use(
+// //   (response) => response,
+// //   (error) => {
+// //     // লগিং এবং অথরাইজেশন এরর এক জায়গায় হ্যান্ডেল করা
+// //     if (error.response) {
+// //       console.error('API Error:', error.response.status, error.response.data);
+// //       if (error.response.status === 401) {
+// //         localStorage.removeItem('token');
+// //         localStorage.removeItem('user');
+// //         window.location.href = '/login';
+// //       }
+// //     }
+// //     return Promise.reject(error);
+// //   }
+// // );
 
-// // // import axios from 'axios';
-
-// // // // ১. বেস কনফিগারেশন
-// // // export const api = axios.create({
-// // //   // Vite এর জন্য import.meta.env এবং Create React App এর জন্য process.env ব্যবহার করুন
-// // //   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
-// // //   withCredentials: true,
-// // //   // headers থেকে Content-Type সরিয়ে দেওয়া ভালো, Axios নিজেই এটি হ্যান্ডেল করে
-// // // });
-
-// // // // ২. রিকোয়েস্ট ইন্টারসেপ্টর (Authorization)
-// // // api.interceptors.request.use(
-// // //   (config) => {
-// // //     const token = localStorage.getItem('token');
-// // //     if (token) {
-// // //       config.headers['Authorization'] = `Bearer ${token}`;
-// // //     }
-// // //     return config;
-// // //   },
-// // //   (error) => Promise.reject(error)
-// // // );
-
-// // // // ৩. রেসপন্স ইন্টারসেপ্টর (Error Handling)
-// // // api.interceptors.response.use(
-// // //   (response) => response,
-// // //   (error) => {
-// // //     if (error.response) {
-// // //       const { status } = error.response;
-
-// // //       // টোকেন এক্সপায়ার হলে বা আনঅথরাইজড হলে
-// // //       if (status === 401) {
-// // //         // লুপ এড়াতে চেক করুন আপনি ইতিমধ্যে লগইন পেজে আছেন কি না
-// // //         if (!window.location.pathname.includes('/login')) {
-// // //           localStorage.removeItem('token');
-// // //           localStorage.removeItem('user');
-// // //           window.location.href = '/login';
-// // //         }
-// // //       }
-      
-// // //       // নেটওয়ার্ক বা সার্ভার এরর লগিং
-// // //       console.error(`[API Error ${status}]:`, error.response.data?.message || 'Something went wrong');
-// // //     } else if (error.request) {
-// // //       console.error('[Network Error]: No response received from server');
-// // //     }
-    
-// // //     return Promise.reject(error);
-// // //   }
-// // // );
 // // import axios from 'axios';
 
 // // // ১. বেস কনফিগারেশন
 // // export const api = axios.create({
-// //   // নিশ্চিত করুন VITE_API_BASE_URL এর শেষে যেন '/' না থাকে
-// //   baseURL: import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api',
-  
-// //   // ✅ ব্যাকএন্ডের সাথে মিল রেখে এটি true করে দিন
-// //   // এটি কুকি বা অথোরাইজেশন হেডার সঠিকভাবে হ্যান্ডেল করতে সাহায্য করবে
-// //   withCredentials: true, 
-  
-// //   timeout: 60000, // ১ মিনিট টাইমআউট (ভার্সেল ফ্রি টায়ারের জন্য যথেষ্ট)
+// //   // Vite এর জন্য import.meta.env এবং Create React App এর জন্য process.env ব্যবহার করুন
+// //   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
+// //   withCredentials: true,
+// //   // headers থেকে Content-Type সরিয়ে দেওয়া ভালো, Axios নিজেই এটি হ্যান্ডেল করে
 // // });
 
-// // // ২. রিকোয়েস্ট ইন্টারসেপ্টর
+// // // ২. রিকোয়েস্ট ইন্টারসেপ্টর (Authorization)
 // // api.interceptors.request.use(
 // //   (config) => {
 // //     const token = localStorage.getItem('token');
 // //     if (token) {
-// //       // টোকেন হেডার সেট করা
-// //       config.headers.Authorization = `Bearer ${token}`;
+// //       config.headers['Authorization'] = `Bearer ${token}`;
 // //     }
-    
-// //     // কনটেন্ট টাইপ নিশ্চিত করা
-// //     config.headers['Content-Type'] = 'application/json';
-// //     return config;
-// //   },
-// //   (error) => {
-// //     return Promise.reject(error);
-// //   }
-// // );
-
-// // // ৩. রেসপন্স ইন্টারসেপ্টর
-// // api.interceptors.response.use(
-// //   (response) => response,
-// //   (error) => {
-// //     // নেটওয়ার্ক এরর বা টাইমআউট হ্যান্ডেল করা
-// //     if (!error.response) {
-// //       console.error('[Network Error]: Check your internet or API Server status.');
-// //       return Promise.reject(new Error('Server is unreachable. Please try again later.'));
-// //     }
-
-// //     const { status } = error.response;
-
-// //     // টোকেন এক্সপায়ার হলে লগআউট করানো
-// //     if (status === 401) {
-// //       const isLoginPage = window.location.pathname.includes('/login');
-// //       if (!isLoginPage) {
-// //         localStorage.removeItem('token');
-// //         localStorage.removeItem('user'); // ইউজার ডাটাও রিমুভ করুন
-// //         window.location.href = '/login?expired=true';
-// //       }
-// //     }
-    
-// //     return Promise.reject(error);
-// //   }
-// // );
-
-// // import axios from 'axios';
-
-// // export const api = axios.create({
-// //   baseURL: import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api',
-// //   withCredentials: true, 
-// //   timeout: 60000, 
-// // });
-
-// // api.interceptors.request.use(
-// //   (config) => {
-// //     const token = localStorage.getItem('token');
-    
-// //     // ১. টোকেন থাকলে সেটি হেডার-এ সেট করা
-// //     if (token) {
-// //       config.headers.Authorization = `Bearer ${token}`;
-// //     }
-    
-// //     // ২. Content-Type হ্যান্ডলিং (CORS ফ্রেন্ডলি)
-// //     if (config.data instanceof FormData) {
-// //       // FormData হলে হেডার ডিলিট করা জরুরি যাতে ব্রাউজার সঠিক boundary সেট করতে পারে
-// //       delete config.headers['Content-Type'];
-// //     } else if (!config.headers['Content-Type']) {
-// //       // শুধু ডাটা থাকলে ডিফল্ট JSON সেট করা
-// //       config.headers['Content-Type'] = 'application/json';
-// //     }
-
 // //     return config;
 // //   },
 // //   (error) => Promise.reject(error)
 // // );
 
+// // // ৩. রেসপন্স ইন্টারসেপ্টর (Error Handling)
 // // api.interceptors.response.use(
 // //   (response) => response,
 // //   (error) => {
-// //     // ৩. নেটওয়ার্ক এরর বা টাইমআউট হ্যান্ডলিং
-// //     if (!error.response) {
-// //       console.error("Network Error: Please check your backend CORS settings or Internet.");
-// //     }
+// //     if (error.response) {
+// //       const { status } = error.response;
 
-// //     // ৪. অথেন্টিকেশন এরর (Expired Token)
-// //     if (error.response?.status === 401) {
-// //       const isLoginPage = window.location.pathname === '/login';
-// //       if (!isLoginPage) {
-// //         localStorage.removeItem('token');
-// //         // ইউজার যেন বারবার রিডাইরেক্ট না হয় তাই চেক করা
-// //         window.location.href = '/login?expired=true';
+// //       // টোকেন এক্সপায়ার হলে বা আনঅথরাইজড হলে
+// //       if (status === 401) {
+// //         // লুপ এড়াতে চেক করুন আপনি ইতিমধ্যে লগইন পেজে আছেন কি না
+// //         if (!window.location.pathname.includes('/login')) {
+// //           localStorage.removeItem('token');
+// //           localStorage.removeItem('user');
+// //           window.location.href = '/login';
+// //         }
 // //       }
+      
+// //       // নেটওয়ার্ক বা সার্ভার এরর লগিং
+// //       console.error(`[API Error ${status}]:`, error.response.data?.message || 'Something went wrong');
+// //     } else if (error.request) {
+// //       console.error('[Network Error]: No response received from server');
 // //     }
+    
 // //     return Promise.reject(error);
 // //   }
 // // );
 // import axios from 'axios';
 
-// // ✅ FIX: strip trailing slash to prevent double-slash bugs
-// const BASE = (import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api').replace(/\/$/, '');
-
+// // ১. বেস কনফিগারেশন
 // export const api = axios.create({
-//   baseURL: BASE,
-//   withCredentials: true,
-//   timeout: 60000,
+//   // নিশ্চিত করুন VITE_API_BASE_URL এর শেষে যেন '/' না থাকে
+//   baseURL: import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api',
+  
+//   // ✅ ব্যাকএন্ডের সাথে মিল রেখে এটি true করে দিন
+//   // এটি কুকি বা অথোরাইজেশন হেডার সঠিকভাবে হ্যান্ডেল করতে সাহায্য করবে
+//   withCredentials: true, 
+  
+//   timeout: 60000, // ১ মিনিট টাইমআউট (ভার্সেল ফ্রি টায়ারের জন্য যথেষ্ট)
 // });
 
-// /**
-//  * ✅ CORE FIX — Cloudinary Proxy URL Builder
-//  *
-//  * BUG BEFORE: replace(/\//g, '_') destroyed version numbers like "v1774334567"
-//  * because backend's replace(/_/g, '/') turned ALL underscores back to slashes,
-//  * making "v1774334567" → "v1774334567" (fine) but "nexsign_docs" → "nexsign/docs" ✓
-//  * — ACTUALLY the real problem: Vercel strips the path after the last dot
-//  * if there is a .pdf extension in the middle of a URL segment.
-//  *
-//  * FIX: encode "/" as "~~" (double tilde) — safe in URL paths, never appears
-//  * in Cloudinary public IDs, and easy to decode on the backend.
-//  *
-//  * ⚠️  You must also update your backend proxy route decoder:
-//  *     const cloudPath = req.params.path.replace(/~~/g, '/');
-//  */
-// export function buildProxyUrl(cloudinaryUrl) {
-//   if (!cloudinaryUrl) return '';
-//   if (cloudinaryUrl.startsWith('blob:') || cloudinaryUrl.startsWith('data:')) {
-//     return cloudinaryUrl;
-//   }
-//   const parts = cloudinaryUrl.split('/upload/');
-//   if (parts.length < 2) return cloudinaryUrl;
-//   // Encode slashes as ~~ so express wildcard captures the full path safely
-//   const encoded = parts[1].replace(/\//g, '~~');
-//   return `${BASE}/documents/proxy/${encoded}`;
-// }
-
+// // ২. রিকোয়েস্ট ইন্টারসেপ্টর
 // api.interceptors.request.use(
 //   (config) => {
 //     const token = localStorage.getItem('token');
 //     if (token) {
+//       // টোকেন হেডার সেট করা
 //       config.headers.Authorization = `Bearer ${token}`;
 //     }
+    
+//     // কনটেন্ট টাইপ নিশ্চিত করা
+//     config.headers['Content-Type'] = 'application/json';
+//     return config;
+//   },
+//   (error) => {
+//     return Promise.reject(error);
+//   }
+// );
+
+// // ৩. রেসপন্স ইন্টারসেপ্টর
+// api.interceptors.response.use(
+//   (response) => response,
+//   (error) => {
+//     // নেটওয়ার্ক এরর বা টাইমআউট হ্যান্ডেল করা
+//     if (!error.response) {
+//       console.error('[Network Error]: Check your internet or API Server status.');
+//       return Promise.reject(new Error('Server is unreachable. Please try again later.'));
+//     }
+
+//     const { status } = error.response;
+
+//     // টোকেন এক্সপায়ার হলে লগআউট করানো
+//     if (status === 401) {
+//       const isLoginPage = window.location.pathname.includes('/login');
+//       if (!isLoginPage) {
+//         localStorage.removeItem('token');
+//         localStorage.removeItem('user'); // ইউজার ডাটাও রিমুভ করুন
+//         window.location.href = '/login?expired=true';
+//       }
+//     }
+    
+//     return Promise.reject(error);
+//   }
+// );
+
+// import axios from 'axios';
+
+// export const api = axios.create({
+//   baseURL: import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api',
+//   withCredentials: true, 
+//   timeout: 60000, 
+// });
+
+// api.interceptors.request.use(
+//   (config) => {
+//     const token = localStorage.getItem('token');
+    
+//     // ১. টোকেন থাকলে সেটি হেডার-এ সেট করা
+//     if (token) {
+//       config.headers.Authorization = `Bearer ${token}`;
+//     }
+    
+//     // ২. Content-Type হ্যান্ডলিং (CORS ফ্রেন্ডলি)
 //     if (config.data instanceof FormData) {
+//       // FormData হলে হেডার ডিলিট করা জরুরি যাতে ব্রাউজার সঠিক boundary সেট করতে পারে
 //       delete config.headers['Content-Type'];
 //     } else if (!config.headers['Content-Type']) {
+//       // শুধু ডাটা থাকলে ডিফল্ট JSON সেট করা
 //       config.headers['Content-Type'] = 'application/json';
 //     }
+
 //     return config;
 //   },
 //   (error) => Promise.reject(error)
@@ -242,36 +168,48 @@
 // api.interceptors.response.use(
 //   (response) => response,
 //   (error) => {
+//     // ৩. নেটওয়ার্ক এরর বা টাইমআউট হ্যান্ডলিং
 //     if (!error.response) {
-//       console.error('Network Error: Check backend CORS or internet connection.');
+//       console.error("Network Error: Please check your backend CORS settings or Internet.");
 //     }
+
+//     // ৪. অথেন্টিকেশন এরর (Expired Token)
 //     if (error.response?.status === 401) {
-//       if (window.location.pathname !== '/login') {
+//       const isLoginPage = window.location.pathname === '/login';
+//       if (!isLoginPage) {
 //         localStorage.removeItem('token');
+//         // ইউজার যেন বারবার রিডাইরেক্ট না হয় তাই চেক করা
 //         window.location.href = '/login?expired=true';
 //       }
 //     }
 //     return Promise.reject(error);
 //   }
-// );workable
-
+// );
 import axios from 'axios';
 
+// ✅ FIX: strip trailing slash to prevent double-slash bugs
 const BASE = (import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api').replace(/\/$/, '');
 
 export const api = axios.create({
   baseURL: BASE,
   withCredentials: true,
-  timeout: 45000, // ✅ Reduced (PDFs rarely need 60s)
-  headers: {
-    'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest' // ✅ CSRF Protection
-  }
+  timeout: 60000,
 });
 
 /**
- * ✅ CLOUDINARY PROXY URL BUILDER (Already Perfect!)
- * Backend MUST have: const cloudPath = decodeURIComponent(req.params.path).replace(/~~/g, '/');
+ * ✅ CORE FIX — Cloudinary Proxy URL Builder
+ *
+ * BUG BEFORE: replace(/\//g, '_') destroyed version numbers like "v1774334567"
+ * because backend's replace(/_/g, '/') turned ALL underscores back to slashes,
+ * making "v1774334567" → "v1774334567" (fine) but "nexsign_docs" → "nexsign/docs" ✓
+ * — ACTUALLY the real problem: Vercel strips the path after the last dot
+ * if there is a .pdf extension in the middle of a URL segment.
+ *
+ * FIX: encode "/" as "~~" (double tilde) — safe in URL paths, never appears
+ * in Cloudinary public IDs, and easy to decode on the backend.
+ *
+ * ⚠️  You must also update your backend proxy route decoder:
+ *     const cloudPath = req.params.path.replace(/~~/g, '/');
  */
 export function buildProxyUrl(cloudinaryUrl) {
   if (!cloudinaryUrl) return '';
@@ -280,103 +218,168 @@ export function buildProxyUrl(cloudinaryUrl) {
   }
   const parts = cloudinaryUrl.split('/upload/');
   if (parts.length < 2) return cloudinaryUrl;
+  // Encode slashes as ~~ so express wildcard captures the full path safely
   const encoded = parts[1].replace(/\//g, '~~');
   return `${BASE}/documents/proxy/${encoded}`;
 }
 
-// ✅ Caching Layer (10x Faster Repeated Calls)
-const cache = new Map();
-export const cachedApi = async (config, cacheKey = null, ttl = 5 * 60 * 1000) => {
-  if (cacheKey) {
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < ttl) {
-      return cached.data;
-    }
-  }
-  
-  const response = await api(config);
-  if (cacheKey) {
-    cache.set(cacheKey, { data: response, timestamp: Date.now() });
-  }
-  return response;
-};
-
-// ✅ Request Interceptor (Enhanced)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // ✅ FormData Auto-Type
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
-    } else {
+    } else if (!config.headers['Content-Type']) {
       config.headers['Content-Type'] = 'application/json';
     }
-    
-    // ✅ Progress for Large Uploads
-    if (config.url?.includes('upload') && config.onUploadProgress) {
-      config.onUploadProgress = (progressEvent) => {
-        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-        config.onUploadProgress(percent);
-      };
-    }
-    
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ✅ Response Interceptor (Production Ready)
 api.interceptors.response.use(
-  (response) => {
-    // ✅ Auto-Cache Dashboard/List Responses
-    if (response.config.method === 'get' && response.config.url?.includes('documents/')) {
-      const cacheKey = `${response.config.url}?${new URLSearchParams(response.config.params).toString()}`;
-      cache.set(cacheKey, { data: response, timestamp: Date.now() });
-    }
-    return response;
-  },
+  (response) => response,
   (error) => {
-    const status = error.response?.status;
-    
-    // ✅ 401 Auto-Logout (Enhanced)
-    if (status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      // ✅ Don't redirect if already on login
-      if (!window.location.pathname.includes('/login')) {
-        const params = new URLSearchParams(window.location.search);
-        params.set('expired', 'true');
-        window.location.href = `/login?${params.toString()}`;
+    if (!error.response) {
+      console.error('Network Error: Check backend CORS or internet connection.');
+    }
+    if (error.response?.status === 401) {
+      if (window.location.pathname !== '/login') {
+        localStorage.removeItem('token');
+        window.location.href = '/login?expired=true';
       }
     }
-    
-    // ✅ Network Error Handling
-    if (!error.response) {
-      console.error('🌐 Network Error - Check internet or backend status');
-    }
-    
-    // ✅ Rate Limit Warning
-    if (status === 429) {
-      console.warn('⏳ Rate limited - Try again in 1 minute');
-    }
-    
     return Promise.reject(error);
   }
 );
 
-// ✅ Health Check Helper
-export const checkBackendHealth = async () => {
-  try {
-    const response = await api.get('/documents/health', { timeout: 5000 });
-    return response.data.status === 'OK';
-  } catch {
-    return false;
-  }
-};
 
-export default api;
+
+
+// import axios from 'axios';
+
+// const BASE = (import.meta.env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api').replace(/\/$/, '');
+
+// export const api = axios.create({
+//   baseURL: BASE,
+//   withCredentials: true,
+//   timeout: 45000, // ✅ Reduced (PDFs rarely need 60s)
+//   headers: {
+//     'Accept': 'application/json',
+//     'X-Requested-With': 'XMLHttpRequest' // ✅ CSRF Protection
+//   }
+// });
+
+// /**
+//  * ✅ CLOUDINARY PROXY URL BUILDER (Already Perfect!)
+//  * Backend MUST have: const cloudPath = decodeURIComponent(req.params.path).replace(/~~/g, '/');
+//  */
+// export function buildProxyUrl(cloudinaryUrl) {
+//   if (!cloudinaryUrl) return '';
+//   if (cloudinaryUrl.startsWith('blob:') || cloudinaryUrl.startsWith('data:')) {
+//     return cloudinaryUrl;
+//   }
+//   const parts = cloudinaryUrl.split('/upload/');
+//   if (parts.length < 2) return cloudinaryUrl;
+//   const encoded = parts[1].replace(/\//g, '~~');
+//   return `${BASE}/documents/proxy/${encoded}`;
+// }
+
+// // ✅ Caching Layer (10x Faster Repeated Calls)
+// const cache = new Map();
+// export const cachedApi = async (config, cacheKey = null, ttl = 5 * 60 * 1000) => {
+//   if (cacheKey) {
+//     const cached = cache.get(cacheKey);
+//     if (cached && Date.now() - cached.timestamp < ttl) {
+//       return cached.data;
+//     }
+//   }
+  
+//   const response = await api(config);
+//   if (cacheKey) {
+//     cache.set(cacheKey, { data: response, timestamp: Date.now() });
+//   }
+//   return response;
+// };
+
+// // ✅ Request Interceptor (Enhanced)
+// api.interceptors.request.use(
+//   (config) => {
+//     const token = localStorage.getItem('token');
+//     if (token) {
+//       config.headers.Authorization = `Bearer ${token}`;
+//     }
+    
+//     // ✅ FormData Auto-Type
+//     if (config.data instanceof FormData) {
+//       delete config.headers['Content-Type'];
+//     } else {
+//       config.headers['Content-Type'] = 'application/json';
+//     }
+    
+//     // ✅ Progress for Large Uploads
+//     if (config.url?.includes('upload') && config.onUploadProgress) {
+//       config.onUploadProgress = (progressEvent) => {
+//         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+//         config.onUploadProgress(percent);
+//       };
+//     }
+    
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
+
+// // ✅ Response Interceptor (Production Ready)
+// api.interceptors.response.use(
+//   (response) => {
+//     // ✅ Auto-Cache Dashboard/List Responses
+//     if (response.config.method === 'get' && response.config.url?.includes('documents/')) {
+//       const cacheKey = `${response.config.url}?${new URLSearchParams(response.config.params).toString()}`;
+//       cache.set(cacheKey, { data: response, timestamp: Date.now() });
+//     }
+//     return response;
+//   },
+//   (error) => {
+//     const status = error.response?.status;
+    
+//     // ✅ 401 Auto-Logout (Enhanced)
+//     if (status === 401) {
+//       localStorage.removeItem('token');
+//       localStorage.removeItem('user');
+      
+//       // ✅ Don't redirect if already on login
+//       if (!window.location.pathname.includes('/login')) {
+//         const params = new URLSearchParams(window.location.search);
+//         params.set('expired', 'true');
+//         window.location.href = `/login?${params.toString()}`;
+//       }
+//     }
+    
+//     // ✅ Network Error Handling
+//     if (!error.response) {
+//       console.error('🌐 Network Error - Check internet or backend status');
+//     }
+    
+//     // ✅ Rate Limit Warning
+//     if (status === 429) {
+//       console.warn('⏳ Rate limited - Try again in 1 minute');
+//     }
+    
+//     return Promise.reject(error);
+//   }
+// );
+
+// // ✅ Health Check Helper
+// export const checkBackendHealth = async () => {
+//   try {
+//     const response = await api.get('/documents/health', { timeout: 5000 });
+//     return response.data.status === 'OK';
+//   } catch {
+//     return false;
+//   }
+// };
+
+// export default api;
