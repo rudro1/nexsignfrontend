@@ -452,7 +452,7 @@
 // export default DocumentCard;
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from "../ui/card"; // আপনার কার্ড পাথ অনুযায়ী চেক করে নিন
+import { Card } from "../ui/Card"; // আপনার কার্ড পাথ অনুযায়ী চেক করে নিন
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
