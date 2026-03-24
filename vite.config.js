@@ -52,7 +52,7 @@ export default defineConfig({
     },
   },
   build: {
-    target: 'esnext', // PDF.js 5.x এর আধুনিক মডিউল সাপোর্টের জন্য
+    target: 'esnext', // PDF.js 5.x এর আধুনিক মডিউল সাপোর্টের জন্য এটি জরুরি
   },
   optimizeDeps: {
     include: ['pdfjs-dist'], 

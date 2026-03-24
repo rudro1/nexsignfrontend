@@ -2859,15 +2859,14 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 
-// ✅ ১. আধুনিক মডিউল ইমপোর্ট (Legacy এর বদলে সরাসরি build ব্যবহার)
+// ১. মূল লাইব্রেরি ইমপোর্ট
 import * as pdfjsLib from 'pdfjs-dist';
 
-// ✅ ২. সরাসরি মডিউল ওয়ার্কার ইমপোর্ট (Vite ?url method)
-// এটি node_modules/pdfjs-dist/build/pdf.worker.mjs থেকে ফাইলটি নেবে
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-
-// ✅ ৩. গ্লোবাল ওয়ার্কার সেটআপ
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+/** * ✅ PRODUCTION FIX: 
+ * যেহেতু node_modules পাথ কাজ করছে না, তাই আমরা সরাসরি সঠিক CDN ব্যবহার করছি।
+ * ভার্সন নম্বর ৫.৫.২০৭ একদম ফিক্সড রাখা হয়েছে।
+ */
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs`;
 
 export default function PdfViewer({
   fileUrl, fields, onFieldsChange, currentPage, onPageChange,
@@ -2886,7 +2885,7 @@ export default function PdfViewer({
     [fields, currentPage]
   );
 
-  // ১. PDF লোডিং লজিক
+  // PDF লোড করার লজিক (আপনার ব্যাকএন্ড প্রক্সি সহ)
   useEffect(() => {
     if (!fileUrl) return;
     let isCancelled = false;
@@ -2895,8 +2894,6 @@ export default function PdfViewer({
       setLoading(true);
       try {
         let finalUrl = fileUrl;
-        
-        // Cloudinary/External URL Proxy
         if (!fileUrl.startsWith('blob:') && !fileUrl.startsWith('data:')) {
           const parts = fileUrl.split('/upload/');
           const cloudPath = parts.length > 1 ? parts[1] : encodeURIComponent(fileUrl);
@@ -2924,30 +2921,22 @@ export default function PdfViewer({
     return () => { isCancelled = true; };
   }, [fileUrl, onTotalPagesChange]);
 
-  // ২. রেন্ডারিং লজিক (Responsive Scaling)
   const renderPage = useCallback(async () => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
-    
-    if (renderTaskRef.current) {
-        renderTaskRef.current.cancel();
-    }
+    if (renderTaskRef.current) renderTaskRef.current.cancel();
     
     try {
       const page = await pdfDoc.getPage(currentPage);
       const containerWidth = containerRef.current.clientWidth - 40; 
-      const originalViewport = page.getViewport({ scale: 1 });
-      const scale = containerWidth / originalViewport.width;
-      const viewport = page.getViewport({ scale });
+      const viewport = page.getViewport({ scale: containerWidth / page.getViewport({ scale: 1 }).width });
 
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d', { alpha: false });
-      
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       setCanvasSize({ width: viewport.width, height: viewport.height });
 
-      const renderContext = { canvasContext: context, viewport };
-      renderTaskRef.current = page.render(renderContext);
+      renderTaskRef.current = page.render({ canvasContext: context, viewport });
       await renderTaskRef.current.promise;
     } catch (err) { 
       if (err.name !== 'RenderingCancelledException') console.error(err);
@@ -2956,35 +2945,29 @@ export default function PdfViewer({
 
   useEffect(() => {
     renderPage();
-    const handleResize = () => renderPage();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', renderPage);
+    return () => window.removeEventListener('resize', renderPage);
   }, [renderPage]);
 
-  // ৩. ফিল্ড প্লেসমেন্ট
+  // ফিল্ড প্লেসমেন্ট এবং UI লজিক আগের মতোই শার্প থাকবে
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading || !e.target.classList.contains('pdf-canvas')) return;
-
     const rect = canvasRef.current.getBoundingClientRect();
     const fW = pendingFieldType === 'signature' ? 20 : 15;
     const fH = pendingFieldType === 'signature' ? 8 : 5;
-
     const xPos = ((e.clientX - rect.left) / canvasSize.width) * 100 - (fW / 2);
     const yPos = ((e.clientY - rect.top) / canvasSize.height) * 100 - (fH / 2);
 
-    const newField = {
+    onFieldsChange([...fields, {
       id: `field_${Date.now()}`,
       type: pendingFieldType,
       page: currentPage,
       x: Number(Math.max(0, Math.min(100 - fW, xPos)).toFixed(4)),
       y: Number(Math.max(0, Math.min(100 - fH, yPos)).toFixed(4)),
-      width: fW, 
-      height: fH,
+      width: fW, height: fH,
       partyIndex: Number(selectedPartyIndex),
       value: '' 
-    };
-
-    onFieldsChange([...fields, newField]);
+    }]);
     onFieldPlaced?.();
   };
 
@@ -3001,7 +2984,6 @@ export default function PdfViewer({
           </Button>
         </div>
       )}
-
       <div 
         className="relative bg-white shadow-xl border border-slate-200 overflow-hidden mb-10"
         style={{ width: canvasSize.width || '100%', height: canvasSize.height || '800px' }}
@@ -3010,65 +2992,36 @@ export default function PdfViewer({
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50">
             <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF] mb-2" />
-            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Syncing Document...</p>
+            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Syncing with NeXsign...</p>
           </div>
         )}
-
         <canvas ref={canvasRef} className="pdf-canvas cursor-crosshair block shadow-inner mx-auto" />
-
-        {currentPageFields.map((field) => {
-          const party = parties[field.partyIndex] || { name: 'Signer', color: '#28ABDF' };
-          return (
-            <Rnd
-              key={field.id}
-              size={{ width: `${field.width}%`, height: `${field.height}%` }}
-              position={{ x: (field.x / 100) * canvasSize.width, y: (field.y / 100) * canvasSize.height }}
-              onDragStop={(e, d) => {
-                onFieldsChange(fields.map(f => f.id === field.id ? { 
-                  ...f, 
-                  x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
-                  y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
-                } : f));
-              }}
-              onResizeStop={(e, dir, ref, delta, pos) => {
-                onFieldsChange(fields.map(f => f.id === field.id ? { 
-                  ...f, 
-                  width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)), 
-                  height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)),
-                  x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)),
-                  y: Number(((pos.y / canvasSize.height) * 100).toFixed(4))
-                } : f));
-              }}
-              bounds="parent"
-              disableDragging={readOnly}
-              enableResizing={!readOnly}
-              className="z-20"
-            >
-              <div 
-                className="w-full h-full border-2 border-dashed flex items-center justify-center relative group backdrop-blur-[1px]"
-                style={{ borderColor: party.color, backgroundColor: `${party.color}15` }}
-              >
-                <div className="text-[9px] font-black uppercase text-center pointer-events-none select-none px-1" style={{ color: party.color }}>
-                  {field.type}<br/>{party.name}
-                </div>
-
-                {!readOnly && (
-                  <button 
-                    type="button" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onFieldsChange(fields.filter(f => f.id !== field.id));
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-md transition-all hover:scale-125 z-50"
-                  >
-                    <Trash2 size={10} />
-                  </button>
-                )}
-              </div>
-            </Rnd>
-          );
-        })}
+        {currentPageFields.map((field) => (
+          <Rnd
+            key={field.id}
+            size={{ width: `${field.width}%`, height: `${field.height}%` }}
+            position={{ x: (field.x / 100) * canvasSize.width, y: (field.y / 100) * canvasSize.height }}
+            onDragStop={(e, d) => {
+              onFieldsChange(fields.map(f => f.id === field.id ? { ...f, x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) } : f));
+            }}
+            onResizeStop={(e, dir, ref, delta, pos) => {
+              onFieldsChange(fields.map(f => f.id === field.id ? { ...f, width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)), height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)), x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)), y: Number(((pos.y / canvasSize.height) * 100).toFixed(4)) } : f));
+            }}
+            bounds="parent"
+            disableDragging={readOnly}
+            enableResizing={!readOnly}
+            className="z-20"
+          >
+            <div className="w-full h-full border-2 border-dashed flex items-center justify-center relative group backdrop-blur-[1px]" style={{ borderColor: parties[field.partyIndex]?.color || '#28ABDF', backgroundColor: `${parties[field.partyIndex]?.color || '#28ABDF'}15` }}>
+              <div className="text-[9px] font-black uppercase text-center pointer-events-none select-none px-1" style={{ color: parties[field.partyIndex]?.color || '#28ABDF' }}>{field.type}<br/>{parties[field.partyIndex]?.name || 'Signer'}</div>
+              {!readOnly && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onFieldsChange(fields.filter(f => f.id !== field.id)); }} onMouseDown={(e) => e.stopPropagation()} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-md transition-all hover:scale-125 z-50">
+                  <Trash2 size={10} />
+                </button>
+              )}
+            </div>
+          </Rnd>
+        ))}
       </div>
     </div>
   );
