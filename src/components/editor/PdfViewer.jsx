@@ -2370,6 +2370,7 @@ import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
+// Worker path update
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
 const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#6366f1', '#14b8a6'];
@@ -2377,7 +2378,7 @@ const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#e
 export default function PdfViewer({
   fileUrl, fileId, fields, onFieldsChange, currentPage, onPageChange,
   onTotalPagesChange, pendingFieldType, selectedPartyIndex,
-  parties, onFieldPlaced, readOnly = false, highlightPartyIndex = null,
+  parties, onFieldPlaced, readOnly = false
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -2392,22 +2393,31 @@ export default function PdfViewer({
   );
 
   useEffect(() => {
-    if (!fileUrl && !fileId) return;
+    if (!fileUrl) return;
     let isCancelled = false;
 
     const loadPdfDoc = async () => {
       setLoading(true);
       try {
-        let cloudPath = fileId || (typeof fileUrl === 'string' && fileUrl.includes('upload/') 
-          ? fileUrl.split('upload/')[1].split('/').slice(1).join('/') 
-          : fileUrl);
+        let finalUrl;
+        if (fileUrl.startsWith('blob:')) {
+          finalUrl = fileUrl;
+        } else {
+          // ✅ আপনার লেটেস্ট ব্যাকএন্ড ইউআরএল অনুযায়ী প্রক্সি সেটআপ
+          let cloudPath = fileId || (fileUrl.includes('upload/') 
+            ? fileUrl.split('upload/')[1].split('/').slice(1).join('/') 
+            : fileUrl);
+          finalUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${encodeURIComponent(cloudPath)}`;
+        }
 
-        const encodedPath = encodeURIComponent(cloudPath);
-        const proxyUrl = `https://nextsignbackendfinal.vercel.app/api/documents/proxy/${encodedPath}`;
-
-        const loadingTask = pdfjsLib.getDocument({ url: proxyUrl, withCredentials: true });
-        const doc = await loadingTask.promise;
+        const loadingTask = pdfjsLib.getDocument({ 
+          url: finalUrl, 
+          withCredentials: !fileUrl.startsWith('blob:'),
+          // Encryption হ্যান্ডেল করার জন্য
+          ignoreEncryption: true 
+        });
         
+        const doc = await loadingTask.promise;
         if (!isCancelled) {
           setPdfDoc(doc);
           onTotalPagesChange?.(doc.numPages);
@@ -2428,12 +2438,14 @@ export default function PdfViewer({
     
     const renderPage = async () => {
       if (renderTaskRef.current) renderTaskRef.current.cancel();
-
+      
       try {
         const page = await pdfDoc.getPage(currentPage);
         const containerWidth = containerRef.current?.clientWidth || 700;
-        const viewport = page.getViewport({ scale: (containerWidth - 40) / page.getViewport({ scale: 1 }).width });
-        
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = (containerWidth - 48) / baseViewport.width;
+        const viewport = page.getViewport({ scale });
+
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d', { alpha: false });
         
@@ -2441,7 +2453,7 @@ export default function PdfViewer({
         canvas.height = viewport.height;
         setCanvasSize({ width: viewport.width, height: viewport.height });
 
-        renderTaskRef.current = page.render({ canvasContext: context, viewport: viewport });
+        renderTaskRef.current = page.render({ canvasContext: context, viewport });
         await renderTaskRef.current.promise;
       } catch (err) { 
         if (err.name !== 'RenderingCancelledException') console.error("Render Error:", err);
@@ -2455,131 +2467,122 @@ export default function PdfViewer({
   const handleContainerClick = (e) => {
     if (readOnly || !pendingFieldType || loading) return;
     if (!e.target.classList.contains('pdf-canvas')) return;
-    
+
     const rect = canvasRef.current.getBoundingClientRect();
-    const fW = pendingFieldType === 'signature' ? 22 : 18;
-    const fH = pendingFieldType === 'signature' ? 8 : 5;
-    
+    const fW = pendingFieldType === 'signature' ? 24 : 18;
+    const fH = pendingFieldType === 'signature' ? 10 : 6;
+
+    const xPercent = ((e.clientX - rect.left) / canvasSize.width) * 100 - fW / 2;
+    const yPercent = ((e.clientY - rect.top) / canvasSize.height) * 100 - fH / 2;
+
     const newField = {
-      id: `field_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      id: `field_${Date.now()}`,
       type: pendingFieldType,
       page: currentPage,
-      x: Number((((e.clientX - rect.left) / canvasSize.width) * 100 - fW / 2).toFixed(4)),
-      y: Number((((e.clientY - rect.top) / canvasSize.height) * 100 - fH / 2).toFixed(4)),
+      x: Number(xPercent.toFixed(4)),
+      y: Number(yPercent.toFixed(4)),
       width: fW, 
       height: fH, 
       partyIndex: Number(selectedPartyIndex)
     };
-    
+
     onFieldsChange([...fields, newField]);
     onFieldPlaced?.();
   };
 
-  // ডিলিট ফাংশন ফিক্সড
   const removeField = (id, e) => {
-    e.preventDefault();
-    e.stopPropagation(); // ড্র্যাগিং ইভেন্ট বন্ধ করার জন্য
+    e.preventDefault(); 
+    e.stopPropagation();
     onFieldsChange(fields.filter(f => f.id !== id));
   };
 
   return (
-    <div ref={containerRef} className="flex-1 w-full overflow-hidden p-4">
+    <div ref={containerRef} className="flex-1 w-full overflow-hidden p-6 bg-slate-50/50">
+      {/* Page Navigation */}
       {pdfDoc && pdfDoc.numPages > 1 && (
-        <div className="flex items-center justify-center gap-4 mb-4 select-none relative z-50">
-          <Button 
-            variant="outline" size="icon" 
-            disabled={currentPage <= 1} 
-            onClick={() => onPageChange(currentPage - 1)}
-            className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] hover:bg-[#28ABDF]/5"
-          >
-            <ChevronLeft className="w-4 h-4" />
+        <div className="flex items-center justify-center gap-6 mb-6">
+          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)} className="rounded-xl shadow-sm border-slate-200">
+            <ChevronLeft className="w-4 h-4 mr-1" /> Prev
           </Button>
-
-          <span className="text-sm font-bold bg-[#28ABDF]/10 text-[#28ABDF] px-4 py-1.5 rounded-full border border-[#28ABDF]/20">
-            Page {currentPage} of {pdfDoc.numPages}
+          <span className="text-xs font-bold text-slate-600 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+            PAGE {currentPage} / {pdfDoc.numPages}
           </span>
-
-          <Button 
-            variant="outline" size="icon" 
-            disabled={currentPage >= pdfDoc.numPages} 
-            onClick={() => onPageChange(currentPage + 1)}
-            className="rounded-xl border-[#28ABDF]/30 text-[#28ABDF] hover:bg-[#28ABDF]/5"
-          >
-            <ChevronRight className="w-4 h-4" />
+          <Button variant="outline" size="sm" disabled={currentPage >= pdfDoc.numPages} onClick={() => onPageChange(currentPage + 1)} className="rounded-xl shadow-sm border-slate-200">
+            Next <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </div>
       )}
 
-      <div className="canvas-container relative mx-auto shadow-2xl border bg-white rounded-lg overflow-hidden"
-        style={{ width: canvasSize.width || '100%', height: canvasSize.height || '600px', cursor: pendingFieldType ? 'crosshair' : 'default' }}
+      {/* PDF Surface */}
+      <div 
+        className="canvas-container relative mx-auto shadow-2xl border-4 border-white bg-white rounded-lg overflow-hidden transition-all duration-300" 
+        style={{ 
+          width: canvasSize.width || '100%', 
+          height: canvasSize.height || '600px', 
+          cursor: pendingFieldType ? 'crosshair' : 'default' 
+        }} 
         onClick={handleContainerClick}
       >
         {loading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-50">
-            <Loader2 className="w-8 h-8 animate-spin text-[#28ABDF]" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-50 backdrop-blur-sm">
+            <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF]" />
+            <p className="text-xs font-bold text-slate-400 mt-4 uppercase tracking-widest">Loading Document...</p>
           </div>
         )}
-        
+
         <canvas ref={canvasRef} className="pdf-canvas block mx-auto" />
 
         {currentPageFields.map(field => {
-          const currentIdx = field.partyIndex ?? field.party_index; 
+          const currentIdx = field.partyIndex ?? field.party_index ?? 0; 
           const color = parties?.[currentIdx]?.color || PARTY_COLORS[currentIdx % PARTY_COLORS.length];
-          const isHighlighted = highlightPartyIndex === null || highlightPartyIndex === currentIdx;
-
+          
           return (
-            <Rnd
-              key={field.id}
+            <Rnd 
+              key={field.id} 
               size={{ 
                 width: (field.width / 100) * canvasSize.width, 
                 height: (field.height / 100) * canvasSize.height 
-              }}
+              }} 
               position={{ 
                 x: (field.x / 100) * canvasSize.width, 
                 y: (field.y / 100) * canvasSize.height 
-              }}
-              onDragStop={(e, d) => {
-                onFieldsChange(fields.map(f => f.id === field.id ? { 
-                  ...f, 
-                  x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
-                  y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
-                } : f));
-              }}
-              onResizeStop={(e, dir, ref, delta, pos) => {
-                onFieldsChange(fields.map(f => f.id === field.id ? {
-                  ...f,
-                  width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)),
-                  height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)),
-                  x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)),
-                  y: Number(((pos.y / canvasSize.height) * 100).toFixed(4))
-                } : f));
-              }}
-              bounds="parent"
-              enableResizing={!readOnly}
-              disableDragging={readOnly}
-              cancel=".delete-button" // ড্র্যাগিং থেকে বাটনকে আলাদা করার জন্য
-              className={`z-20 group ${isHighlighted ? 'opacity-100' : 'opacity-20 pointer-events-none'}`}
+              }} 
+              onDragStop={(e, d) => onFieldsChange(fields.map(f => f.id === field.id ? { 
+                ...f, 
+                x: Number(((d.x / canvasSize.width) * 100).toFixed(4)), 
+                y: Number(((d.y / canvasSize.height) * 100).toFixed(4)) 
+              } : f))} 
+              onResizeStop={(e, dir, ref, delta, pos) => onFieldsChange(fields.map(f => f.id === field.id ? { 
+                ...f, 
+                width: Number(((parseFloat(ref.style.width) / canvasSize.width) * 100).toFixed(4)), 
+                height: Number(((parseFloat(ref.style.height) / canvasSize.height) * 100).toFixed(4)), 
+                x: Number(((pos.x / canvasSize.width) * 100).toFixed(4)), 
+                y: Number(((pos.y / canvasSize.height) * 100).toFixed(4)) 
+              } : f))} 
+              bounds="parent" 
+              enableResizing={!readOnly} 
+              disableDragging={readOnly} 
+              className="z-20 group"
             >
               <div 
-                className="w-full h-full border-2 flex items-center justify-center relative bg-white/60 backdrop-blur-[1px]" 
+                className="w-full h-full border-2 flex flex-col items-center justify-center relative bg-white/40 backdrop-blur-[1px] rounded-sm transition-colors" 
                 style={{ borderColor: color }}
               >
+                {/* Party Label */}
                 <div 
-                  className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[8px] font-black text-white uppercase" 
+                  className="absolute -top-5 left-0 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase tracking-tighter" 
                   style={{ backgroundColor: color }}
                 >
                   {parties?.[currentIdx]?.name || `Party ${currentIdx + 1}`}
                 </div>
 
-                <span className="text-[9px] font-black uppercase pointer-events-none" style={{ color }}>
-                  {field.type}
-                </span>
+                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color }}>{field.type}</span>
 
                 {!readOnly && (
                   <button 
-                    type="button"
-                    className="delete-button absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-xl transition-all hover:scale-125 z-[100] cursor-pointer pointer-events-auto"
-                    onMouseDown={(e) => removeField(field.id, e)} // onClick এর বদলে onMouseDown ব্যবহার করা হয়েছে
+                    type="button" 
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 shadow-lg transition-all hover:scale-110 z-50" 
+                    onMouseDown={(e) => removeField(field.id, e)}
                   >
                     <Trash2 size={12} />
                   </button>

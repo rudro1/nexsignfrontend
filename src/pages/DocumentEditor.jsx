@@ -1892,15 +1892,15 @@
 //     </div>
 //   );
 // }
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '../components/ui/Card';
+import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Upload, Save, Send, ArrowLeft, FileText, Loader2, Copy, Check } from 'lucide-react';
+import { Upload, Save, Send, ArrowLeft, FileText, Loader2 } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer from '@/components/editor/PdfViewer';
@@ -1914,7 +1914,6 @@ export default function DocumentEditor() {
   const initialDocId = urlParams.get('id');
 
   const [docId, setDocId] = useState(initialDocId);
-  const [doc, setDoc] = useState(null);
   const [title, setTitle] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [fileId, setFileId] = useState(''); 
@@ -1924,242 +1923,142 @@ export default function DocumentEditor() {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
   const [pendingFieldType, setPendingFieldType] = useState(null);
-  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
-  const [generatedSignLink, setGeneratedSignLink] = useState('');
   const [ccEmails, setCcEmails] = useState([]);
-  const [isCopied, setIsCopied] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
 
-  // ১. ডকুমেন্ট লোড লজিক
+  // টেমপ্লেট বা ড্রাফট ডাটা লোড করা
   useEffect(() => {
-    const init = async () => {
-      if (docId) {
+    const loadInitialData = async () => {
+      if (initialDocId && initialDocId !== 'new') {
         try {
-          const res = await api.get(`/documents/${docId}`);
+          const res = await api.get(`/documents/${initialDocId}`);
           const d = res.data;
           if (d) {
-            setDoc(d);
             setTitle(d.title || '');
             setFileUrl(d.fileUrl || '');
             setFileId(d.fileId || ''); 
             setParties(d.parties || []);
             setCcEmails(d.ccEmails || []);
-            
-            if (d.fields && Array.isArray(d.fields)) {
-              const parsedFields = d.fields.map(f => {
-                if (typeof f === 'string') {
-                  try { return JSON.parse(f); } catch (e) { return f; }
-                }
-                return f;
-              });
-              setFields(parsedFields);
+            if (d.fields) {
+              const parsed = d.fields.map(f => (typeof f === 'string' ? JSON.parse(f) : f));
+              setFields(parsed);
             }
-            setTotalPages(d.totalPages || 1);
           }
-        } catch (error) { toast.error("Failed to load document"); }
+        } catch (error) {
+          toast.error("Failed to load document data");
+        }
       }
     };
-    init();
-  }, [docId]);
+    loadInitialData();
+  }, [initialDocId]);
 
-  // ২. পেলোড ক্লিন আপ লজিক (Product-Grade)
-  const getCleanPayload = useCallback(() => {
-    const formattedCCs = typeof ccEmails === 'string' 
-      ? ccEmails.split(',').map(e => e.trim()).filter(e => e !== "")
-      : ccEmails;
-
-    return {
-      title: title || 'Untitled Document',
-      fileUrl,
-      fileId,
-      parties,
-      fields, 
-      totalPages,
-      ccEmails: Array.isArray(formattedCCs) ? formattedCCs : [], 
-      senderMeta: {
-        name: user?.full_name || user?.name || 'Document Owner',
-        email: user?.email || '',
-        time: new Date().toISOString() // ISO Format API এর জন্য ভালো
-      }
-    };
-  }, [title, fileUrl, fileId, parties, fields, totalPages, ccEmails, user]);
-
-  // ৩. ক্লাউডিনারি আপলোড (Bypassing Vercel Timeout)
-  const handleUpload = async (e) => {
+  const handleLocalUpload = (e) => {
     const file = e.target.files[0];
-    if (!file || file.type !== 'application/pdf') return toast.error("Please select a PDF file");
-
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', 'nextsign'); 
-    formData.append('folder', 'nexsign_docs');
-
-    try {
-      const cloudRes = await axios.post(
-        `https://api.cloudinary.com/v1_1/dk9v5b3zj/raw/upload`,
-        formData
-      );
-
-      const res = await api.post('/documents/upload-metadata', {
-        title: file.name.replace('.pdf', ''),
-        fileUrl: cloudRes.data.secure_url,
-        fileId: cloudRes.data.public_id
-      });
-
-      const data = res.data;
-      setDocId(data._id);
-      setFileUrl(data.fileUrl);
-      setFileId(data.fileId);
-      setTitle(data.title);
-      setDoc(data);
-      
-      window.history.replaceState(null, '', `${window.location.pathname}?id=${data._id}`);
-      toast.success('Document uploaded successfully!');
-    } catch (error) {
-      toast.error('Upload failed. Check your Cloudinary configuration.');
-    } finally {
-      setUploading(false);
-    }
+    if (!file || file.type !== 'application/pdf') return toast.error("Please select a PDF");
+    setPendingFile(file);
+    setFileUrl(URL.createObjectURL(file));
+    setFileId('local_preview'); 
+    setTitle(file.name.replace('.pdf', ''));
   };
 
-  const handleSave = async () => {
-    if (!docId) return toast.error('Upload document first');
-    setSaving(true);
-    try {
-      await api.put(`/documents/${docId}`, getCleanPayload());
-      toast.success('Draft updated');
-    } catch (err) { toast.error('Save failed'); } finally { setSaving(false); }
+  const preparePayload = (overrides = {}) => {
+    return {
+      title: title || 'Untitled Document',
+      fileUrl: overrides.fileUrl || fileUrl,
+      fileId: overrides.fileId || fileId,
+      parties: parties,
+      fields: fields.map(f => JSON.stringify(f)), // Backend requires stringified fields
+      ccEmails: Array.isArray(ccEmails) ? ccEmails : [],
+      senderMeta: {
+        name: user?.full_name || 'NeXsign User',
+        email: user?.email || ''
+      },
+      ...overrides
+    };
   };
 
   const handleSend = async () => {
-    if (!docId || !fileId || parties.length === 0 || fields.length === 0) {
-      return toast.error('Please add parties and fields first');
-    }
+    if (!fileUrl) return toast.error('Upload a PDF first');
+    if (parties.length === 0) return toast.error('Add at least one signer');
+    if (fields.length === 0) return toast.error('Place signature fields on PDF');
 
     setSending(true);
     try {
-      await api.put(`/documents/${docId}`, getCleanPayload());
-      const res = await api.post('/documents/send', { id: docId });
-      
-      if (res.data.success) {
-        if (res.data.signLink) {
-          setGeneratedSignLink(res.data.signLink);
-          toast.success('Signer link generated!');
-        } else {
-          toast.success('Document sent successfully!');
-          setTimeout(() => navigate(isAdmin ? '/admin' : '/dashboard'), 2000);
-        }
+      let finalUrl = fileUrl;
+      let finalId = fileId;
+
+      // যদি নতুন ফাইল হয় তবে Cloudinary-তে আপলোড হবে
+      if (fileId === 'local_preview' && pendingFile) {
+        const formData = new FormData();
+        formData.append('file', pendingFile);
+        formData.append('upload_preset', 'nextsign'); 
+        const cloudRes = await axios.post(`https://api.cloudinary.com/v1_1/dk9v5b3zj/raw/upload`, formData);
+        finalUrl = cloudRes.data.secure_url;
+        finalId = cloudRes.data.public_id;
       }
-    } catch (error) { 
-      toast.error(error.response?.data?.error || 'Failed to send'); 
-    } finally { setSending(false); }
-  };
 
-  const onPageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) setCurrentPage(newPage);
-  };
+      const res = await api.post('/documents/send', preparePayload({ 
+        fileUrl: finalUrl, 
+        fileId: finalId,
+        saveAsTemplate: fileId === 'local_preview' // নতুন ফাইল হলে টেমপ্লেট হিসেবেও সেভ হবে
+      }));
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedSignLink);
-    setIsCopied(true);
-    toast.success("Link copied!");
-    setTimeout(() => setIsCopied(false), 2000);
+      if (res.data.success) {
+        toast.success('Document sent for signature!');
+        navigate(isAdmin ? '/admin' : '/dashboard');
+      }
+    } catch (err) {
+      toast.error('Failed to send document');
+    } finally {
+      setSending(false);
+    }
   };
-
-  const isEditable = !doc || doc.status === 'draft';
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')} 
-            className="rounded-full"
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <Input 
-            value={title} 
-            onChange={e => setTitle(e.target.value)} 
-            placeholder="Document title" 
-            className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 bg-transparent" 
-            disabled={!isEditable} 
+            value={title} onChange={e => setTitle(e.target.value)} 
+            placeholder="Document Title" 
+            className="text-xl font-bold border-none bg-transparent focus-visible:ring-0" 
           />
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
-          <Button variant="outline" onClick={handleSave} disabled={saving || uploading} className="rounded-xl flex-1 sm:flex-none">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save
-          </Button>
-          <Button 
-            onClick={handleSend} 
-            disabled={sending || uploading} 
-            className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl flex-1 sm:flex-none shadow-md"
-          >
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} Send
+          <Button onClick={handleSend} disabled={sending} className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-8 shadow-lg">
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />} 
+            {sending ? 'Sending...' : 'Send Now'}
           </Button>
         </div>
       </div>
 
-      {generatedSignLink && (
-        <Card className="mb-8 p-5 bg-[#28ABDF]/5 border-[#28ABDF] border-2 animate-in fade-in slide-in-from-top-4 duration-500 rounded-2xl shadow-lg">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4 overflow-hidden">
-              <div className="p-3 bg-[#28ABDF] rounded-xl text-white shadow-inner">
-                <Send className="w-6 h-6" />
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Signer Link Ready!</p>
-                <p className="text-xs text-[#28ABDF] truncate font-mono bg-white/80 p-2 rounded-lg border border-[#28ABDF]/20 mt-1">
-                  {generatedSignLink}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="border-[#28ABDF] text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white transition-all font-bold rounded-xl"
-                onClick={copyToClipboard}
-              >
-                {isCopied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-                {isCopied ? 'Copied' : 'Copy Link'}
-              </Button>
-              <Button 
-                size="sm" 
-                className="bg-slate-900 text-white hover:bg-slate-800 font-bold rounded-xl px-6"
-                onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
-              >
-                Done
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
       <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar */}
         <div className="w-full lg:w-80 space-y-6">
-          {!fileId && (
-            <Card className="p-8 border-dashed border-2 flex flex-col items-center text-center hover:bg-slate-50 transition-colors">
-              <Upload className={`w-12 h-12 mb-4 ${uploading ? 'animate-bounce text-[#28ABDF]' : 'text-slate-300'}`} />
-              <Button asChild variant="secondary" disabled={uploading} className="rounded-xl">
-                <label className="cursor-pointer"> {uploading ? 'Uploading...' : 'Select PDF File'}
-                  <input type="file" className="hidden" accept="application/pdf" onChange={handleUpload} />
-                </label>
+          {!fileUrl && (
+            <Card className="p-8 border-dashed border-2 flex flex-col items-center text-center">
+              <Upload className="w-10 h-10 mb-4 text-slate-300" />
+              <Button asChild variant="outline" className="rounded-xl cursor-pointer">
+                <label> Select PDF <input type="file" className="hidden" accept="application/pdf" onChange={handleLocalUpload} /></label>
               </Button>
             </Card>
           )}
-          <Card className="p-5 shadow-sm border-slate-200 rounded-2xl"> 
-            <PartyManager parties={parties} onChange={setParties} /> 
-            <div className="mt-4">
-              <CCInput value={ccEmails} onChange={setCcEmails} />
+          
+          <Card className="p-5 rounded-2xl shadow-sm border-slate-200">
+            <PartyManager parties={parties} onChange={setParties} />
+            <div className="mt-4 border-t pt-4">
+               <CCInput value={ccEmails} onChange={setCcEmails} />
             </div>
           </Card>
-          {fileId && (
-            <Card className="p-5 shadow-sm border-slate-200 rounded-2xl">
+
+          {fileUrl && (
+            <Card className="p-5 rounded-2xl shadow-sm border-slate-200">
               <FieldToolbar 
                 parties={parties} 
                 selectedPartyIndex={selectedPartyIndex} 
@@ -2170,32 +2069,25 @@ export default function DocumentEditor() {
           )}
         </div>
 
-        <div className="flex-1">
-          {fileId ? (
-            <div className="rounded-3xl overflow-hidden border border-slate-200 shadow-xl bg-white">
-              <PdfViewer 
-                fileId={fileId} 
-                fields={fields} 
-                onFieldsChange={setFields} 
-                currentPage={currentPage} 
-                onPageChange={onPageChange}
-                totalPages={totalPages} 
-                onTotalPagesChange={setTotalPages} 
-                pendingFieldType={pendingFieldType} 
-                selectedPartyIndex={selectedPartyIndex} 
-                parties={parties} 
-                onFieldPlaced={() => setPendingFieldType(null)} 
-                readOnly={!isEditable} 
-              />
-            </div>
+        {/* PDF Viewer */}
+        <div className="flex-1 min-h-[800px] bg-white rounded-3xl border shadow-2xl overflow-hidden">
+          {fileUrl ? (
+            <PdfViewer 
+              fileUrl={fileUrl} fileId={fileId} fields={fields} 
+              onFieldsChange={setFields} currentPage={currentPage} 
+              onPageChange={setCurrentPage} totalPages={totalPages} 
+              onTotalPagesChange={setTotalPages} pendingFieldType={pendingFieldType} 
+              selectedPartyIndex={selectedPartyIndex} parties={parties} 
+              onFieldPlaced={() => setPendingFieldType(null)} 
+            />
           ) : (
-            <div className="h-[600px] bg-slate-50 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-slate-400">
-              <FileText className="w-20 h-20 mb-4 opacity-10" /> 
-              <p className="font-medium">No document uploaded yet</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 py-40">
+              <FileText className="w-16 h-16 mb-4 opacity-10" />
+              <p>Please upload a document to start editing</p>
             </div>
           )}
         </div>
       </div>
     </div>
-  ); 
+  );
 }

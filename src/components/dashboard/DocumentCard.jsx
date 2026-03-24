@@ -452,127 +452,139 @@
 // export default DocumentCard;
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from "../ui/Card"; 
+import { Card } from "../ui/card"; // আপনার কার্ড পাথ অনুযায়ী চেক করে নিন
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { FileText, Users, ArrowRight, Clock, CheckCircle2, AlertCircle, Pencil } from 'lucide-react';
+import { FileText, Users, ArrowRight, Clock, CheckCircle2, AlertCircle, Pencil, Layout } from 'lucide-react';
 
-// ১. কনফিগ অবজেক্টটি কম্পোনেন্টের বাইরে নিয়ে আসা হয়েছে যাতে প্রতি রেন্ডারে নতুন মেমরি না নেয়।
 const statusConfig = {
   draft: { label: 'Draft', color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300', icon: Pencil },
-  pending: { label: 'Pending', color: 'bg-amber-100 hover:bg-blue text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
-  in_progress: { label: 'In Progress', color: 'bg-sky-100 hover:bg-blue text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
-  completed: { label: 'Completed', color: 'bg-green-100 hover:bg-blue text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
+  pending: { label: 'Pending', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
+  in_progress: { label: 'In Progress', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
+  completed: { label: 'Completed', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle },
+  template: { label: 'Template', color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400', icon: Layout },
 };
 
 const PARTY_COLORS = ['#0ea5e9','#8b5cf6','#f59e0b','#10b981','#ef4444','#ec4899'];
 
-// ২. React.memo ব্যবহার করা হয়েছে যাতে লিস্ট স্ক্রোল করার সময় অকারণে রি-রেন্ডার না হয়।
 const DocumentCard = React.memo(({ doc }) => {
   const navigate = useNavigate();
-  const config = statusConfig[doc.status] || statusConfig.draft;
+  
+  // ১. স্ট্যাটাস যদি টেমপ্লেট হয়, তবে আলাদা কনফিগ দেখানো
+  const config = useMemo(() => {
+    if (doc.isTemplate) return statusConfig.template;
+    return statusConfig[doc.status] || statusConfig.draft;
+  }, [doc.status, doc.isTemplate]);
+
   const StatusIcon = config.icon;
   const parties = doc.parties || [];
 
-  // ৩. প্রোগ্রেস ক্যালকুলেশন মেমোয়াইজড (পারফরম্যান্স বুস্ট)
   const progress = useMemo(() => {
     if (!parties.length) return 0;
-    const signed = parties.reduce((acc, p) => p.status === 'signed' ? acc + 1 : acc, 0);
-    return Math.round((signed / parties.length) * 100);
+    const signedCount = parties.filter(p => p.status === 'signed').length;
+    return Math.round((signedCount / parties.length) * 100);
   }, [parties]);
 
-  // ৪. কারেন্ট সাইনার লজিক অপ্টিমাইজড
   const currentSigner = useMemo(() => {
-    return parties.length > 0 && doc.status === 'in_progress'
-      ? parties[doc.currentPartyIndex || 0]
-      : null;
-  }, [parties, doc.status, doc.currentPartyIndex]);
+    if (doc.status !== 'in_progress' || doc.isTemplate) return null;
+    return parties[doc.currentPartyIndex || 0];
+  }, [parties, doc.status, doc.currentPartyIndex, doc.isTemplate]);
 
-  // ৫. ডেট ফরম্যাটিং মেমোয়াইজড
   const formattedDate = useMemo(() => {
     const dateString = doc.updatedAt || doc.createdAt;
     if (!dateString) return '';
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric'
-      });
-    } catch (e) { return ''; }
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric'
+    });
   }, [doc.updatedAt, doc.createdAt]);
 
-  // ৬. হ্যান্ডলার মেমোয়াইজড
-  const handleViewAction = useCallback((e) => {
-    e.stopPropagation(); // ইভেন্ট বাবিলিং রোধ
-    if (doc.status === 'completed') {
+  const handleAction = useCallback((e) => {
+    e.stopPropagation();
+    
+    // ২. যদি কমপ্লিটেড হয়, তবে সরাসরি ফাইল ওপেন করা
+    if (doc.status === 'completed' && !doc.isTemplate) {
       if (doc.fileUrl) {
-        const timestamp = new Date(doc.updatedAt).getTime();
-        const finalUrl = `${doc.fileUrl}?v=${timestamp}`;
-        window.open(finalUrl, '_blank');
+        window.open(doc.fileUrl, '_blank');
       } else {
-        toast.error("File URL not found");
+        toast.error("Final document not ready yet.");
       }
-    } else {
-      navigate(`/DocumentEditor?id=${doc._id}`);
+      return;
     }
-  }, [doc.status, doc.fileUrl, doc.updatedAt, doc._id, navigate]);
+
+    // ৩. টেমপ্লেট বা ড্রাফট হলে এডিটরে পাঠানো
+    navigate(`/DocumentEditor?id=${doc._id}${doc.isTemplate ? '&type=template' : ''}`);
+  }, [doc.status, doc.fileUrl, doc._id, doc.isTemplate, navigate]);
 
   return (
-    <Card className="p-4 bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 dark:hover:border-sky-600 transition-all group w-full overflow-hidden will-change-transform">
+    <Card className="p-5 bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/50 hover:shadow-md dark:hover:border-sky-500/50 transition-all group flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0">
-            <FileText className="w-4 h-4 text-sky-500"/>
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+            <FileText className="w-5 h-5 text-sky-500"/>
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-slate-900 dark:text-white truncate text-sm sm:text-base">{doc.title}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{formattedDate}</p>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm sm:text-base tracking-tight">
+              {doc.title || 'Untitled Document'}
+            </h3>
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">{formattedDate}</p>
           </div>
         </div>
-        <Badge className={`${config.color} border-0 font-medium shrink-0`}>
+        <Badge className={`${config.color} border-0 font-semibold px-2 py-0.5 rounded-lg text-[10px] uppercase shadow-sm`}>
           <StatusIcon className="w-3 h-3 mr-1"/>{config.label}
         </Badge>
       </div>
 
-      {/* Parties Section */}
-      {parties.length > 0 && (
-        <div className="mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-3.5 h-3.5 text-slate-400"/>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{parties.length} parties</span>
+      {/* Progress & Parties */}
+      {!doc.isTemplate && (
+        <div className="mb-6 flex-grow">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <Users className="w-3.5 h-3.5"/>
+              <span className="text-xs font-medium">{parties.length} Signers</span>
+            </div>
+            <span className="text-[11px] font-bold text-sky-600 dark:text-sky-400">{progress}% Done</span>
           </div>
-          <div className="flex gap-1 h-1.5">
+          
+          <div className="flex gap-1 h-1.5 bg-slate-100 dark:bg-slate-700/50 rounded-full overflow-hidden p-[1px]">
             {parties.map((p, i) => (
               <div 
                 key={i} 
-                className="rounded-full flex-1 transition-opacity duration-500" 
+                className="rounded-full flex-1 transition-all duration-700 ease-in-out" 
                 style={{ 
-                  backgroundColor: p.status === 'signed' ? '#22c55e' : p.status === 'sent' ? PARTY_COLORS[i % PARTY_COLORS.length] : '#e2e8f0',
-                  opacity: p.status === 'signed' ? 1 : p.status === 'sent' ? 0.6 : 0.3
+                  backgroundColor: p.status === 'signed' ? '#10b981' : p.status === 'sent' ? PARTY_COLORS[i % PARTY_COLORS.length] : 'transparent',
+                  opacity: p.status === 'signed' ? 1 : 0.4
                 }}
               />
             ))}
           </div>
+          
           {currentSigner && (
-            <p className="text-xs text-sky-500 mt-2 italic break-words">Awaiting: {currentSigner.name}</p>
+            <div className="mt-3 flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"/>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                Awaiting: <span className="font-semibold text-slate-700 dark:text-slate-300">{currentSigner.name}</span>
+              </p>
+            </div>
           )}
         </div>
       )}
 
-      {/* Bottom Section */}
-      <div className="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-slate-100 dark:border-slate-700">
-        <span className="text-xs text-slate-400 font-medium">
-          {doc.status === 'completed' ? '100% complete' : `${progress}% complete`}
-        </span>
+      {/* Footer */}
+      <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 dark:border-slate-700/50">
+        <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+           {doc.isTemplate ? 'Template File' : `ID: ...${doc._id?.slice(-5)}`}
+        </div>
         <Button 
           variant="ghost" 
           size="sm" 
-          onClick={handleViewAction} 
-          className="text-sky-500 hover:text-blue-500 hover:bg-blue-200 dark:hover:bg-sky-600 gap-1 font-semibold transition-colors"
+          onClick={handleAction} 
+          className="text-sky-600 hover:text-white hover:bg-sky-500 dark:text-sky-400 dark:hover:bg-sky-600 rounded-lg gap-1.5 font-bold text-xs h-8 px-3 transition-all"
         >
-          {doc.status === 'completed' ? 'View Final' : doc.status === 'draft' ? 'Edit' : 'View'}
-          <ArrowRight className="w-3.5 h-3.5"/>
+          {doc.status === 'completed' ? 'Open PDF' : doc.isTemplate ? 'Use Template' : 'Manage'}
+          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"/>
         </Button>
       </div>
     </Card>
