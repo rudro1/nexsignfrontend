@@ -4692,6 +4692,14 @@
 //   return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full" />;
 // }
 
+
+
+
+
+
+
+
+
 // import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 // import { useParams } from 'react-router-dom';
 // import { api } from '@/api/apiClient';
@@ -5167,6 +5175,9 @@
  * 3. ✅ Handles 410 Gone for already-signed links
  * 4. ✅ Sends deviceInfo + locationData + clientTime to backend for audit trail
  */
+
+
+
 
 
 
