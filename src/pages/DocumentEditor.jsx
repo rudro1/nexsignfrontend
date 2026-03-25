@@ -2067,6 +2067,7 @@ export default function DocumentEditor() {
       }
 
       formData.append('title',      title.trim());
+      
       formData.append('parties',    JSON.stringify(
         parties.map(p => ({ name: p.name.trim(), email: p.email.trim().toLowerCase() }))
       ));

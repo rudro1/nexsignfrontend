@@ -609,6 +609,8 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+// একদম উপরের দিকে ইম্পোর্ট করুন
+import { buildProxyUrl } from '@/api/apiClient';
 import {
   FileText, Users, ArrowRight, Clock,
   CheckCircle2, AlertCircle, Pencil, Layout,
@@ -695,22 +697,38 @@ const DocumentCard = React.memo(({ doc }) => {
     : '';
 }, [doc.createdAt, doc.updatedAt]);
  
-  const handleAction = useCallback((e) => {
-    e.stopPropagation();
-    e.preventDefault();
+  // const handleAction = useCallback((e) => {
+  //   e.stopPropagation();
+  //   e.preventDefault();
 
-    if (doc.status === 'completed' && !doc.isTemplate) {
-      if (doc.fileUrl) {
-        window.open(doc.fileUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        toast.error('Final document is not ready yet.');
-      }
-      return;
+  //   if (doc.status === 'completed' && !doc.isTemplate) {
+  //     if (doc.fileUrl) {
+  //       window.open(doc.fileUrl, '_blank', 'noopener,noreferrer');
+  //     } else {
+  //       toast.error('Final document is not ready yet.');
+  //     }
+  //     return;
+  //   }
+
+  //   navigate(`/DocumentEditor?id=${doc._id}${doc.isTemplate ? '&type=template' : ''}`);
+  // }, [doc, navigate]);
+const handleAction = useCallback((e) => {
+  e.stopPropagation();
+  e.preventDefault();
+
+  if (doc.status === 'completed' && !doc.isTemplate) {
+    if (doc.fileUrl) {
+      // ✅ ফিক্স: সরাসরি fileUrl ব্যবহার না করে buildProxyUrl ফাংশনটি কল করুন
+      const finalUrl = buildProxyUrl(doc.fileUrl);
+      window.open(finalUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      toast.error('Final document is not ready yet.');
     }
+    return;
+  }
 
-    navigate(`/DocumentEditor?id=${doc._id}${doc.isTemplate ? '&type=template' : ''}`);
-  }, [doc, navigate]);
-
+  navigate(`/DocumentEditor?id=${doc._id}${doc.isTemplate ? '&type=template' : ''}`);
+}, [doc, navigate]);
   return (
  <Card
   onClick={handleAction}

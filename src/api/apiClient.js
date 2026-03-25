@@ -211,18 +211,41 @@ export const api = axios.create({
  * ⚠️  You must also update your backend proxy route decoder:
  *     const cloudPath = req.params.path.replace(/~~/g, '/');
  */
+// export function buildProxyUrl(cloudinaryUrl) {
+//   if (!cloudinaryUrl) return '';
+//   if (cloudinaryUrl.startsWith('blob:') || cloudinaryUrl.startsWith('data:')) {
+//     return cloudinaryUrl;
+//   }
+//   const parts = cloudinaryUrl.split('/upload/');
+//   if (parts.length < 2) return cloudinaryUrl;
+//   // Encode slashes as ~~ so express wildcard captures the full path safely
+//   const encoded = parts[1].replace(/\//g, '~~');
+//   return `${BASE}/documents/proxy/${encoded}`;
+// }
+/**
+ * ✅ CORE FIX — Cloudinary Proxy URL Builder with Cache Buster
+ * * কেন এই পরিবর্তন? 
+ * ব্রাউজার অনেক সময় একই URL দেখে পুরনো ফাইল ক্যাশ থেকে দেখায়। 
+ * শেষে ?t=[timestamp] যোগ করলে ব্রাউজার বাধ্য হয়ে সার্ভার থেকে লেটেস্ট ফাইল লোড করে।
+ */
 export function buildProxyUrl(cloudinaryUrl) {
   if (!cloudinaryUrl) return '';
   if (cloudinaryUrl.startsWith('blob:') || cloudinaryUrl.startsWith('data:')) {
     return cloudinaryUrl;
   }
+  
   const parts = cloudinaryUrl.split('/upload/');
   if (parts.length < 2) return cloudinaryUrl;
-  // Encode slashes as ~~ so express wildcard captures the full path safely
-  const encoded = parts[1].replace(/\//g, '~~');
-  return `${BASE}/documents/proxy/${encoded}`;
-}
 
+  // ১. স্ল্যাশগুলোকে '~~' দিয়ে এনকোড করা (আগের মতোই)
+  const encoded = parts[1].replace(/\//g, '~~');
+
+  // ২. ✅ ফিক্স: শেষে একটি ইউনিক টাইমস্ট্যাম্প যোগ করা
+  const cacheBuster = `?t=${new Date().getTime()}`;
+
+  // ৩. ফাইনাল প্রক্সি ইউআরএল রিটার্ন করা
+  return `${BASE}/documents/proxy/${encoded}${cacheBuster}`;
+}
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
