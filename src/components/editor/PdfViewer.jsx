@@ -2854,6 +2854,18 @@
 //     </div>
 //   );
 // }
+
+
+
+
+
+
+
+
+
+
+
+
 // import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 // import { Button } from '@/components/ui/button';
 // import { ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
@@ -2863,6 +2875,12 @@
 
 // pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
+// //import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
+
+
+// pdfjsLib.GlobalWorkerOptions.workerSrc =
+//    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  
 // export default function PdfViewer({
 //   fileUrl, fields, onFieldsChange, currentPage, onPageChange,
 //   onTotalPagesChange, pendingFieldType, selectedPartyIndex,
@@ -3065,6 +3083,12 @@
 //     </div>
 //   );
 // }
+
+
+
+
+
+
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';

@@ -120,6 +120,7 @@ export default function App() {
               position="top-right"
               richColors
               toastOptions={{
+                 duration: 1000,
                 style: { zIndex: 9999 } 
               }}
             /> 

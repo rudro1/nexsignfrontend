@@ -319,7 +319,7 @@ const handleSubmit = async (e) => {
         toast.error("Invalid email or password.");
       }
     } else {
-      toast.error(err.response?.data?.message || 'লগইন ফেইল করেছে।');
+      toast.error(err.response?.data?.message || 'Login Faild');
     }
   } finally {
     setLoading(false);
@@ -353,17 +353,36 @@ const handleSubmit = async (e) => {
   };
 
   //fortgot password
+// const handleForgotPassword = async () => {
+//     if (!formData.email) {
+//       toast.error("Please enter your email first.");
+//       return;
+//     }
+//     try {
+//       await resetPassword(formData.email);
+//     } catch (err) {
+//       // Error handles inside resetPassword via toast
+//     }
+//   };
+
+
 const handleForgotPassword = async () => {
-    if (!formData.email) {
-      toast.error("Please enter your email first.");
-      return;
-    }
-    try {
-      await resetPassword(formData.email);
-    } catch (err) {
-      // Error handles inside resetPassword via toast
-    }
-  };
+  if (!formData.email) {
+    toast.error("Please enter your email first.");
+    return;
+  }
+  try {
+    await resetPassword(formData.email); // Firebase password reset email sent
+    //toast.success("Check your inbox to reset your password.");
+    
+    // Optionally redirect to login page
+    setFormData({ ...formData, password: '' }); // clear password field
+    navigate("/login");
+    
+  } catch (err) {
+    // Error handled in resetPassword
+  }
+};
 
 
   return (
@@ -373,7 +392,7 @@ const handleForgotPassword = async () => {
           <Link to="/"><LogIn className="h-6 w-6 text-sky-500" /></Link>
         </div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Sign In</h1>
-        <p className="text-slate-500 text-sm mt-1">Welcome back to NexSign</p>
+        <p className="text-slate-500 text-sm mt-1">Welcome back to NeXsign</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-sm mx-auto w-full text-left">

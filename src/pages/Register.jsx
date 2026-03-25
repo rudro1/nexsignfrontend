@@ -269,7 +269,7 @@ const handleSubmit = async (e) => {
           <Link to="/"><UserPlus className="h-6 w-6 text-sky-500" /></Link>
         </div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Create Account</h1>
-        <p className="text-slate-500 text-sm mt-1">Join NexSign today</p>
+        <p className="text-slate-500 text-sm mt-1">Join NeXsign today</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3 max-w-sm mx-auto w-full text-left">

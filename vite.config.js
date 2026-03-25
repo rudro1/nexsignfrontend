@@ -60,6 +60,6 @@ export default defineConfig({
         target: 'https://nextsignbackendfinal.vercel.app/api',
         changeOrigin: true,
       },
-    },
-  },
+    }
+  }
 });
