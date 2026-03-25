@@ -2017,14 +2017,51 @@ export default function DocumentEditor() {
   };
 
   // ── Send document ────────────────────────────────────────────────────────
+  // const handleSend = async () => {
+  //   if (!validate()) return;
+  //   setProcessing(true);
+
+  //   try {
+  //     const formData = new FormData();
+
+  //     // ✅ FIX: only append file if it's a fresh File object (not an existing Cloudinary URL)
+  //     if (rawFile instanceof File) {
+  //       formData.append('file', rawFile);
+  //     }
+
+  //     formData.append('title',      title.trim());
+  //     formData.append('parties',    JSON.stringify(
+  //       parties.map(p => ({ name: p.name.trim(), email: p.email.trim().toLowerCase() }))
+  //     ));
+  //     formData.append('ccEmails',   JSON.stringify(ccEmails));
+  //     formData.append('fields',     JSON.stringify(fields));
+  //     formData.append('totalPages', String(totalPages));
+
+  //     const res = await api.post('/documents/upload-and-send', formData);
+
+  //     if (res.data?.success) {
+  //       toast.success('🎉 Document sent to all signers!');
+  //       // Revoke blob URL before navigating away
+  //       if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
+  //       navigate('/dashboard');
+  //     } else {
+  //       toast.error(res.data?.error || 'Something went wrong. Please try again.');
+  //     }
+  //   } catch (err) {
+  //     const msg = err.response?.data?.error || err.message || 'Failed to send document.';
+  //     console.error('Send error:', err.response?.data || err);
+  //     toast.error(msg);
+  //   } finally {
+  //     setProcessing(false);
+  //   }
+  // };
+
   const handleSend = async () => {
     if (!validate()) return;
     setProcessing(true);
 
     try {
       const formData = new FormData();
-
-      // ✅ FIX: only append file if it's a fresh File object (not an existing Cloudinary URL)
       if (rawFile instanceof File) {
         formData.append('file', rawFile);
       }
@@ -2037,25 +2074,33 @@ export default function DocumentEditor() {
       formData.append('fields',     JSON.stringify(fields));
       formData.append('totalPages', String(totalPages));
 
-      const res = await api.post('/documents/upload-and-send', formData);
+      // ১. API কল শুরু করুন কিন্তু await করবেন না (Background processing)
+      api.post('/documents/upload-and-send', formData)
+        .then(res => {
+          if (res.data?.success) {
+            toast.success('🎉 Document processed and sent!');
+          } else {
+            toast.error(res.data?.error || 'Processing failed in background.');
+          }
+        })
+        .catch(err => {
+          console.error('Background send error:', err);
+          toast.error('Failed to send document in background.');
+        });
 
-      if (res.data?.success) {
-        toast.success('🎉 Document sent to all signers!');
-        // Revoke blob URL before navigating away
-        if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
-        navigate('/dashboard');
-      } else {
-        toast.error(res.data?.error || 'Something went wrong. Please try again.');
-      }
+      // ২. ফাইল মেমোরি ফ্রি করুন
+      if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
+
+      // ৩. ইউজারকে সাথে সাথে ড্যাশবোর্ডে পাঠিয়ে দিন
+      toast.info("Sending document in background...");
+      navigate('/dashboard');
+
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Failed to send document.';
-      console.error('Send error:', err.response?.data || err);
+      const msg = err.response?.data?.error || err.message || 'Failed to initiate send.';
       toast.error(msg);
-    } finally {
       setProcessing(false);
     }
   };
-
   const canSend = fileReady && parties.length > 0 && fields.length > 0 && !processing;
 
   return (
