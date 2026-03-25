@@ -4311,8 +4311,6 @@
 //   return <canvas ref={canvasRef} className="w-full h-full" />;
 // }
 
-<<<<<<< Updated upstream
-=======
 
 
 
@@ -4337,7 +4335,6 @@
 
 
 
->>>>>>> Stashed changes
 // import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 // import { useParams } from 'react-router-dom';
 // import { api } from '@/api/apiClient';
@@ -4348,12 +4345,10 @@
 // import { Loader2, CheckCircle2, PenTool, Type, ChevronDown } from 'lucide-react';
 // import SignaturePad from '@/components/signing/SignaturePad';
 // import * as pdfjsLib from 'pdfjs-dist';
-<<<<<<< Updated upstream
 // import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 
 // // ✅ Same worker as PdfViewer — no CDN
 // pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-=======
 // //import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 
 // // ✅ Same worker as PdfViewer — no CDN
@@ -4362,7 +4357,6 @@
 //   `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 
->>>>>>> Stashed changes
 
 // export default function SignerView() {
 //   const { token } = useParams();
