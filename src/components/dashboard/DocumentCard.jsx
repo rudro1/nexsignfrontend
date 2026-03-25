@@ -673,19 +673,28 @@ const DocumentCard = React.memo(({ doc }) => {
     return parties.find(p => p.status !== 'signed') || null;
   }, [parties, doc.status, doc.isTemplate]);
 
-  const formattedDate = useMemo(() => {
-    const dateStr = doc.createdAt || doc.updatedAt;
-    if (!dateStr) return '';
-    try {
-      return new Date(dateStr).toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric',
-      });
-    } catch {
-      return '';
-    }
-  }, [doc.createdAt, doc.updatedAt]);
+  // const formattedDate = useMemo(() => {
+  //   const dateStr = doc.createdAt || doc.updatedAt;
+  //   if (!dateStr) return '';
+  //   try {
+  //     return new Date(dateStr).toLocaleDateString('en-GB', {
+  //       day: '2-digit', month: 'short', year: 'numeric',
+  //     });
+  //   } catch {
+  //     return '';
+  //   }
+  // }, [doc.createdAt, doc.updatedAt]);
 
   // ✅ FIX: action handler with proper event handling
+ const formattedDate = useMemo(() => {
+  const dateStr = doc.createdAt || doc.updatedAt;
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return !isNaN(date) 
+    ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '';
+}, [doc.createdAt, doc.updatedAt]);
+ 
   const handleAction = useCallback((e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -703,10 +712,10 @@ const DocumentCard = React.memo(({ doc }) => {
   }, [doc, navigate]);
 
   return (
-    <Card
-      onClick={handleAction}
-      className="p-5 bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 hover:shadow-xl dark:hover:border-[#28ABDF]/40 hover:border-[#28ABDF]/30 transition-all duration-200 cursor-pointer group flex flex-col h-full rounded-2xl"
-    >
+ <Card
+  onClick={handleAction}
+  className="p-5 bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 hover:shadow-2xl hover:-translate-y-1 dark:hover:border-[#28ABDF]/40 hover:border-[#28ABDF]/30 transition-all duration-300 cursor-pointer group flex flex-col h-full rounded-2xl"
+>
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-5">
         <div className="flex items-center gap-3 min-w-0">

@@ -382,7 +382,7 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import DocumentCard from '@/components/dashboard/DocumentCard';
 import { useAuth } from '@/lib/AuthContext';
 
-const LIMIT = 9; // 3-column grid looks best with multiples of 3
+const LIMIT = 6; // 3-column grid looks best with multiples of 3
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -392,6 +392,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [documents, setDocuments]     = useState([]);
   const [isLoading, setIsLoading]     = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [page, setPage]               = useState(1);
   const [hasMore, setHasMore]         = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -400,55 +401,110 @@ export default function Dashboard() {
   // ✅ FIX: use AbortController to cancel in-flight requests on unmount
   const abortRef = useRef(null);
 
-  const fetchDocuments = useCallback(async (pageNum = 1, append = false) => {
-    // Cancel previous request if still running
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+  // const fetchDocuments = useCallback(async (pageNum = 1, append = false) => {
+  //   // Cancel previous request if still running
+  //   abortRef.current?.abort();
+  //   abortRef.current = new AbortController();
 
-    try {
-      if (!append) setIsLoading(true);
-      else setIsFetchingMore(true);
-      setFetchError(null);
+  //   try {
+  //     if (!append) setIsLoading(true);
+  //     else setIsFetchingMore(true);
+  //     setFetchError(null);
 
-      const res = await api.get('/documents', {
-        params: { page: pageNum, limit: LIMIT },
-        signal: abortRef.current.signal,
-      });
+  //     const res = await api.get('/documents', {
+  //       params: { page: pageNum, limit: LIMIT },
+  //       signal: abortRef.current.signal,
+  //     });
 
-      const rawData      = res.data?.documents || [];
-      const serverHasMore = !!res.data?.hasMore;
+  //     const rawData      = res.data?.documents || [];
+  //     const serverHasMore = !!res.data?.hasMore;
 
-      if (append) {
-        setDocuments(prev => {
-          const existingIds = new Set(prev.map(d => d._id));
-          return [...prev, ...rawData.filter(d => !existingIds.has(d._id))];
-        });
-      } else {
-        setDocuments(rawData);
-      }
-      setHasMore(serverHasMore);
-      setPage(pageNum);
-    } catch (err) {
-      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      console.error('Dashboard fetch error:', err);
-      setFetchError('Failed to load documents. Please refresh.');
-    } finally {
-      setIsLoading(false);
-      setIsFetchingMore(false);
-    }
-  }, []);
+  //     if (append) {
+  //       setDocuments(prev => {
+  //         const existingIds = new Set(prev.map(d => d._id));
+  //         return [...prev, ...rawData.filter(d => !existingIds.has(d._id))];
+  //       });
+  //     } else {
+  //       setDocuments(rawData);
+  //     }
+  //     setHasMore(serverHasMore);
+  //     setPage(pageNum);
+  //   } catch (err) {
+  //     if (err.name === 'CanceledError' || err.name === 'AbortError') return;
+  //     console.error('Dashboard fetch error:', err);
+  //     setFetchError('Failed to load documents. Please refresh.');
+  //   } finally {
+  //     setIsLoading(false);
+  //     setIsFetchingMore(false);
+  //   }
+  // }, []);
 
   // ✅ FIX: redirect admin, fetch on mount — no localStorage cache
-  useEffect(() => {
-    if (authLoading) return;
-    if (isAdmin) {
-      navigate('/admin', { replace: true });
-      return;
-    }
-    fetchDocuments(1, false);
+ 
+ const fetchDocuments = useCallback(async (pageNum = 1, append = false, silent = false) => {
+  abortRef.current?.abort();
+  abortRef.current = new AbortController();
 
-    return () => { abortRef.current?.abort(); };
-  }, [isAdmin, authLoading, navigate, fetchDocuments]);
+  try {
+    // শুধুমাত্র প্রথমবার বা পেজ লোডের সময় মেইন লোডার দেখাবে
+    if (!append && !silent) setIsLoading(true);
+    if (silent) setIsSyncing(true);
+    if (append) setIsFetchingMore(true);
+    setFetchError(null);
+
+    const res = await api.get('/documents', {
+      params: { 
+        page: pageNum, 
+        limit: LIMIT,
+        select: 'title status createdAt isTemplate parties.status parties.name fileUrl' 
+      },
+      signal: abortRef.current.signal,
+    });
+
+    const rawData = res.data?.documents || [];
+    const serverHasMore = !!res.data?.hasMore;
+
+    if (append) {
+      setDocuments(prev => {
+        const existingIds = new Set(prev.map(d => d._id));
+        return [...prev, ...rawData.filter(d => !existingIds.has(d._id))];
+      });
+    } else {
+      // সাইলেন্ট আপডেট হলে ডাটা রিপ্লেস হবে কিন্তু ইউজার টের পাবে না
+      setDocuments(rawData);
+    }
+    setHasMore(serverHasMore);
+    setPage(pageNum);
+  } catch (err) {
+    if (err.name === 'CanceledError' || err.name === 'AbortError') return;
+    setFetchError('Failed to load. Click to retry.');
+  } finally {
+    setIsLoading(false);
+    setIsFetchingMore(false);
+    setIsSyncing(false);
+  }
+}, []);
+ 
+useEffect(() => {
+  if (authLoading) return;
+  if (isAdmin) {
+    navigate('/admin', { replace: true });
+    return;
+  }
+
+  // প্রথমবার ডাটা আনা
+  fetchDocuments(1, false);
+
+  // অটো-রিফ্রেশ লজিক (রিলোড ছাড়া আপডেট)
+  const interval = setInterval(() => {
+    fetchDocuments(1, false, true); 
+  }, 15000); 
+
+  return () => {
+    abortRef.current?.abort();
+    clearInterval(interval);
+  };
+}, [isAdmin, authLoading, navigate, fetchDocuments]);
 
   const handleLoadMore = () => {
     if (!isFetchingMore && hasMore) fetchDocuments(page + 1, true);
@@ -480,14 +536,29 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
+        {/* <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             Welcome back, {user?.full_name?.split(' ')[0] || 'there'} 👋
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
             Manage and track your documents &amp; signatures.
           </p>
-        </div>
+          
+        </div> */}
+
+
+        <div>
+  <div className="flex items-center gap-2">
+    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+      Welcome back, {user?.full_name?.split(' ')[0] || 'there'} 👋
+    </h1>
+    {/* সাইলেন্ট আপডেট হওয়ার সময় এই আইকনটি ঘুরবে */}
+    {isSyncing && <Loader2 className="w-5 h-5 animate-spin text-[#28ABDF] mt-1" />}
+  </div>
+  <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+    {isSyncing ? "Syncing latest data..." : "Manage and track your documents & signatures."}
+  </p>
+</div>
         <Link to="/DocumentEditor?id=new">
           <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl gap-2 shadow-lg px-6 py-5 transition-all active:scale-95 font-semibold">
             <Plus className="w-5 h-5" /> New Document
@@ -557,11 +628,16 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map(doc => (
               <DocumentCard key={doc._id} doc={doc} />
             ))}
-          </div>
+          </div> */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+  {filtered.map(doc => (
+    <DocumentCard key={doc._id} doc={doc} />
+  ))}
+</div>
 
           {/* Load More */}
           {hasMore && (
