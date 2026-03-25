@@ -5291,28 +5291,65 @@ export default function SignerView() {
 
   // ── Render PDF ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!docData?.fileUrl) return;
-    setPdfError(null);
-    const proxyUrl = buildProxyUrl(docData.fileUrl);
+  if (!docData?.fileUrl) return;
+  
+  let isMounted = true;
+  let loadingTask = null;
+  setPdfError(null);
 
-    pdfjsLib.getDocument({ url: proxyUrl, withCredentials: false }).promise
-      .then(async (pdf) => {
-        await new Promise(r => setTimeout(r, 60));
-        const cw    = containerRef.current?.clientWidth || 800;
-        const pages = [];
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page     = await pdf.getPage(i);
-          const scale    = Math.max((cw - 32) / page.getViewport({ scale: 1 }).width, 0.5);
-          const viewport = page.getViewport({ scale });
-          pages.push({ num: i, viewport, pageObj: page });
-        }
-        setPagesData(pages);
-      })
-      .catch(err => {
+  // ১. প্রক্সি ইউআরএল এর সাথে টাইমস্ট্যাম্প যোগ করা (ক্যাশ এড়াতে)
+  const proxyUrl = `${buildProxyUrl(docData.fileUrl)}?t=${Date.now()}`;
+
+  const loadPdf = async () => {
+    try {
+      loadingTask = pdfjsLib.getDocument({ 
+        url: proxyUrl, 
+        withCredentials: false 
+      });
+
+      const pdf = await loadingTask.promise;
+      
+      if (!isMounted) return;
+
+      // পিডিএফ লোড হওয়ার পর ছোট একটা ডিলে (UI থ্রেড ফ্রি রাখতে)
+      await new Promise(r => setTimeout(r, 100));
+
+      const cw = containerRef.current?.clientWidth || 800;
+      const pages = [];
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        // ২. স্কেলিং লজিক (উইডথ অনুযায়ী ফিট করা)
+        const viewport = page.getViewport({ scale: 1 });
+        const scale = (cw - 40) / viewport.width; // ৪০ পিক্সেল প্যাডিং রাখা ভালো
+        const scaledViewport = page.getViewport({ scale: Math.max(scale, 0.5) });
+
+        pages.push({ 
+          num: i, 
+          viewport: scaledViewport, 
+          pageObj: page 
+        });
+      }
+
+      if (isMounted) setPagesData(pages);
+    } catch (err) {
+      if (isMounted && err.name !== 'RenderingCancelledException') {
         console.error('PDF load error:', err);
         setPdfError('Could not load document PDF.');
-      });
-  }, [docData]);
+      }
+    }
+  };
+
+  loadPdf();
+
+  // ৩. ক্লিনআপ ফাংশন
+  return () => {
+    isMounted = false;
+    if (loadingTask) {
+      loadingTask.destroy(); // পুরনো টাস্ক কিল করা
+    }
+  };
+}, [docData]);
 
   // ── Auto-scroll to first unsigned field ──────────────────────────────────
   useEffect(() => {
@@ -5361,7 +5398,7 @@ export default function SignerView() {
   }, [textValue, activeField, myPartyIndex]);
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
     const remaining = myFields.filter(f => !f.filled).length;
     if (remaining > 0) {
       toast.error(`Please fill all ${remaining} remaining field(s).`);
@@ -5369,27 +5406,41 @@ export default function SignerView() {
       first && document.getElementById(`field-${first.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    
     setSubmitting(true);
 
-    // Collect geo + device info in parallel (non-blocking to UX)
-    const [locationData, deviceInfo] = await Promise.all([
-      getGeoLocation().catch(() => ({ text: 'Unknown' })),
-      Promise.resolve(getDeviceInfo()),
-    ]);
-
     try {
-      await api.post('/documents/sign/submit', {
+      // ১. প্যারালালি ডেটা কালেক্ট করা
+      const [locationData, deviceInfo] = await Promise.all([
+        getGeoLocation().catch(() => ({ text: 'Unknown' })),
+        Promise.resolve(getDeviceInfo()),
+      ]);
+
+      // ২. এপিআই কল
+      const response = await api.post('/documents/sign/submit', {
         token,
         fields:       fieldsRef.current,
         locationData,
         deviceInfo,
         clientTime:   new Date().toISOString(),
       });
-      setCompleted(true);
-      toast.success('Document signed successfully!');
+
+      // ৩. ব্যাকএন্ড রেসপন্স অনুযায়ী হ্যান্ডলিং
+      if (response.data.success) {
+        setCompleted(true);
+        
+        if (response.data.completed) {
+          toast.success('Document finalized and all parties notified!');
+        } else {
+          toast.success('Your signature recorded! Notifying next person...');
+        }
+      }
     } catch (err) {
       setSubmitting(false);
-      toast.error(err.response?.data?.error || 'Submission failed. Please try again.');
+      // এরর মেসেজ আরও স্পেসিফিক করা
+      const errMsg = err.response?.data?.error || 'Submission failed. Please check your connection.';
+      toast.error(errMsg);
+      console.error('Submit Error:', err);
     }
   };
 
@@ -5619,19 +5670,60 @@ function PageCanvas({ page }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     let cancelled = false;
-    const ratio   = window.devicePixelRatio || 1;
-    canvas.width  = page.viewport.width  * ratio;
-    canvas.height = page.viewport.height * ratio;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(ratio, ratio);
-    const task = page.pageObj.render({ canvasContext: ctx, viewport: page.viewport });
-    task.promise.catch(err => { if (!cancelled && err.name !== 'RenderingCancelledException') console.error(err); });
-    return () => { cancelled = true; try { task.cancel(); } catch (_) {} };
+    let renderTask = null;
+
+    const renderPage = async () => {
+      try {
+        const ratio = window.devicePixelRatio || 1;
+        const ctx = canvas.getContext('2d', { alpha: false }); // পারফরম্যান্সের জন্য alpha false রাখা ভালো যদি পিডিএফ ট্রান্সপারেন্ট না হয়
+
+        canvas.width = page.viewport.width * ratio;
+        canvas.height = page.viewport.height * ratio;
+        
+        ctx.scale(ratio, ratio);
+
+        renderTask = page.pageObj.render({ 
+          canvasContext: ctx, 
+          viewport: page.viewport 
+        });
+
+        await renderTask.promise;
+      } catch (err) {
+        if (!cancelled && err.name !== 'RenderingCancelledException') {
+          console.error('Canvas render error:', err);
+        }
+      }
+    };
+
+    renderPage();
+
+    return () => {
+      cancelled = true;
+      if (renderTask) {
+        try {
+          renderTask.cancel();
+        } catch (e) {
+          // ক্যানসেল করার সময় এরর ইগনোর করুন
+        }
+      }
+      // ৩. পেজ অবজেক্ট ক্লিনআপ (মেমোরি সেভ করতে)
+      if (page.pageObj && page.pageObj.cleanup) {
+        page.pageObj.cleanup();
+      }
+    };
   }, [page]);
 
   return (
-    <canvas ref={canvasRef} className="absolute top-0 left-0"
-      style={{ width: page.viewport.width, height: page.viewport.height }} />
+    <canvas 
+      ref={canvasRef} 
+      className="absolute top-0 left-0 shadow-sm"
+      style={{ 
+        width: page.viewport.width, 
+        height: page.viewport.height,
+        display: 'block' 
+      }} 
+    />
   );
 }
