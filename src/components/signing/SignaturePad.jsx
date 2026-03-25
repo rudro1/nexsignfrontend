@@ -709,130 +709,335 @@
 //   );
 // }
 
+// import React, { useRef, useState, useEffect, useCallback } from 'react';
+// import { Button } from '@/components/ui/button';
+// import { Input } from '@/components/ui/input';
+// import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+// import { Eraser, Check, Type as TypeIcon, PenTool } from 'lucide-react';
+
+// export default function SignaturePad({ onSignatureComplete }) {
+//   const canvasRef = useRef(null);
+//   const [isDrawing, setIsDrawing] = useState(false);
+//   const [hasDrawn, setHasDrawn] = useState(false);
+//   const [typedSig, setTypedSig] = useState('');
+//   const [mode, setMode] = useState('draw');
+
+//   // ১. ক্যানভাস সেটআপ এবং হাই-রেজোলিউশন সাপোর্ট
+//   useEffect(() => {
+//     const canvas = canvasRef.current;
+//     if (!canvas || mode !== 'draw') return;
+
+//     const ctx = canvas.getContext('2d');
+//     const dpr = window.devicePixelRatio || 1;
+//     const rect = canvas.getBoundingClientRect();
+
+//     // রেজোলিউশন শার্প করার জন্য Scaling
+//     canvas.width = rect.width * dpr;
+//     canvas.height = rect.height * dpr;
+//     ctx.scale(dpr, dpr);
+
+//     // ড্রয়িং স্টাইল
+//     ctx.strokeStyle = '#000000';
+//     ctx.lineWidth = 2.5;
+//     ctx.lineCap = 'round';
+//     ctx.lineJoin = 'round';
+//   }, [mode]);
+
+//   // ২. পজিশন ক্যালকুলেটর (Optimized for Mobile/Desktop)
+//   const getPos = useCallback((e) => {
+//     const canvas = canvasRef.current;
+//     if (!canvas) return { x: 0, y: 0 };
+//     const rect = canvas.getBoundingClientRect();
+//     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+//     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+//     return { 
+//       x: clientX - rect.left, 
+//       y: clientY - rect.top 
+//     };
+//   }, []);
+
+//   const startDraw = (e) => {
+//     const pos = getPos(e);
+//     const ctx = canvasRef.current.getContext('2d');
+//     ctx.beginPath();
+//     ctx.moveTo(pos.x, pos.y);
+//     setIsDrawing(true);
+//   };
+
+//   const draw = (e) => {
+//     if (!isDrawing) return;
+//     const pos = getPos(e);
+//     const ctx = canvasRef.current.getContext('2d');
+//     ctx.lineTo(pos.x, pos.y);
+//     ctx.stroke();
+//     setHasDrawn(true);
+//   };
+
+//   const endDraw = () => setIsDrawing(false);
+
+//   const clearCanvas = () => {
+//     const canvas = canvasRef.current;
+//     if (!canvas) return;
+//     const ctx = canvas.getContext('2d');
+//     // ক্যানভাস পুরোপুরি পরিষ্কার (স্বচ্ছ) করা
+//     ctx.clearRect(0, 0, canvas.width, canvas.height);
+//     setHasDrawn(false);
+//   };
+
+//   // ৩. সিগনেচার কনফার্মেশন লজিক (Transparent PNG Fix)
+//   const handleConfirm = () => {
+//     let finalValue = "";
+
+//     if (mode === 'draw') {
+//       if (!hasDrawn) return;
+//       // সরাসরি স্বচ্ছ PNG এক্সপোর্ট (সাদা ব্যাকগ্রাউন্ড ছাড়াই)
+//       finalValue = canvasRef.current.toDataURL('image/png');
+//     } else {
+//       if (!typedSig.trim()) return;
+
+//       const canvas = document.createElement('canvas');
+//       canvas.width = 1000; 
+//       canvas.height = 250;
+//       const ctx = canvas.getContext('2d');
+
+//       // নিশ্চিত করা যে ক্যানভাসটি স্বচ্ছ
+//       ctx.clearRect(0, 0, canvas.width, canvas.height); 
+
+//       // প্রফেশনাল টেক্সট স্টাইল
+//       ctx.fillStyle = '#000000'; 
+//       ctx.font = '500 85px "Times New Roman", serif'; 
+//       ctx.textAlign = 'center';
+//       ctx.textBaseline = 'middle';
+      
+//       ctx.fillText(typedSig, 500, 125);
+//       finalValue = canvas.toDataURL('image/png');
+//     }
+
+//     onSignatureComplete(finalValue);
+//   };
+
+//   return (
+//     <div className="space-y-5 animate-in fade-in duration-300">
+//       <Tabs value={mode} onValueChange={setMode} className="w-full">
+//         <TabsList className="grid grid-cols-2 w-full bg-slate-100 rounded-xl p-1">
+//           <TabsTrigger value="draw" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+//             <PenTool className="w-4 h-4" /> Draw
+//           </TabsTrigger>
+//           <TabsTrigger value="type" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+//             <TypeIcon className="w-4 h-4" /> Type
+//           </TabsTrigger>
+//         </TabsList>
+
+//         <TabsContent value="draw" className="mt-4 outline-none">
+//           <div className="relative border-2 border-slate-200 rounded-2xl bg-slate-50 shadow-inner group transition-all hover:border-sky-200 overflow-hidden">
+//             <canvas
+//               ref={canvasRef}
+//               className="w-full h-44 cursor-crosshair touch-none bg-white/50"
+//               onMouseDown={startDraw}
+//               onMouseMove={draw}
+//               onMouseUp={endDraw}
+//               onMouseLeave={endDraw}
+//               onTouchStart={startDraw}
+//               onTouchMove={draw}
+//               onTouchEnd={endDraw}
+//             />
+//           </div>
+//           <div className="flex justify-between items-center mt-3">
+//             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-2">Sign within the box</p>
+//             <Button variant="ghost" size="sm" onClick={clearCanvas} className="text-rose-500 hover:bg-rose-50 rounded-lg">
+//               <Eraser className="w-4 h-4 mr-2" /> Clear
+//             </Button>
+//           </div>
+//         </TabsContent>
+
+//         <TabsContent value="type" className="mt-4 outline-none">
+//           <div className="relative">
+//             <Input
+//               value={typedSig}
+//               onChange={e => setTypedSig(e.target.value)}
+//               placeholder="Enter your full name..."
+//               className="h-28 text-4xl text-center rounded-2xl border-2 border-slate-200 focus:border-sky-500 focus:ring-0 transition-all bg-slate-50/30"
+//               style={{ fontFamily: '"Times New Roman", serif' }} 
+//             />
+//             {typedSig && (
+//               <p className="absolute bottom-2 right-4 text-[9px] text-slate-400 italic">Signature Preview</p>
+//             )}
+//           </div>
+//         </TabsContent>
+//       </Tabs>
+
+//       <Button
+//         onClick={handleConfirm}
+//         disabled={(mode === 'draw' && !hasDrawn) || (mode === 'type' && !typedSig.trim())}
+//         className="w-full h-14 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl shadow-xl shadow-sky-100 transition-all active:scale-[0.98] font-bold text-lg"
+//       >
+//         <Check className="w-6 h-6 mr-2" /> Use This Signature
+//       </Button>
+//     </div>
+//   );
+// }
+
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Eraser, Check, Type as TypeIcon, PenTool } from 'lucide-react';
 
+// ─── FONT OPTIONS for typed signatures ──────────────────────────────────────
+const FONT_OPTIONS = [
+  { label: 'Classic Serif',   value: '"Times New Roman", Georgia, serif' },
+  { label: 'Cursive Script',  value: '"Brush Script MT", "Dancing Script", cursive' },
+  { label: 'Modern Sans',     value: '"Helvetica Neue", Arial, sans-serif' },
+  { label: 'Monospace',       value: '"Courier New", Courier, monospace' },
+];
+
 export default function SignaturePad({ onSignatureComplete }) {
-  const canvasRef = useRef(null);
+  const canvasRef   = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [hasDrawn, setHasDrawn] = useState(false);
-  const [typedSig, setTypedSig] = useState('');
-  const [mode, setMode] = useState('draw');
+  const [hasDrawn,  setHasDrawn]  = useState(false);
+  const [typedSig,  setTypedSig]  = useState('');
+  const [mode,      setMode]      = useState('draw');
+  const [fontIndex, setFontIndex] = useState(0); // for typed mode
 
-  // ১. ক্যানভাস সেটআপ এবং হাই-রেজোলিউশন সাপোর্ট
-  useEffect(() => {
+  // ── Canvas setup — TRANSPARENT background ───────────────────────────────
+  const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || mode !== 'draw') return;
+    if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
+    const dpr  = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
 
-    // রেজোলিউশন শার্প করার জন্য Scaling
-    canvas.width = rect.width * dpr;
+    // Physical pixel size
+    canvas.width  = rect.width  * dpr;
     canvas.height = rect.height * dpr;
+
+    const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    // ড্রয়িং স্টাইল
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  }, [mode]);
+    // ✅ DO NOT fill background — leave transparent
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth   = 2.2;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+  }, []);
 
-  // ২. পজিশন ক্যালকুলেটর (Optimized for Mobile/Desktop)
+  useEffect(() => {
+    if (mode === 'draw') {
+      // Small delay to let the DOM render
+      setTimeout(initCanvas, 50);
+    }
+  }, [mode, initCanvas]);
+
+  // ── Pointer position helper ──────────────────────────────────────────────
   const getPos = useCallback((e) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { 
-      x: clientX - rect.left, 
-      y: clientY - rect.top 
+    const rect   = canvas.getBoundingClientRect();
+    const src    = e.touches ? e.touches[0] : e;
+    return {
+      x: src.clientX - rect.left,
+      y: src.clientY - rect.top,
     };
   }, []);
 
-  const startDraw = (e) => {
+  const startDraw = useCallback((e) => {
+    e.preventDefault();
     const pos = getPos(e);
-    const ctx = canvasRef.current.getContext('2d');
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
     setIsDrawing(true);
-  };
+  }, [getPos]);
 
-  const draw = (e) => {
+  const draw = useCallback((e) => {
+    e.preventDefault();
     if (!isDrawing) return;
     const pos = getPos(e);
-    const ctx = canvasRef.current.getContext('2d');
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
     setHasDrawn(true);
-  };
+  }, [isDrawing, getPos]);
 
-  const endDraw = () => setIsDrawing(false);
+  const endDraw = useCallback((e) => {
+    e?.preventDefault();
+    setIsDrawing(false);
+  }, []);
 
-  const clearCanvas = () => {
+  const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    // ক্যানভাস পুরোপুরি পরিষ্কার (স্বচ্ছ) করা
+    // ✅ clearRect preserves transparency (no fillRect white)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
-  };
+  }, []);
 
-  // ৩. সিগনেচার কনফার্মেশন লজিক (Transparent PNG Fix)
-  const handleConfirm = () => {
-    let finalValue = "";
+  // ── Confirm — always export as transparent PNG ───────────────────────────
+  const handleConfirm = useCallback(() => {
+    let finalValue = '';
 
     if (mode === 'draw') {
       if (!hasDrawn) return;
-      // সরাসরি স্বচ্ছ PNG এক্সপোর্ট (সাদা ব্যাকগ্রাউন্ড ছাড়াই)
-      finalValue = canvasRef.current.toDataURL('image/png');
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      // ✅ KEY FIX: toDataURL on a canvas that was NEVER filled = transparent PNG
+      // No white background, no fillRect, clean alpha channel.
+      finalValue = canvas.toDataURL('image/png');
+
     } else {
+      // Typed signature — render on a transparent canvas
       if (!typedSig.trim()) return;
 
       const canvas = document.createElement('canvas');
-      canvas.width = 1000; 
-      canvas.height = 250;
+      canvas.width  = 900;
+      canvas.height = 220;
       const ctx = canvas.getContext('2d');
 
-      // নিশ্চিত করা যে ক্যানভাসটি স্বচ্ছ
-      ctx.clearRect(0, 0, canvas.width, canvas.height); 
+      // ✅ DO NOT call fillRect — canvas starts transparent
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // প্রফেশনাল টেক্সট স্টাইল
-      ctx.fillStyle = '#000000'; 
-      ctx.font = '500 85px "Times New Roman", serif'; 
-      ctx.textAlign = 'center';
+      const font = FONT_OPTIONS[fontIndex]?.value || FONT_OPTIONS[0].value;
+      ctx.fillStyle    = '#1a1a1a';
+      ctx.font         = `italic 90px ${font}`;
+      ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
-      
-      ctx.fillText(typedSig, 500, 125);
+      ctx.fillText(typedSig.trim(), 450, 110);
+
       finalValue = canvas.toDataURL('image/png');
     }
 
     onSignatureComplete(finalValue);
-  };
+  }, [mode, hasDrawn, typedSig, fontIndex, onSignatureComplete]);
+
+  const canConfirm = mode === 'draw' ? hasDrawn : typedSig.trim().length > 0;
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-300">
-      <Tabs value={mode} onValueChange={setMode} className="w-full">
+    <div className="space-y-5">
+      <Tabs value={mode} onValueChange={(v) => { setMode(v); setHasDrawn(false); setTypedSig(''); }} className="w-full">
         <TabsList className="grid grid-cols-2 w-full bg-slate-100 rounded-xl p-1">
-          <TabsTrigger value="draw" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger value="draw" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-semibold">
             <PenTool className="w-4 h-4" /> Draw
           </TabsTrigger>
-          <TabsTrigger value="type" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger value="type" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-semibold">
             <TypeIcon className="w-4 h-4" /> Type
           </TabsTrigger>
         </TabsList>
 
+        {/* ── DRAW TAB ── */}
         <TabsContent value="draw" className="mt-4 outline-none">
-          <div className="relative border-2 border-slate-200 rounded-2xl bg-slate-50 shadow-inner group transition-all hover:border-sky-200 overflow-hidden">
+          {/* ✅ Canvas wrapper: NO bg-white class — must be transparent */}
+          <div className="relative border-2 border-slate-200 rounded-2xl overflow-hidden shadow-inner hover:border-sky-300 transition-colors"
+               style={{ background: 'repeating-linear-gradient(45deg,#f8fafc 0,#f8fafc 10px,#f0f4f8 10px,#f0f4f8 20px)' }}>
             <canvas
               ref={canvasRef}
-              className="w-full h-44 cursor-crosshair touch-none bg-white/50"
+              // ✅ NO bg-white here — CSS background is decorative only (not captured)
+              className="w-full h-44 cursor-crosshair touch-none block"
+              style={{ background: 'transparent' }}
               onMouseDown={startDraw}
               onMouseMove={draw}
               onMouseUp={endDraw}
@@ -841,37 +1046,68 @@ export default function SignaturePad({ onSignatureComplete }) {
               onTouchMove={draw}
               onTouchEnd={endDraw}
             />
+            {!hasDrawn && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <p className="text-slate-300 text-sm font-medium select-none">Draw your signature here</p>
+              </div>
+            )}
           </div>
           <div className="flex justify-between items-center mt-3">
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-2">Sign within the box</p>
-            <Button variant="ghost" size="sm" onClick={clearCanvas} className="text-rose-500 hover:bg-rose-50 rounded-lg">
-              <Eraser className="w-4 h-4 mr-2" /> Clear
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+              Sign inside the box above
+            </p>
+            <Button variant="ghost" size="sm" onClick={clearCanvas}
+              className="text-rose-500 hover:bg-rose-50 rounded-lg gap-1.5">
+              <Eraser className="w-3.5 h-3.5" /> Clear
             </Button>
           </div>
         </TabsContent>
 
-        <TabsContent value="type" className="mt-4 outline-none">
-          <div className="relative">
+        {/* ── TYPE TAB ── */}
+        <TabsContent value="type" className="mt-4 outline-none space-y-3">
+          {/* Font selector */}
+          <div className="flex gap-2 flex-wrap">
+            {FONT_OPTIONS.map((f, i) => (
+              <button
+                key={i}
+                onClick={() => setFontIndex(i)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  fontIndex === i
+                    ? 'border-sky-500 bg-sky-50 text-sky-700'
+                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                }`}
+                style={{ fontFamily: f.value }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Typed preview */}
+          <div className="relative border-2 border-slate-200 rounded-2xl overflow-hidden hover:border-sky-300 transition-colors"
+               style={{ background: 'repeating-linear-gradient(45deg,#f8fafc 0,#f8fafc 10px,#f0f4f8 10px,#f0f4f8 20px)' }}>
             <Input
               value={typedSig}
               onChange={e => setTypedSig(e.target.value)}
-              placeholder="Enter your full name..."
-              className="h-28 text-4xl text-center rounded-2xl border-2 border-slate-200 focus:border-sky-500 focus:ring-0 transition-all bg-slate-50/30"
-              style={{ fontFamily: '"Times New Roman", serif' }} 
+              placeholder="Type your full name..."
+              className="h-24 text-3xl sm:text-4xl text-center border-none bg-transparent focus-visible:ring-0 font-medium"
+              style={{ fontFamily: FONT_OPTIONS[fontIndex]?.value, fontStyle: 'italic' }}
             />
-            {typedSig && (
-              <p className="absolute bottom-2 right-4 text-[9px] text-slate-400 italic">Signature Preview</p>
-            )}
           </div>
+          {typedSig && (
+            <p className="text-[10px] text-slate-400 text-right italic">
+              Preview — will be rendered in {FONT_OPTIONS[fontIndex]?.label}
+            </p>
+          )}
         </TabsContent>
       </Tabs>
 
       <Button
         onClick={handleConfirm}
-        disabled={(mode === 'draw' && !hasDrawn) || (mode === 'type' && !typedSig.trim())}
-        className="w-full h-14 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl shadow-xl shadow-sky-100 transition-all active:scale-[0.98] font-bold text-lg"
+        disabled={!canConfirm}
+        className="w-full h-13 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl shadow-lg font-bold text-base transition-all active:scale-[0.98] disabled:opacity-40 py-3"
       >
-        <Check className="w-6 h-6 mr-2" /> Use This Signature
+        <Check className="w-5 h-5 mr-2" /> Use This Signature
       </Button>
     </div>
   );
