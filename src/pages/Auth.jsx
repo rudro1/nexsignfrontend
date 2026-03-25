@@ -38,7 +38,7 @@ export default function Auth({ initialMode = "login" }) {
           {/* Dynamic Content based on isLogin */}
           <div className="space-y-6">
             <h2 className="text-4xl font-bold">
-              {isLogin ? "Welcome Back!" : "Let's Get Started gggg!"}
+              {isLogin ? "Welcome Back!" : "Let's Get Started !"}
             </h2>
             <p className="opacity-90 leading-relaxed text-lg">
               {isLogin 
