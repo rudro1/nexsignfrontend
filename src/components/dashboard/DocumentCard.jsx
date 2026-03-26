@@ -609,11 +609,10 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-// একদম উপরের দিকে ইম্পোর্ট করুন
-import { buildProxyUrl } from '@/api/apiClient';
+import { api, buildProxyUrl } from '@/api/apiClient';
 import {
   FileText, Users, ArrowRight, Clock,
-  CheckCircle2, AlertCircle, Pencil, Layout,
+  CheckCircle2, AlertCircle, Pencil, Layout, Eye, ShieldCheck,
 } from 'lucide-react';
 
 const statusConfig = {
@@ -729,6 +728,33 @@ const handleAction = useCallback((e) => {
 
   navigate(`/DocumentEditor?id=${doc._id}${doc.isTemplate ? '&type=template' : ''}`);
 }, [doc, navigate]);
+
+const handleOpenAudit = useCallback((e) => {
+  e.stopPropagation();
+  e.preventDefault();
+  navigate(`/audit?id=${doc._id}`);
+}, [doc._id, navigate]);
+
+const handlePublishTemplate = useCallback(async (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+  try {
+    const res = await api.post(`/documents/templates/${doc._id}/publish`);
+    if (res.data?.success) {
+      toast.success('Template published');
+    }
+  } catch (err) {
+    toast.error(err.response?.data?.error || 'Failed to publish template');
+  }
+}, [doc._id]);
+
+const monitorStats = useMemo(() => {
+  const sent = parties.filter(p => p.status === 'sent' || p.status === 'signed').length;
+  const opened = parties.filter(p => (p.linkOpenCount || 0) > 0 || p.linkOpenedAt).length;
+  const signed = parties.filter(p => p.status === 'signed').length;
+  return { sent, opened, signed, total: parties.length };
+}, [parties]);
+
   return (
  <Card
   onClick={handleAction}
@@ -800,6 +826,11 @@ const handleAction = useCallback((e) => {
               </p>
             </div>
           )}
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
+            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Sent {monitorStats.sent}/{monitorStats.total}</span>
+            <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Opened {monitorStats.opened}</span>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Signed {monitorStats.signed}</span>
+          </div>
         </div>
       )}
 
@@ -827,6 +858,18 @@ const handleAction = useCallback((e) => {
           <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
         </Button>
       </div>
+      {!doc.isTemplate && (
+        <div className="mt-2 flex gap-2">
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleOpenAudit}>
+            <ShieldCheck className="w-3 h-3 mr-1" /> Audit
+          </Button>
+          {doc.status === 'draft' && (
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handlePublishTemplate}>
+              Publish Template
+            </Button>
+          )}
+        </div>
+      )}
     </Card>
   );
 });

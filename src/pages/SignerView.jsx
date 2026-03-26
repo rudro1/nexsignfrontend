@@ -5222,8 +5222,11 @@ const getGeoLocation = () => new Promise((resolve) => {
         const data = await r.json();
         resolve({
           city:    data.address?.city || data.address?.town || data.address?.village || 'Unknown',
+          region:  data.address?.state || data.address?.region || '',
           country: data.address?.country || 'Unknown',
           postal:  data.address?.postcode || '',
+          postalCode: data.address?.postcode || '',
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
           text:    `${data.address?.city || ''}, ${data.address?.country || ''}`,
         });
       } catch {

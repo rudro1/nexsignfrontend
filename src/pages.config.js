@@ -77,6 +77,8 @@ import Dashboard from './pages/Dashboard';
 import DocumentEditor from './pages/DocumentEditor';
 import SignerView from './pages/SignerView';
 import AdminDashboard from './pages/AdminDashboard';
+import Templates from './pages/Templates';
+import Audit from './pages/Audit';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import __Layout from './Layout.jsx';
@@ -85,6 +87,8 @@ export const PAGES = {
     "landing": Landing,
     "dashboard": Dashboard,
     "DocumentEditor": DocumentEditor,
+    "templates": Templates,
+    "audit": Audit,
     "sign": SignerView,
     "admin": AdminDashboard, // ✅ এই কি-টি 'admin' হিসেবেই থাকবে
     "login": Login,

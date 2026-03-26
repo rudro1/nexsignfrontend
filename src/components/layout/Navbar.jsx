@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Moon, Sun, Menu, X, LogOut,LayoutDashboard,ShieldCheck } from "lucide-react";
+import { Moon, Sun, Menu, X, LogOut, LayoutDashboard, ShieldCheck, LayoutTemplate } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Logo from "@/components/ui/Logo";
 
@@ -61,6 +61,8 @@ const scrollToSection = (id) => {
       setActiveLink("pricing");
     } else if (path === "/dashboard") {
       setActiveLink("dashboard");
+    } else if (path === "/templates") {
+      setActiveLink("templates");
     } else if (path === "/login") {
       setActiveLink("login");
     } else if (path === "/register") {
@@ -128,13 +130,22 @@ const scrollToSection = (id) => {
                   <ShieldCheck size={18}/> Admin Panel
                 </Link>
               ) : (
-                <Link
-                  to="/dashboard"
-                  onClick={() => handleLinkClick("dashboard", "/dashboard")}
-                  className={`flex items-center gap-1 hover:text-sky-500 ${activeLink === "dashboard" ? "text-sky-500 font-bold" : ""}`}
-                >
-                  <LayoutDashboard size={18}/> Dashboard
-                </Link>
+                <>
+                  <Link
+                    to="/dashboard"
+                    onClick={() => handleLinkClick("dashboard", "/dashboard")}
+                    className={`flex items-center gap-1 hover:text-sky-500 ${activeLink === "dashboard" ? "text-sky-500 font-bold" : ""}`}
+                  >
+                    <LayoutDashboard size={18}/> Dashboard
+                  </Link>
+                  <Link
+                    to="/templates"
+                    onClick={() => handleLinkClick("templates", "/templates")}
+                    className={`flex items-center gap-1 hover:text-sky-500 ${activeLink === "templates" ? "text-sky-500 font-bold" : ""}`}
+                  >
+                    <LayoutTemplate size={18}/> Templates
+                  </Link>
+                </>
               )
             )}
           </div>
@@ -238,13 +249,22 @@ const scrollToSection = (id) => {
                   Admin Panel
                 </Link>
               ) : (
-                <Link
-                  to="/dashboard"
-                  onClick={() => handleLinkClick("dashboard", "/dashboard")}
-                  className={`block ${activeLink === "dashboard" ? "text-blue-600 font-bold" : ""}`}
-                >
-                  Dashboard
-                </Link>
+                <>
+                  <Link
+                    to="/dashboard"
+                    onClick={() => handleLinkClick("dashboard", "/dashboard")}
+                    className={`block ${activeLink === "dashboard" ? "text-blue-600 font-bold" : ""}`}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/templates"
+                    onClick={() => handleLinkClick("templates", "/templates")}
+                    className={`block ${activeLink === "templates" ? "text-blue-600 font-bold" : ""}`}
+                  >
+                    Templates
+                  </Link>
+                </>
               )
             )}
           </div>
