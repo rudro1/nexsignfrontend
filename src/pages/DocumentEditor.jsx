@@ -1904,9 +1904,11 @@ export default function DocumentEditor() {
   const [fileReady, setFileReady] = useState(false); // true once a file is selected/loaded
   const [parties, setParties]     = useState([]);
   const [fields, setFields]       = useState([]);
-  const [ccEmails, setCcEmails]   = useState([]);
-  const [ccInput, setCcInput]     = useState('');
-
+  // const [ccEmails, setCcEmails]   = useState([]);
+  // const [ccInput, setCcInput]     = useState('');
+const [ccRecipients, setCcRecipients] = useState([]);
+  const [ccEmailInput, setCcEmailInput] = useState('');
+  const [ccDesignationInput, setCcDesignationInput] = useState('');
   const [currentPage, setCurrentPage]               = useState(1);
   const [totalPages, setTotalPages]                 = useState(1);
   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
@@ -1923,7 +1925,8 @@ export default function DocumentEditor() {
         setFileUrl(d.fileUrl || '');
         setFileReady(true);
         setParties(d.parties || []);
-        setCcEmails(d.ccEmails || []);
+        // setCcEmails(d.ccEmails || []);
+        setCcRecipients(d.ccRecipients || []);
         setFields((d.fields || []).map(f => typeof f === 'string' ? JSON.parse(f) : f));
       })
       .catch(() => toast.error('Failed to load document'));
@@ -1958,26 +1961,45 @@ export default function DocumentEditor() {
   }, [fileUrl]);
 
   // ── CC email helpers ─────────────────────────────────────────────────────
-  const addCcEmail = () => {
-    const email = ccInput.trim().toLowerCase();
+  // const addCcEmail = () => {
+  //   const email = ccInput.trim().toLowerCase();
+  //   if (!email) return;
+  //   // Basic email validation
+  //   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  //     toast.error('Please enter a valid email address.');
+  //     return;
+  //   }
+  //   if (ccEmails.includes(email)) {
+  //     toast.error('This email is already added.');
+  //     return;
+  //   }
+  //   setCcEmails(prev => [...prev, email]);
+  //   setCcInput('');
+  // };
+
+  // const removeCcEmail = (email) => {
+  //   setCcEmails(prev => prev.filter(e => e !== email));
+  // };
+const addCcRecipient = () => {
+    const email = ccEmailInput.trim().toLowerCase();
+    const designation = ccDesignationInput.trim();
     if (!email) return;
-    // Basic email validation
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       toast.error('Please enter a valid email address.');
       return;
     }
-    if (ccEmails.includes(email)) {
+    if (ccRecipients.some(r => r.email === email)) {
       toast.error('This email is already added.');
       return;
     }
-    setCcEmails(prev => [...prev, email]);
-    setCcInput('');
+    setCcRecipients(prev => [...prev, { email, designation, type: 'cc' }]);
+    setCcEmailInput('');
+    setCcDesignationInput('');
   };
 
-  const removeCcEmail = (email) => {
-    setCcEmails(prev => prev.filter(e => e !== email));
+  const removeCcRecipient = (email) => {
+    setCcRecipients(prev => prev.filter(r => r.email !== email));
   };
-
   // ── Validation ───────────────────────────────────────────────────────────
   const validate = () => {
     if (!rawFile && !fileUrl) {
@@ -2071,7 +2093,8 @@ export default function DocumentEditor() {
       formData.append('parties',    JSON.stringify(
         parties.map(p => ({ name: p.name.trim(), email: p.email.trim().toLowerCase() }))
       ));
-      formData.append('ccEmails',   JSON.stringify(ccEmails));
+      // formData.append('ccEmails',   JSON.stringify(ccEmails));
+      formData.append('ccRecipients', JSON.stringify(ccRecipients));
       formData.append('fields',     JSON.stringify(fields));
       formData.append('totalPages', String(totalPages));
 
@@ -2193,7 +2216,7 @@ export default function DocumentEditor() {
           </Card>
 
           {/* CC Recipients */}
-          <Card className="p-4 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+          {/* <Card className="p-4 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
             <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 dark:text-slate-300 text-sm">
               <Mail size={15} className="text-[#28ABDF]" />
               CC Recipients
@@ -2232,6 +2255,54 @@ export default function DocumentEditor() {
                       <X size={10} />
                     </button>
                   </span>
+                ))}
+              </div>
+            )}
+          </Card> */}
+          {/* CC Recipients with Designation */}
+          <Card className="p-4 shadow-sm border-slate-100 dark:border-slate-800 rounded-2xl">
+            <div className="flex items-center gap-2 mb-3 font-semibold text-slate-700 dark:text-slate-300 text-sm">
+              <Mail size={15} className="text-[#28ABDF]" />
+              CC Recipients
+            </div>
+            <div className="space-y-2">
+              <Input
+                placeholder="Email address"
+                value={ccEmailInput}
+                onChange={e => setCcEmailInput(e.target.value)}
+                className="text-xs rounded-lg h-9"
+              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Designation (e.g. HR)"
+                  value={ccDesignationInput}
+                  onChange={e => setCcDesignationInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCcRecipient())}
+                  className="text-xs rounded-lg h-9 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addCcRecipient}
+                  className="rounded-lg h-9 px-3 text-xs font-semibold border-[#28ABDF] text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white"
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+            {ccRecipients.length > 0 && (
+              <div className="flex flex-col gap-2 mt-3">
+                {ccRecipients.map(rcp => (
+                  <div key={rcp.email} className="flex items-center justify-between bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300 border border-sky-100 dark:border-sky-800 rounded-xl px-3 py-2">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[11px] font-bold truncate">{rcp.email}</span>
+                      <span className="text-[9px] opacity-70 truncate">{rcp.designation || 'Staff'}</span>
+                    </div>
+                    <button type="button" onClick={() => removeCcRecipient(rcp.email)} className="text-slate-400 hover:text-red-500 p-1">
+                      <X size={14} />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
