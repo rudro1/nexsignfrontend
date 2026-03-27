@@ -535,41 +535,49 @@ useEffect(() => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        {/* <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Welcome back, {user?.full_name?.split(' ')[0] || 'there'} 👋
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
-            Manage and track your documents &amp; signatures.
-          </p>
-          
-        </div> */}
-
-
-        <div>
-  <div className="flex items-center gap-2">
-    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-      Welcome back, {user?.full_name?.split(' ')[0] || 'there'} 👋
-    </h1>
-    {/* সাইলেন্ট আপডেট হওয়ার সময় এই আইকনটি ঘুরবে */}
-    {isSyncing && <Loader2 className="w-5 h-5 animate-spin text-[#28ABDF] mt-1" />}
+ 
+{/* ── Header ─────────────────────────────────── */}
+<div className="flex flex-col sm:flex-row sm:items-center
+                justify-between gap-4 mb-8">
+  <div>
+    <div className="flex items-center gap-2">
+      <h1 className="text-2xl sm:text-3xl font-bold
+                     text-slate-900 dark:text-white tracking-tight">
+        Welcome back,{' '}
+        {user?.full_name?.split(' ')[0] || 'there'} 👋
+      </h1>
+      {isSyncing && (
+        <Loader2 className="w-5 h-5 animate-spin
+                            text-[#28ABDF] mt-1" />
+      )}
+    </div>
+    <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+      {isSyncing
+        ? 'Syncing latest data...'
+        : 'Manage and track your documents & signatures.'}
+    </p>
   </div>
-  <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
-    {isSyncing ? "Syncing latest data..." : "Manage and track your documents & signatures."}
-  </p>
+
+  {/* ── Two action buttons ── */}
+  <div className="flex gap-3 shrink-0">
+    <Link to="/DocumentEditor?id=new">
+      <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white
+                         rounded-xl gap-2 shadow-lg px-5 py-5
+                         transition-all active:scale-95 font-semibold">
+        <Plus className="w-4 h-4" /> New Document
+      </Button>
+    </Link>
+    <Link to="/new-template">
+      <Button variant="outline"
+              className="rounded-xl gap-2 px-5 py-5 font-semibold
+                         border-[#28ABDF] text-[#28ABDF]
+                         hover:bg-[#28ABDF] hover:text-white
+                         transition-all active:scale-95">
+        <Layout className="w-4 h-4" /> New Template
+      </Button>
+    </Link>
+  </div>
 </div>
-        <Link to="/DocumentEditor?id=new">
-          <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl gap-2 shadow-lg px-6 py-5 transition-all active:scale-95 font-semibold">
-            <Plus className="w-5 h-5" /> New Document
-          </Button>
-        </Link>
-        {/* <Link to="/templates">
-          <Button variant="outline" className="rounded-xl gap-2">
-            <Layout className="w-4 h-4" /> Templates
-          </Button>
-        </Link> */}
-      </div>
 
       {/* ── Stats ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
