@@ -564,11 +564,11 @@ useEffect(() => {
             <Plus className="w-5 h-5" /> New Document
           </Button>
         </Link>
-        <Link to="/templates">
+        {/* <Link to="/templates">
           <Button variant="outline" className="rounded-xl gap-2">
             <Layout className="w-4 h-4" /> Templates
           </Button>
-        </Link>
+        </Link> */}
       </div>
 
       {/* ── Stats ──────────────────────────────────────────────────────── */}
