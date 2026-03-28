@@ -369,7 +369,9 @@ export default function Dashboard() {
   const [search,         setSearch]         = useState('');
   const [statusFilter,   setStatusFilter]   = useState('all');
   const [lastFetched,    setLastFetched]    = useState(null);
-
+const [serverStats, setServerStats] = useState({
+  total: 0, inProgress: 0, completed: 0, templates: 0,
+});
   const abortRef     = useRef(null);
   const isMounted    = useRef(true);
   const pageRef      = useRef(1);
@@ -414,6 +416,7 @@ export default function Dashboard() {
       }
 
       setHasMore(serverHasMore);
+      if (res.data?.stats) setServerStats(res.data.stats);
       setPage(pageNum);
       if (!res.__fromCache) setLastFetched(Date.now());
 
@@ -478,14 +481,12 @@ export default function Dashboard() {
   }, [fetchDocuments]);
 
   // ── Stats ──────────────────────────────────────────────────────
-  const stats = useMemo(() => ({
-    total:      documents.filter(d => !d.isTemplate).length,
-    inProgress: documents.filter(d =>
-      d.status === 'in_progress' && !d.isTemplate).length,
-    completed:  documents.filter(d =>
-      d.status === 'completed'   && !d.isTemplate).length,
-    templates:  documents.filter(d =>  d.isTemplate).length,
-  }), [documents]);
+const stats = useMemo(() => ({
+  total:      serverStats.total      || documents.filter(d => !d.isTemplate).length,
+  inProgress: serverStats.inProgress || documents.filter(d => d.status === 'in_progress' && !d.isTemplate).length,
+  completed:  serverStats.completed  || documents.filter(d => d.status === 'completed'   && !d.isTemplate).length,
+  templates:  serverStats.templates  || documents.filter(d => d.isTemplate).length,
+}), [serverStats, documents]);
 
   // ── Client-side filter ─────────────────────────────────────────
   const filtered = useMemo(() => {

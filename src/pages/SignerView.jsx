@@ -7548,16 +7548,25 @@ export default function SignerView() {
         setDocData(data);
         setMyPartyIndex(Number(data.partyIndex ?? 0));
 
-        const parsed = (data.fields || []).map(f => {
-          const obj = typeof f === 'string' ? JSON.parse(f) : f;
-          return {
-            ...obj,
-            partyIndex: Number(obj.partyIndex ?? 0),
-            filled: Number(obj.partyIndex) !== Number(data.partyIndex)
-              ? !!obj.value
-              : false,
-          };
-        });
+      // ✅ নতুন — সব properties explicitly নাও
+const parsed = (data.fields || []).map(f => {
+  const obj = typeof f === 'string' ? JSON.parse(f) : f;
+  return {
+    id:         obj.id,
+    type:       obj.type,
+    page:       Number(obj.page),
+    x:          Number(obj.x),
+    y:          Number(obj.y),
+    width:      Number(obj.width  || 200),
+    height:     Number(obj.height || 60),
+    partyIndex: Number(obj.partyIndex ?? 0),
+    value:      obj.value || '',
+    fontFamily: obj.fontFamily || 'Helvetica',
+    fontSize:   Number(obj.fontSize || 14),
+    filled: Number(obj.partyIndex) !== Number(data.partyIndex)
+      ? !!obj.value : false,
+  };
+});
         setFields(parsed);
 
       } catch (err) {
@@ -7720,67 +7729,78 @@ export default function SignerView() {
   }, [textValue, activeField, scrollToNextField]);
 
   // ── Submit ────────────────────────────────────────────────
-  const handleSubmit = useCallback(async () => {
-    if (!allFilled) {
-      const remaining = totalFields - filledCount;
-      toast.error(
-        `${remaining} field${remaining > 1 ? 's' : ''} remaining.`
-      );
-      const first = myFields.find(f => !f.filled);
-      first && document.getElementById(`field-${first.id}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+ const handleSubmit = useCallback(async () => {
+  if (!allFilled) {
+    const remaining = totalFields - filledCount;
+    toast.error(`${remaining} field${remaining > 1 ? 's' : ''} remaining.`);
+    const first = myFields.find(f => !f.filled);
+    if (first) document.getElementById(`field-${first.id}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  setSubmitting(true);
+
+  try {
+    const locationData = await Promise.race([
+      geoRef.current || Promise.resolve({ text: 'Unknown' }),
+      new Promise(r => setTimeout(() => r({ text: 'Unknown' }), 2000)),
+    ]);
+
+    // ✅ সব required properties পাঠাও
+    const mySignedFields = fieldsRef.current
+      .filter(f => Number(f.partyIndex) === myPartyIndex && f.filled)
+      .map(f => ({
+        id:         f.id,
+        type:       f.type,
+        page:       Number(f.page),
+        x:          Number(f.x),
+        y:          Number(f.y),
+        width:      Number(f.width  || 200),
+        height:     Number(f.height || 60),
+        partyIndex: Number(f.partyIndex),
+        value:      f.value || '',
+        fontFamily: f.fontFamily || 'Helvetica',
+        fontSize:   Number(f.fontSize || 14),
+      }));
+
+    // ✅ Client-side validate
+    const invalid = mySignedFields.find(
+      f => !f.id || !f.type ||
+           f.page == null || isNaN(f.page) ||
+           f.x    == null || isNaN(f.x)    ||
+           f.y    == null || isNaN(f.y)
+    );
+    if (invalid) {
+      toast.error('Field data error. Please refresh and try again.');
+      setSubmitting(false);
       return;
     }
 
-    setSubmitting(true);
+    await api.post('/documents/sign/submit', {
+      token,
+      fields:     mySignedFields,
+      locationData,
+      clientTime: new Date().toLocaleString('en-US', {
+        timeZoneName: 'short', hour12: true,
+      }),
+    });
 
-    // ✅ Optimistic UI — show success immediately
+    // ✅ API success এর পরে দেখাও
     setCompleted(true);
     toast.success('Signature submitted! 🎉');
 
-    // ✅ Background API call
-    (async () => {
-      try {
-        const [locationData] = await Promise.all([
-          Promise.race([
-            geoRef.current || Promise.resolve({ text: 'Unknown' }),
-            new Promise(r =>
-              setTimeout(() => r({ text: 'Unknown' }), 2000)
-            ),
-          ]),
-        ]);
-
-        const mySignedFields = fieldsRef.current
-          .filter(
-            f => Number(f.partyIndex) === myPartyIndex && f.filled
-          )
-          .map(f => ({
-            id:    f.id,
-            value: f.value,
-            type:  f.type,
-          }));
-
-        await api.post('/documents/sign/submit', {
-          token,
-          fields:     mySignedFields,
-          locationData,
-          clientTime: new Date().toLocaleString('en-US', {
-            timeZoneName: 'short',
-            hour12:       true,
-          }),
-        });
-
-      } catch (err) {
-        console.error('Submit sync error:', err.message);
-        // Don't show error to user — signature is already recorded
-        // in the optimistic UI
-      }
-    })();
-
-  }, [
-    allFilled, myFields, totalFields,
-    filledCount, myPartyIndex, token,
-  ]);
+  } catch (err) {
+    console.error('Submit error:', err);
+    toast.error(
+      err?.response?.data?.error ||
+      err?.data?.error ||
+      err?.message ||
+      'Submission failed. Please try again.'
+    );
+    setSubmitting(false);
+  }
+}, [allFilled, myFields, totalFields, filledCount, myPartyIndex, token]);
 
   // ════════════════════════════════════════════════════════════
   // RENDER STATES
