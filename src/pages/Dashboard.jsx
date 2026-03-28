@@ -307,215 +307,491 @@
 // ════════════════════════════════════════════════════════════════
 // FILE 1: src/pages/Dashboard.jsx
 // ════════════════════════════════════════════════════════════════
-/**
- * Dashboard.jsx — NeXsign Enterprise
- * Optimized: AbortController, silent 15s refresh, no localStorage, fast stats
- */
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { api } from '@/api/apiClient';
-import { useAuth } from '@/lib/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import React, {
+  useState, useEffect, useCallback,
+  useMemo, useRef,
+} from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { api, apiCache }     from '@/api/apiClient';
+import { Button }   from '@/components/ui/button';
+import { Input }    from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Plus, Search, FileText, CheckCircle2,
-  Send, Loader2, ChevronDown, Layout, RefreshCw,
+  Send, Loader2, ChevronDown, Layout,
+  RefreshCw, AlertCircle, WifiOff,
 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import StatsCard from '@/components/dashboard/StatsCard';
+import StatsCard    from '@/components/dashboard/StatsCard';
 import DocumentCard from '@/components/dashboard/DocumentCard';
-import SEO from '@/components/seo/SEO';
+import { useAuth }  from '@/lib/AuthContext';
 
-const LIMIT = 9;
+const LIMIT        = 6;
+const AUTO_REFRESH = 30_000;
 
+// ── Offline Banner ────────────────────────────────────────────────
+function OfflineBanner() {
+  const [offline, setOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const on  = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener('online',  on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online',  on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+
+  if (!offline) return null;
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50
+                    bg-red-500 text-white py-2.5
+                    animate-in slide-in-from-top-1 duration-200">
+      <div className="max-w-7xl mx-auto px-4
+                      flex items-center justify-center
+                      gap-2 text-sm font-semibold">
+        <WifiOff className="w-4 h-4" />
+        No internet — showing cached data
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════
 export default function Dashboard() {
-  const navigate             = useNavigate();
+  const navigate                    = useNavigate();
   const { user, isAdmin, loading: authLoading } = useAuth();
 
-  const [search, setSearch]               = useState('');
-  const [statusFilter, setStatusFilter]   = useState('all');
-  const [documents, setDocuments]         = useState([]);
-  const [isLoading, setIsLoading]         = useState(true);
-  const [isSyncing, setIsSyncing]         = useState(false);
-  const [page, setPage]                   = useState(1);
-  const [hasMore, setHasMore]             = useState(false);
+  const [documents,      setDocuments]      = useState([]);
+  const [isLoading,      setIsLoading]      = useState(true);
+  const [isSyncing,      setIsSyncing]      = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [fetchError, setFetchError]       = useState(null);
-  const abortRef                          = useRef(null);
+  const [hasMore,        setHasMore]        = useState(false);
+  const [page,           setPage]           = useState(1);
+  const [fetchError,     setFetchError]     = useState(null);
+  const [search,         setSearch]         = useState('');
+  const [statusFilter,   setStatusFilter]   = useState('all');
+  const [lastFetched,    setLastFetched]    = useState(null);
+  const [serverStats,    setServerStats]    = useState({
+    total: 0, inProgress: 0, completed: 0, templates: 0,
+  });
 
-  const fetchDocuments = useCallback(async (pageNum = 1, append = false, silent = false) => {
+  const abortRef  = useRef(null);
+  const isMounted = useRef(true);
+  const pageRef   = useRef(1);
+
+  useEffect(() => { pageRef.current = page; }, [page]);
+  useEffect(() => () => { isMounted.current = false; }, []);
+
+  // ── Fetch ─────────────────────────────────────────────────
+  const fetchDocuments = useCallback(async ({
+    pageNum = 1,
+    append  = false,
+    silent  = false,
+  } = {}) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
-    try {
-      if (!append && !silent) setIsLoading(true);
-      if (silent)             setIsSyncing(true);
-      if (append)             setIsFetchingMore(true);
-      setFetchError(null);
 
+    if (!isMounted.current) return;
+
+    if (!append && !silent) setIsLoading(true);
+    if (silent)              setIsSyncing(true);
+    if (append)              setIsFetchingMore(true);
+    setFetchError(null);
+
+    try {
       const res = await api.get('/documents', {
         params: { page: pageNum, limit: LIMIT },
         signal: abortRef.current.signal,
       });
 
-      const rawData        = res.data?.documents || [];
-      const serverHasMore  = !!res.data?.hasMore;
+      if (!isMounted.current) return;
 
-      setDocuments(prev => {
-        if (!append) return rawData;
-        const ids = new Set(prev.map(d => d._id));
-        return [...prev, ...rawData.filter(d => !ids.has(d._id))];
-      });
+      const raw           = res.data?.documents  || [];
+      const serverHasMore = !!res.data?.hasMore;
+
+      if (append) {
+        setDocuments(prev => {
+          const ids = new Set(prev.map(d => d._id));
+          return [...prev, ...raw.filter(d => !ids.has(d._id))];
+        });
+      } else {
+        setDocuments(raw);
+      }
+
       setHasMore(serverHasMore);
+      if (res.data?.stats) setServerStats(res.data.stats);
       setPage(pageNum);
+      if (!res.__fromCache) setLastFetched(Date.now());
+
     } catch (err) {
-      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      setFetchError('Failed to load. Click Refresh to retry.');
+      if (!isMounted.current) return;
+      if (err.__cancelled)    return;
+
+      setFetchError(
+        documents.length > 0
+          ? null
+          : 'Failed to load. Please retry.'
+      );
     } finally {
-      setIsLoading(false);
-      setIsFetchingMore(false);
-      setIsSyncing(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+        setIsSyncing(false);
+        setIsFetchingMore(false);
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Auth guard + initial load ──────────────────────────────
   useEffect(() => {
     if (authLoading) return;
-    if (isAdmin)    { navigate('/admin', { replace: true }); return; }
-    fetchDocuments(1, false, false);
-    const interval = setInterval(() => fetchDocuments(1, false, true), 15000);
-    return () => { abortRef.current?.abort(); clearInterval(interval); };
-  }, [isAdmin, authLoading, navigate, fetchDocuments]);
+    if (isAdmin) { navigate('/admin', { replace: true }); return; }
 
-  const handleLoadMore = () => {
-    if (!isFetchingMore && hasMore) fetchDocuments(page + 1, true, false);
-  };
+    fetchDocuments({ pageNum: 1 });
 
+    const id = setInterval(() => {
+      if (navigator.onLine) fetchDocuments({ pageNum: 1, silent: true });
+    }, AUTO_REFRESH);
+
+    return () => {
+      clearInterval(id);
+      abortRef.current?.abort();
+    };
+  }, [authLoading, isAdmin, navigate, fetchDocuments]);
+
+  // ── Online → refresh ──────────────────────────────────────
+  useEffect(() => {
+    const handler = () => {
+      apiCache.clear();
+      fetchDocuments({ pageNum: 1, silent: true });
+    };
+    window.addEventListener('online', handler);
+    return () => window.removeEventListener('online', handler);
+  }, [fetchDocuments]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!isFetchingMore && hasMore) {
+      fetchDocuments({ pageNum: pageRef.current + 1, append: true });
+    }
+  }, [isFetchingMore, hasMore, fetchDocuments]);
+
+  const handleRefresh = useCallback(() => {
+    apiCache.clear();
+    fetchDocuments({ pageNum: 1 });
+  }, [fetchDocuments]);
+
+  // ── Document deleted handler ──────────────────────────────
+  const handleDocDeleted = useCallback((id) => {
+    setDocuments(prev => prev.filter(d => d._id !== id));
+    apiCache.clear();
+  }, []);
+
+  // ── Document updated handler (e.g. after resend) ──────────
+  // ✅ Triggers a silent refresh to get latest status
+  const handleDocRefresh = useCallback(() => {
+    fetchDocuments({ pageNum: 1, silent: true });
+  }, [fetchDocuments]);
+
+  // ── Stats ─────────────────────────────────────────────────
   const stats = useMemo(() => ({
-    total:      documents.filter(d => !d.isTemplate).length,
-    inProgress: documents.filter(d => (d.status === 'in_progress' || d.status === 'processing') && !d.isTemplate).length,
-    completed:  documents.filter(d => d.status === 'completed' && !d.isTemplate).length,
-    templates:  documents.filter(d => d.isTemplate).length,
-  }), [documents]);
+    total:      serverStats.total      || documents.filter(d => !d.isTemplate).length,
+    inProgress: serverStats.inProgress || documents.filter(d => d.status === 'in_progress' && !d.isTemplate).length,
+    completed:  serverStats.completed  || documents.filter(d => d.status === 'completed'   && !d.isTemplate).length,
+    templates:  serverStats.templates  || documents.filter(d => d.isTemplate).length,
+  }), [serverStats, documents]);
 
+  // ── Client-side filter ────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return documents.filter(doc => {
-      const titleOk  = !q || (doc.title || '').toLowerCase().includes(q);
-      if (statusFilter === 'templates') return titleOk && doc.isTemplate;
-      const statusOk = statusFilter === 'all' || doc.status === statusFilter;
-      return titleOk && statusOk && !doc.isTemplate;
+      const titleMatch = !q ||
+        (doc.title || '').toLowerCase().includes(q);
+      if (statusFilter === 'templates')
+        return titleMatch && doc.isTemplate;
+      const statusMatch =
+        statusFilter === 'all' || doc.status === statusFilter;
+      return titleMatch && statusMatch && !doc.isTemplate;
     });
   }, [documents, search, statusFilter]);
+
+  // ── Last updated text ─────────────────────────────────────
+  const lastUpdatedText = useMemo(() => {
+    if (!lastFetched) return '';
+    const s = Math.floor((Date.now() - lastFetched) / 1000);
+    if (s < 10)   return 'Just updated';
+    if (s < 60)   return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    return '';
+  }, [lastFetched]);
 
   if (authLoading || isAdmin) return null;
 
   return (
     <>
-      <SEO
-        title={`My Documents — NeXsign Dashboard`}
-        description="Manage and track all your signature requests."
-        noIndex
-      />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <OfflineBanner />
+
+      <div className="max-w-7xl mx-auto
+                      px-4 sm:px-6 lg:px-8 py-8">
+
+        {/* ── Header ─────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-start
+                        justify-between gap-4 mb-8">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-                Welcome back, {user?.full_name?.split(' ')[0] || 'there'} 👋
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-bold
+                             text-slate-900 dark:text-white
+                             tracking-tight">
+                Welcome back,{' '}
+                {user?.full_name?.split(' ')[0] || 'there'} 👋
               </h1>
-              {isSyncing && <RefreshCw className="w-4 h-4 animate-spin text-[#28ABDF]" />}
+
+              {isSyncing && (
+                <span className="inline-flex items-center gap-1.5
+                                 text-xs text-slate-400
+                                 bg-slate-100 dark:bg-slate-800
+                                 px-2.5 py-1 rounded-full">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Syncing
+                </span>
+              )}
             </div>
-            <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
-              {isSyncing ? 'Syncing…' : 'Manage and track your documents & signatures.'}
+
+            <p className="text-slate-500 dark:text-slate-400
+                          mt-1 text-sm">
+              Manage and track your documents &amp; signatures.
+              {lastUpdatedText && (
+                <span className="ml-2 text-slate-400 text-xs">
+                  · {lastUpdatedText}
+                </span>
+              )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefresh}
+              title="Refresh"
+              className="rounded-xl text-slate-400
+                         hover:text-sky-500 hover:bg-sky-50
+                         dark:hover:bg-sky-900/20 w-10 h-10"
+            >
+              <RefreshCw className={`w-4 h-4
+                ${isSyncing ? 'animate-spin text-sky-500' : ''}`} />
+            </Button>
+
             <Link to="/DocumentEditor?id=new">
-              <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl gap-2 shadow-md px-5 py-5 font-semibold active:scale-95 transition-all">
-                <Plus className="w-5 h-5" /> New Document
+              <Button className="bg-[#28ABDF] hover:bg-[#2399c8]
+                                 text-white rounded-xl gap-2
+                                 shadow-lg shadow-sky-500/25
+                                 px-4 sm:px-5 h-10 sm:h-11
+                                 transition-all active:scale-95
+                                 font-semibold text-sm">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">New Document</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+            </Link>
+
+            <Link to="/new-template">
+              <Button
+                variant="outline"
+                className="rounded-xl gap-2 px-4 sm:px-5
+                           h-10 sm:h-11 font-semibold text-sm
+                           border-[#28ABDF] text-[#28ABDF]
+                           hover:bg-[#28ABDF] hover:text-white
+                           transition-all active:scale-95"
+              >
+                <Layout className="w-4 h-4" />
+                <span className="hidden sm:inline">New Template</span>
+                <span className="sm:hidden">Template</span>
               </Button>
             </Link>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatsCard label="Total Docs"  value={stats.total}      icon={FileText}     color="sky"    />
-          <StatsCard label="Active"       value={stats.inProgress} icon={Send}         color="amber"  />
-          <StatsCard label="Completed"    value={stats.completed}  icon={CheckCircle2} color="green"  />
-          <StatsCard label="Templates"    value={stats.templates}  icon={Layout}       color="violet" />
+        {/* ── Stats ──────────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4
+                        gap-3 sm:gap-4 mb-8">
+          <StatsCard
+            label="Total Docs"
+            value={stats.total}
+            icon={FileText}
+            color="sky"
+            loading={isLoading}
+          />
+          <StatsCard
+            label="Active"
+            value={stats.inProgress}
+            icon={Send}
+            color="amber"
+            loading={isLoading}
+          />
+          <StatsCard
+            label="Completed"
+            value={stats.completed}
+            icon={CheckCircle2}
+            color="green"
+            loading={isLoading}
+          />
+          <StatsCard
+            label="Templates"
+            value={stats.templates}
+            icon={Layout}
+            color="violet"
+            loading={isLoading}
+          />
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6 items-stretch sm:items-center">
-          <div className="relative flex-1 w-full sm:max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        {/* ── Error Banner ───────────────────────────────── */}
+        {fetchError && documents.length === 0 && (
+          <div className="flex items-center gap-3
+                          bg-red-50 dark:bg-red-900/10
+                          border border-red-200 dark:border-red-800
+                          rounded-2xl px-4 py-3 mb-6 text-sm">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+            <span className="text-red-600 dark:text-red-400
+                             font-medium flex-1">
+              {fetchError}
+            </span>
+            <Button
+              variant="ghost" size="sm"
+              onClick={handleRefresh}
+              className="text-red-500 hover:bg-red-100
+                         h-8 px-3 font-semibold shrink-0"
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {/* ── Filters ────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6
+                        items-stretch sm:items-center">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2
+                               -translate-y-1/2 w-4 h-4
+                               text-slate-400 pointer-events-none" />
             <Input
-              placeholder="Search documents…"
+              placeholder="Search documents..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-10 rounded-xl border-slate-200 dark:border-slate-700 h-10"
+              className="pl-9 h-10 rounded-xl
+                         border-slate-200 dark:border-slate-700
+                         focus:border-[#28ABDF]
+                         bg-white dark:bg-slate-900"
             />
           </div>
-          <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
-            <TabsList className="bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-full sm:w-auto grid grid-cols-4 sm:flex">
-              <TabsTrigger value="all"         className="text-xs font-semibold rounded-lg">All</TabsTrigger>
-              <TabsTrigger value="templates"   className="text-xs font-semibold rounded-lg">Templates</TabsTrigger>
-              <TabsTrigger value="in_progress" className="text-xs font-semibold rounded-lg">Active</TabsTrigger>
-              <TabsTrigger value="completed"   className="text-xs font-semibold rounded-lg">Done</TabsTrigger>
+
+          <Tabs
+            value={statusFilter}
+            onValueChange={v => setStatusFilter(v)}
+            className="w-full sm:w-auto"
+          >
+            <TabsList className="bg-slate-100 dark:bg-slate-800
+                                 rounded-xl p-1 w-full sm:w-auto
+                                 grid grid-cols-4 sm:flex h-10">
+              <TabsTrigger value="all"
+                className="text-xs font-semibold rounded-lg">
+                All
+              </TabsTrigger>
+              <TabsTrigger value="templates"
+                className="text-xs font-semibold rounded-lg">
+                Templates
+              </TabsTrigger>
+              <TabsTrigger value="in_progress"
+                className="text-xs font-semibold rounded-lg">
+                Active
+              </TabsTrigger>
+              <TabsTrigger value="completed"
+                className="text-xs font-semibold rounded-lg">
+                Done
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-          {fetchError && (
-            <Button variant="outline" size="sm" onClick={() => fetchDocuments(1, false, false)}
-              className="rounded-xl text-xs gap-1.5 flex-shrink-0">
-              <RefreshCw className="w-3.5 h-3.5" /> Retry
-            </Button>
-          )}
         </div>
 
-        {/* Grid */}
+        {/* ── Document Grid ──────────────────────────────── */}
         {isLoading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-52 rounded-2xl" />
+            ))}
           </div>
-        ) : fetchError ? (
-          <div className="text-center py-14 bg-red-50 dark:bg-red-900/10 rounded-3xl border border-dashed border-red-200">
-            <p className="text-red-500 font-medium mb-3 text-sm">{fetchError}</p>
-            <Button variant="outline" onClick={() => fetchDocuments(1, false, false)} className="rounded-xl gap-1.5 text-sm">
-              <RefreshCw className="w-4 h-4" /> Try Again
-            </Button>
-          </div>
+
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
-            <FileText className="w-12 h-12 mx-auto text-slate-300 mb-4" />
-            <p className="text-slate-500 font-medium mb-1">No documents found</p>
-            <p className="text-slate-400 text-sm mb-5">
+          <div className="text-center py-20
+                          bg-slate-50 dark:bg-slate-900/50
+                          rounded-3xl border border-dashed
+                          border-slate-200 dark:border-slate-800">
+            <div className="w-16 h-16 bg-slate-100
+                            dark:bg-slate-800 rounded-2xl
+                            flex items-center justify-center
+                            mx-auto mb-4">
+              <FileText className="w-8 h-8 text-slate-300" />
+            </div>
+            <p className="text-slate-600 dark:text-slate-400
+                          font-semibold mb-1">
+              No documents found
+            </p>
+            <p className="text-slate-400 text-sm mb-6">
               {search || statusFilter !== 'all'
                 ? 'Try adjusting your search or filter.'
                 : 'Create your first document to get started.'}
             </p>
             {!search && statusFilter === 'all' && (
               <Link to="/DocumentEditor?id=new">
-                <Button className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl gap-2">
+                <Button className="bg-[#28ABDF] hover:bg-[#2399c8]
+                                   text-white rounded-xl gap-2
+                                   shadow-lg shadow-sky-500/25
+                                   font-semibold">
                   <Plus className="w-4 h-4" /> Create Document
                 </Button>
               </Link>
             )}
           </div>
+
         ) : (
           <>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-400">
-              {filtered.map(doc => <DocumentCard key={doc._id} doc={doc} />)}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3
+                            gap-5 animate-in fade-in
+                            slide-in-from-bottom-2 duration-300">
+              {filtered.map(doc => (
+                <DocumentCard
+                  key={doc._id}
+                  doc={doc}
+                  onDeleted={handleDocDeleted}
+                  onRefresh={handleDocRefresh}  // ✅ pass refresh
+                />
+              ))}
             </div>
+
             {hasMore && (
               <div className="flex justify-center mt-10">
-                <Button variant="outline" onClick={handleLoadMore} disabled={isFetchingMore}
-                  className="rounded-full border-[#28ABDF] text-[#28ABDF] hover:bg-[#28ABDF] hover:text-white px-8 h-11 font-semibold transition-all gap-2">
-                  {isFetchingMore
-                    ? <><Loader2 className="animate-spin w-4 h-4" />Loading...</>
-                    : <><ChevronDown className="w-4 h-4" />Load More</>
-                  }
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMore}
+                  disabled={isFetchingMore}
+                  className="rounded-full border-[#28ABDF]
+                             text-[#28ABDF] hover:bg-[#28ABDF]
+                             hover:text-white px-8 h-11
+                             font-semibold transition-all
+                             disabled:opacity-60"
+                >
+                  {isFetchingMore ? (
+                    <Loader2 className="animate-spin mr-2 w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="mr-2 w-4 h-4" />
+                  )}
+                  {isFetchingMore ? 'Loading...' : 'Load More'}
                 </Button>
               </div>
             )}
