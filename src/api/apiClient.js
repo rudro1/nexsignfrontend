@@ -102,43 +102,37 @@ const BASE = (
   'https://nextsignbackendfinal.vercel.app/api'
 ).replace(/\/$/, '');
 
-const TIMEOUT_NORMAL  = 15000;  // 15s — normal requests
-const TIMEOUT_UPLOAD  = 60000;  // 60s — file upload
-const MAX_RETRIES     = 3;
-const RETRY_DELAY_MS  = 1000;   // 1s base (exponential)
-const CACHE_TTL_MS    = 30000;  // 30s cache
+const TIMEOUT_NORMAL = 15000;  // 15s
+const TIMEOUT_UPLOAD = 60000;  // 60s
+const MAX_RETRIES    = 1;      // ✅ 3 থেকে 1 — Dashboard hang fix
+const RETRY_DELAY_MS = 2000;   // 2s base
+const CACHE_TTL_MS   = 30000;  // 30s
 
 // ════════════════════════════════════════════════════════════════
-// IN-MEMORY CACHE — re-render এ data হারায় না
+// CACHE — memory তে data রাখে
 // ════════════════════════════════════════════════════════════════
-const requestCache   = new Map(); // { key: { data, timestamp } }
-const inflightMap    = new Map(); // deduplication
-const retryCountMap  = new Map(); // retry tracking
+const requestCache  = new Map();
+const inflightMap   = new Map(); // ✅ Deduplication — same request দুবার যাবে না
 
-// ════════════════════════════════════════════════════════════════
-// HELPERS
-// ════════════════════════════════════════════════════════════════
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const getBackoffDelay = (attempt) =>
-  RETRY_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
 
 const isUploadRequest = (config) =>
   config.data instanceof FormData ||
-  config.url?.includes('upload') ||
-  config.url?.includes('sign');
+  (config.url || '').includes('upload') ||
+  (config.url || '').includes('sign');
 
 const isRetryable = (error) => {
   if (axios.isCancel(error)) return false;
-  if (!error.response)       return true;  // network/timeout
-  return [408, 429, 502, 503, 504].includes(error.response.status);
+  if (!error.response)       return true;
+  return [408, 429, 502, 503, 504].includes(
+    error.response?.status
+  );
 };
 
 const getCacheKey = (config) => {
   const params = config.params
-    ? JSON.stringify(config.params)
-    : '';
-  return `${config.method?.toUpperCase()}:${config.url}${params}`;
+    ? JSON.stringify(config.params) : '';
+  return `${(config.method || 'get').toUpperCase()}:${config.url || ''}${params}`;
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -149,7 +143,7 @@ export const api = axios.create({
   withCredentials: true,
   timeout:         TIMEOUT_NORMAL,
   headers: {
-    'Accept':       'application/json',
+    Accept:         'application/json',
     'Content-Type': 'application/json',
   },
 });
@@ -159,35 +153,20 @@ export const api = axios.create({
 // ════════════════════════════════════════════════════════════════
 api.interceptors.request.use(
   (config) => {
-    // Auth token
+    // ── Auth token ──────────────────────────────────────────
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // FormData — browser নিজেই Content-Type set করবে
+    // ── FormData — browser নিজেই Content-Type set করবে ──────
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
 
-    // Upload timeout বাড়াও
+    // ── Upload timeout ───────────────────────────────────────
     if (isUploadRequest(config)) {
       config.timeout = TIMEOUT_UPLOAD;
-    }
-
-    // GET requests এ cache check
-    if (config.method === 'get' && !config.noCache) {
-      const key    = getCacheKey(config);
-      const cached = requestCache.get(key);
-      const now    = Date.now();
-
-      if (cached && now - cached.timestamp < CACHE_TTL_MS) {
-        // Cancel request — cached data return করব
-        config.__fromCache = cached.data;
-        config.cancelToken = new axios.CancelToken((c) =>
-          c('__CACHE_HIT__')
-        );
-      }
     }
 
     return config;
@@ -196,81 +175,75 @@ api.interceptors.request.use(
 );
 
 // ════════════════════════════════════════════════════════════════
-// RESPONSE INTERCEPTOR — retry + cache + error normalize
+// RESPONSE INTERCEPTOR
 // ════════════════════════════════════════════════════════════════
 api.interceptors.response.use(
-  // ── Success ──────────────────────────────────────────────────
+  // ── Success ────────────────────────────────────────────────
   (response) => {
-    // Cache GET responses
-    if (response.config.method === 'get') {
-      const key = getCacheKey(response.config);
+    const config = response.config;
+
+    // GET responses cache করো
+    if (config?.method?.toLowerCase() === 'get') {
+      const key = getCacheKey(config);
       requestCache.set(key, {
         data:      response.data,
         timestamp: Date.now(),
       });
+      inflightMap.delete(key);
     }
-    // Reset retry count on success
-    retryCountMap.delete(response.config.url);
+
     return response;
   },
 
-  // ── Error ─────────────────────────────────────────────────────
+  // ── Error ──────────────────────────────────────────────────
   async (error) => {
-    const config = error.config;
-
-    // ── Cache hit (not a real error) ─────────────────────────
-    if (
-      axios.isCancel(error) &&
-      error.message === '__CACHE_HIT__'
-    ) {
-      return Promise.resolve({
-        data:        config.__fromCache,
-        status:      200,
-        __fromCache: true,
-      });
-    }
-
-    // ── Real cancel ──────────────────────────────────────────
+    // Cancel — ignore করো
     if (axios.isCancel(error)) {
       return Promise.reject({ __cancelled: true });
     }
 
-    // ── 401 — token expired ──────────────────────────────────
+    const config = error.config;
+    if (!config) return Promise.reject(normalizeError(error));
+
+    const key = getCacheKey(config);
+
+    // ── 401 — logout ────────────────────────────────────────
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      if (window.location.pathname !== '/login') {
+      inflightMap.delete(key);
+      if (
+        typeof window !== 'undefined' &&
+        window.location.pathname !== '/login'
+      ) {
         window.location.href = '/login?expired=true';
       }
       return Promise.reject(normalizeError(error));
     }
 
-    // ── 403 — forbidden ───────────────────────────────────────
-    if (error.response?.status === 403) {
+    // ── 400, 404, 403 — retry করব না ───────────────────────
+    if ([400, 403, 404, 422].includes(error.response?.status)) {
+      inflightMap.delete(key);
       return Promise.reject(normalizeError(error));
     }
 
-    // ── Retry logic ──────────────────────────────────────────
-    if (config && isRetryable(error)) {
-      const retryKey   = getCacheKey(config);
-      const retryCount = retryCountMap.get(retryKey) || 0;
+    // ── Retry logic ─────────────────────────────────────────
+    if (isRetryable(error)) {
+      config.__retryCount = (config.__retryCount || 0) + 1;
 
-      if (retryCount < MAX_RETRIES) {
-        retryCountMap.set(retryKey, retryCount + 1);
-
-        const delay = getBackoffDelay(retryCount);
+      if (config.__retryCount <= MAX_RETRIES) {
         console.warn(
-          `🔁 Retry ${retryCount + 1}/${MAX_RETRIES}:`,
-          config.url,
-          `(${Math.round(delay)}ms delay)`
+          `🔁 Retry ${config.__retryCount}/${MAX_RETRIES}:`,
+          config.url
         );
 
-        await sleep(delay);
+        // Stale cache থাকলে সেটা দিয়ে দাও, background এ retry
+        const cached = requestCache.get(key);
+        if (cached && config.method?.toLowerCase() === 'get') {
+          // Background এ fresh data আনো
+          setTimeout(() => {
+            api(config).catch(() => {});
+          }, RETRY_DELAY_MS);
 
-        // Stale cache return করো while retrying
-        const cached = requestCache.get(retryKey);
-        if (cached && config.method === 'get') {
-          // Background retry
-          api(config).catch(() => {});
           return Promise.resolve({
             data:        cached.data,
             status:      200,
@@ -279,48 +252,79 @@ api.interceptors.response.use(
           });
         }
 
+        await sleep(RETRY_DELAY_MS);
         return api(config);
       }
     }
 
-    // ── Final error normalize ────────────────────────────────
-    retryCountMap.delete(config?.url);
+    inflightMap.delete(key);
     return Promise.reject(normalizeError(error));
   }
 );
 
 // ════════════════════════════════════════════════════════════════
-// ERROR NORMALIZER — consistent error shape
+// API GET — cache + deduplication সহ
+// ════════════════════════════════════════════════════════════════
+const originalGet = api.get.bind(api);
+api.get = async function cachedGet(url, config = {}) {
+  const mergedConfig = { ...config, url, method: 'get' };
+  const key          = getCacheKey(mergedConfig);
+
+  // ── Cache hit ───────────────────────────────────────────
+  if (!config.noCache) {
+    const cached = requestCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return Promise.resolve({
+        data:        cached.data,
+        status:      200,
+        __fromCache: true,
+      });
+    }
+  }
+
+  // ── Deduplication — একই request চলছে? ──────────────────
+  if (inflightMap.has(key)) {
+    return inflightMap.get(key);
+  }
+
+  // ── Fresh request ───────────────────────────────────────
+  const promise = originalGet(url, config).finally(() => {
+    inflightMap.delete(key);
+  });
+
+  inflightMap.set(key, promise);
+  return promise;
+};
+
+// ════════════════════════════════════════════════════════════════
+// ERROR NORMALIZER
 // ════════════════════════════════════════════════════════════════
 function normalizeError(error) {
-  const isOffline = !navigator.onLine;
+  const isOffline =
+    typeof navigator !== 'undefined' && !navigator.onLine;
 
   if (!error.response) {
     return {
-      __network:  true,
-      __offline:  isOffline,
-      __timeout:  error.code === 'ECONNABORTED',
-      message: isOffline
+      __network: true,
+      __offline: isOffline,
+      __timeout: error.code === 'ECONNABORTED',
+      message:   isOffline
         ? 'No internet connection.'
         : error.code === 'ECONNABORTED'
           ? 'Request timed out. Please try again.'
           : 'Cannot reach server. Please try again.',
-      status:      0,
-      retry:       true,
-      originalError: error,
+      status: 0,
+      retry:  true,
     };
   }
 
-  const message =
-    error.response.data?.message ||
-    error.response.data?.error   ||
-    `Error ${error.response.status}`;
-
   return {
-    message,
-    status:        error.response.status,
-    data:          error.response.data,
-    originalError: error,
+    message:
+      error.response.data?.message ||
+      error.response.data?.error   ||
+      `Server error (${error.response.status})`,
+    status: error.response.status,
+    data:   error.response.data,
   };
 }
 
@@ -330,87 +334,70 @@ function normalizeError(error) {
 export function buildProxyUrl(cloudinaryUrl) {
   if (!cloudinaryUrl) return '';
 
-  // Blob/data URLs — সরাসরি ব্যবহার করো
   if (
     cloudinaryUrl.startsWith('blob:') ||
     cloudinaryUrl.startsWith('data:')
   ) return cloudinaryUrl;
 
-  // Already a proxy URL
-  if (cloudinaryUrl.includes('/documents/proxy/')) 
+  if (cloudinaryUrl.includes('/documents/proxy/'))
     return cloudinaryUrl;
 
   const parts = cloudinaryUrl.split('/upload/');
   if (parts.length < 2) return cloudinaryUrl;
 
   const encoded = parts[1]
-    .split('?')[0]         // query string remove
-    .replace(/\//g, '~~'); // slash encode
+    .split('?')[0]
+    .replace(/\//g, '~~');
 
   return `${BASE}/documents/proxy/${encoded}`;
-  // Note: cache-busting বাদ দিলাম — same URL = browser cache ব্যবহার করবে
 }
 
 // ════════════════════════════════════════════════════════════════
-// CACHE UTILITIES — component থেকে ব্যবহার করা যাবে
+// CACHE UTILITIES
 // ════════════════════════════════════════════════════════════════
 export const apiCache = {
-  /** নির্দিষ্ট URL এর cache মুছো */
   invalidate: (url, params = {}) => {
     const key = `GET:${url}${JSON.stringify(params)}`;
     requestCache.delete(key);
+    inflightMap.delete(key);
   },
 
-  /** সব cache মুছো */
   clear: () => {
     requestCache.clear();
-    console.log('🗑️ API cache cleared');
+    inflightMap.clear();
   },
 
-  /** Cache এ কী আছে দেখো (debug) */
   inspect: () => {
     const result = {};
     requestCache.forEach((v, k) => {
       result[k] = {
         age:  `${Math.round((Date.now() - v.timestamp) / 1000)}s`,
-        size: JSON.stringify(v.data).length + ' bytes',
+        size: `${JSON.stringify(v.data).length} bytes`,
       };
     });
     return result;
   },
 
-  /** Background এ prefetch করো */
   prefetch: (url, params = {}) => {
-    api.get(url, { params, noCache: false }).catch(() => {});
+    api.get(url, { params }).catch(() => {});
   },
 };
 
 // ════════════════════════════════════════════════════════════════
-// ONLINE/OFFLINE — reconnect হলে auto retry
+// ONLINE/OFFLINE EVENTS — SSR safe
 // ════════════════════════════════════════════════════════════════
-let pendingRequests = [];
-
-window.addEventListener('offline', () => {
-  console.warn('📵 Network offline');
-});
-
-window.addEventListener('online', () => {
-  console.log('✅ Network restored — retrying pending requests');
-  // Cache clear করো — fresh data আসবে
-  apiCache.clear();
-  // Pending requests retry
-  const pending = [...pendingRequests];
-  pendingRequests = [];
-  pending.forEach(({ config, resolve, reject }) => {
-    api(config).then(resolve).catch(reject);
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    console.log('✅ Network restored');
+    apiCache.clear();
   });
-});
 
-// ════════════════════════════════════════════════════════════════
-// EXPORTS
-// ════════════════════════════════════════════════════════════════
+  window.addEventListener('offline', () => {
+    console.warn('📵 Network offline');
+  });
+}
+
 export default api;
-
 /* 
   ── Usage Examples ────────────────────────────────────────────
 
