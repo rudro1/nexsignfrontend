@@ -7272,7 +7272,7 @@
  * 7. Error differentiation: expired vs invalid
  * 8. HiDPI canvas rendering
  */
-i// src/pages/SignerView.jsx
+// src/pages/SignerView.jsx
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
