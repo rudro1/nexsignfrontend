@@ -1306,7 +1306,7 @@ import {
 } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import { toast } from 'sonner';
-import SEO from '@/components/seo/SEO';
+
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading: authLoading } = useAuth();
