@@ -653,828 +653,540 @@
 
 // src/pages/DocumentEditor.jsx
 import React, {
-  useState, useEffect, useCallback,
-  useRef, useMemo,
+  useState, useCallback, useRef, useEffect,
 } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { api, apiCache } from '@/api/apiClient';
-import { useAuth }   from '@/lib/AuthContext';
-import { Button }    from '@/components/ui/button';
-import { Input }     from '@/components/ui/input';
-import { Label }     from '@/components/ui/label';
+import { useNavigate } from 'react-router-dom';
+import { api } from '@/api/apiClient';
+import { useAuth } from '@/lib/AuthContext';
+import { Button }      from '@/components/ui/button';
+import { Input }       from '@/components/ui/input';
+import { Card }        from '@/components/ui/Card';
+import { toast }       from 'sonner';
 import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { toast } from 'sonner';
-import {
-  Upload, Send, ArrowLeft, FileText,
-  Loader2, Mail, X, ImagePlus, Type,
-  CheckCircle2, AlertCircle, Users,
+  ArrowLeft, Send, Loader2, FileText,
+  Upload, Users, X, Plus, Mail,
 } from 'lucide-react';
-import PartyManager from '@/components/editor/PartyManager';
-import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer    from '@/components/editor/PdfViewer';
+import FieldToolbar from '@/components/editor/FieldToolbar';
+import PartyManager from '@/components/editor/PartyManager';
 
-// ── Constants ─────────────────────────────────────────────────────
-const FONT_FAMILIES = [
-  { label: 'Helvetica',       value: 'Helvetica'       },
-  { label: 'Times New Roman', value: 'Times New Roman' },
-  { label: 'Courier',         value: 'Courier'         },
-];
-const FONT_SIZES    = [10, 11, 12, 13, 14, 16, 18, 20, 24];
-const MAX_PDF_MB    = 15;
-const EMAIL_RE      = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981'];
 
-// ── Section Card ──────────────────────────────────────────────────
-function SideCard({ children, className = '' }) {
-  return (
-    <div className={`bg-white dark:bg-slate-900
-                     border border-slate-100 dark:border-slate-800
-                     rounded-2xl p-4 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-function SideLabel({ children }) {
-  return (
-    <p className="text-[10px] font-bold text-slate-400
-                  uppercase tracking-widest mb-3">
-      {children}
-    </p>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ════════════════════════════════════════════════════════════════
 export default function DocumentEditor() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user } = useAuth();
+  const navigate    = useNavigate();
+  const { user }    = useAuth();
 
-  // ── Parse docId from URL ──────────────────────────────────
-  const docId = useMemo(() => {
-    const id = new URLSearchParams(location.search).get('id');
-    return id === 'new' ? null : id;
-  }, [location.search]);
+  // ── State ───────────────────────────────────────────────────
+  const [rawFile,         setRawFile]         = useState(null);
+  const [fileUrl,         setFileUrl]         = useState('');
+  const [fileReady,       setFileReady]       = useState(false);
+  const [title,           setTitle]           = useState('');
+  const [companyName,     setCompanyName]     = useState('');
+  const [companyLogo,     setCompanyLogo]     = useState('');
+  const [companyLogoFile, setCompanyLogoFile] = useState(null);
+  const [parties,         setParties]         = useState([
+    { name: '', email: '', color: COLORS[0] },
+  ]);
+  const [ccList,          setCcList]          = useState([]);
+  const [ccEmail,         setCcEmail]         = useState('');
+  const [fields,          setFields]          = useState([]);
+  const [currentPage,     setCurrentPage]     = useState(1);
+  const [totalPages,      setTotalPages]      = useState(1);
+  const [selectedParty,   setSelectedParty]   = useState(0);
+  const [pendingType,     setPendingType]      = useState(null);
+  const [selectedFieldId, setSelectedFieldId] = useState(null);
+  const [sending,         setSending]         = useState(false);
+  const [uploadProgress,  setUploadProgress]  = useState(0);
 
-  // ── Core state ────────────────────────────────────────────
-  const [rawFile,             setRawFile]             = useState(null);
-  const [title,               setTitle]               = useState('');
-  const [fileUrl,             setFileUrl]             = useState('');
-  const [fileReady,           setFileReady]           = useState(false);
-  const [parties,             setParties]             = useState([]);
-  const [fields,              setFields]              = useState([]);
-  const [ccList,              setCcList]              = useState([]);
-  const [companyLogo,         setCompanyLogo]         = useState('');
-  const [companyLogoFile,     setCompanyLogoFile]     = useState(null);
-  const [companyLogoPreview,  setCompanyLogoPreview]  = useState('');
-  const [companyName,         setCompanyName]         = useState('');
-
-  // ── Editor state ──────────────────────────────────────────
-  const [currentPage,        setCurrentPage]        = useState(1);
-  const [totalPages,         setTotalPages]         = useState(1);
-  const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
-  const [pendingFieldType,   setPendingFieldType]   = useState(null);
-  const [selectedFieldId,    setSelectedFieldId]    = useState(null);
-  const [processing,         setProcessing]         = useState(false);
-  const [docLoading,         setDocLoading]         = useState(false);
-
-  // ── CC state ──────────────────────────────────────────────
-  const [ccEmail,       setCcEmail]       = useState('');
-  const [ccName,        setCcName]        = useState('');
-  const [ccDesignation, setCcDesignation] = useState('');
-
-  const blobUrlRef = useRef(null);
-
-  // ── Cleanup blob URL on unmount ───────────────────────────
-  useEffect(() => {
-    return () => {
-      if (blobUrlRef.current?.startsWith('blob:')) {
-        URL.revokeObjectURL(blobUrlRef.current);
-      }
-    };
-  }, []);
-
-  // ── Selected field ────────────────────────────────────────
-  const selectedField = useMemo(
-    () => fields.find(f => f.id === selectedFieldId),
-    [fields, selectedFieldId]
-  );
-
-  // ── Load existing doc ─────────────────────────────────────
-  useEffect(() => {
-    if (!docId) return;
-    setDocLoading(true);
-    api.get(`/documents/${docId}`)
-      .then(res => {
-        const d = res.data?.document || res.data;
-        setTitle(d.title             || '');
-        setFileUrl(d.fileUrl         || '');
-        setFileReady(true);
-        setParties(d.parties         || []);
-        setCcList(d.ccList           || []);
-        setCompanyLogo(d.companyLogo || '');
-        setCompanyLogoPreview(d.companyLogo || '');
-        setCompanyName(d.companyName || '');
-        setFields(
-          (d.fields || []).map(f =>
-            typeof f === 'string' ? JSON.parse(f) : f
-          )
-        );
-      })
-      .catch(() => toast.error('Failed to load document.'))
-      .finally(() => setDocLoading(false));
-  }, [docId]);
-
-  // ── File select ───────────────────────────────────────────
+  // ── File Select ─────────────────────────────────────────────
   const handleFileSelect = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.type !== 'application/pdf') {
-      toast.error('Please upload a PDF file.');
+      toast.error('Only PDF files are allowed.');
       return;
     }
-    if (file.size > MAX_PDF_MB * 1024 * 1024) {
-      toast.error(`PDF must be under ${MAX_PDF_MB}MB.`);
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('File size must be under 20MB.');
       return;
     }
 
-    // Revoke old blob
-    if (blobUrlRef.current?.startsWith('blob:')) {
-      URL.revokeObjectURL(blobUrlRef.current);
-    }
-
-    const url = URL.createObjectURL(file);
-    blobUrlRef.current = url;
+    if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
 
     setRawFile(file);
-    setTitle(prev => prev || file.name.replace(/\.pdf$/i, ''));
-    setFileUrl(url);
+    setFileUrl(URL.createObjectURL(file));
     setFileReady(true);
     setFields([]);
     setCurrentPage(1);
-    setSelectedFieldId(null);
-    toast.success('PDF loaded! Place signature fields.');
+    setTitle(prev => prev || file.name.replace(/\.pdf$/i, ''));
+    toast.success('PDF loaded successfully!');
     e.target.value = '';
-  }, []);
+  }, [fileUrl]);
 
-  // ── Logo select ───────────────────────────────────────────
-  const handleLogoSelect = useCallback((e) => {
+  // ── Logo Select ─────────────────────────────────────────────
+  const handleLogoSelect = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image.');
+      toast.error('Only image files allowed for logo.');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB.');
-      return;
-    }
+
     setCompanyLogoFile(file);
-    setCompanyLogoPreview(URL.createObjectURL(file));
+
+    // Upload logo first
+    try {
+      const lf = new FormData();
+      lf.append('logo', file);
+      const res = await api.post('/documents/upload-logo', lf);
+      if (res.data?.logoUrl) {
+        setCompanyLogo(res.data.logoUrl);
+        toast.success('Logo uploaded!');
+      }
+    } catch {
+      toast.error('Logo upload failed.');
+    }
     e.target.value = '';
   }, []);
 
-  const removeLogo = useCallback(() => {
-    setCompanyLogoPreview('');
-    setCompanyLogoFile(null);
-    setCompanyLogo('');
-  }, []);
+  // ── Party Helpers ───────────────────────────────────────────
+  const addParty = () => {
+    if (parties.length >= 4) {
+      toast.error('Maximum 4 parties allowed.');
+      return;
+    }
+    setParties(p => [
+      ...p,
+      { name: '', email: '', color: COLORS[p.length % COLORS.length] },
+    ]);
+  };
 
-  // ── CC helpers ────────────────────────────────────────────
-  const addCc = useCallback(() => {
+  const removeParty = (i) => {
+    if (parties.length <= 1) return;
+    setParties(p => p.filter((_, idx) => idx !== i));
+    setFields(f =>
+      f.filter(field => Number(field.partyIndex) !== i)
+       .map(field => ({
+         ...field,
+         partyIndex: field.partyIndex > i
+           ? field.partyIndex - 1
+           : field.partyIndex,
+       }))
+    );
+  };
+
+  const updateParty = (i, key, val) =>
+    setParties(p =>
+      p.map((party, idx) =>
+        idx === i ? { ...party, [key]: val } : party
+      )
+    );
+
+  // ── CC Helpers ──────────────────────────────────────────────
+  const addCc = () => {
     const email = ccEmail.trim().toLowerCase();
-    if (!email) return;
-    if (!EMAIL_RE.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       toast.error('Invalid email address.');
       return;
     }
     if (ccList.some(r => r.email === email)) {
-      toast.error('Already added.');
+      toast.error('Email already added.');
       return;
     }
-    setCcList(prev => [...prev, {
-      email,
-      name:        ccName.trim(),
-      designation: ccDesignation.trim(),
-    }]);
+    setCcList(p => [...p, { email, name: '' }]);
     setCcEmail('');
-    setCcName('');
-    setCcDesignation('');
-  }, [ccEmail, ccName, ccDesignation, ccList]);
+  };
 
-  const removeCc = useCallback((email) => {
-    setCcList(prev => prev.filter(r => r.email !== email));
-  }, []);
-
-  // ── Typography update ─────────────────────────────────────
-  const updateFieldTypography = useCallback((key, value) => {
-    if (!selectedFieldId) return;
-    setFields(prev =>
-      prev.map(f =>
-        f.id === selectedFieldId ? { ...f, [key]: value } : f
-      )
-    );
-  }, [selectedFieldId]);
-
-  // ── Fields per party summary ──────────────────────────────
-  const fieldSummary = useMemo(() =>
-    parties.map((p, i) => ({
-      ...p,
-      count: fields.filter(f => Number(f.partyIndex) === i).length,
-    }))
-  , [parties, fields]);
-
-  const allPartiesHaveFields = useMemo(() =>
-    parties.length > 0 &&
-    parties.every((_, i) =>
-      fields.some(f => Number(f.partyIndex) === i)
-    )
-  , [parties, fields]);
-
-  // ── Validation ────────────────────────────────────────────
-  const validate = useCallback(() => {
-    if (!rawFile && !fileUrl) {
-      toast.error('Please upload a PDF.');
-      return false;
+  // ── Send Document ───────────────────────────────────────────
+  const handleSend = async () => {
+    // Validation
+    if (!rawFile) {
+      toast.error('Please upload a PDF file.');
+      return;
     }
     if (!title.trim()) {
       toast.error('Please enter a document title.');
-      return false;
+      return;
     }
-    if (!parties.length) {
-      toast.error('Please add at least one signer.');
-      return false;
+    if (parties.some(p => !p.name.trim() || !p.email.trim())) {
+      toast.error('Please fill in all party names and emails.');
+      return;
     }
-    if (parties.some(p => !p.name?.trim() || !p.email?.trim())) {
-      toast.error('All signers need a name and email.');
-      return false;
+    if (fields.length === 0) {
+      toast.error('Please place at least one field on the document.');
+      return;
     }
-    if (parties.some(p => !EMAIL_RE.test(p.email))) {
-      toast.error('One or more signer emails are invalid.');
-      return false;
-    }
-    if (!fields.length) {
-      toast.error('Please place at least one field.');
-      return false;
-    }
-    if (!allPartiesHaveFields) {
-      const missing = parties.find((_, i) =>
-        !fields.some(f => Number(f.partyIndex) === i)
-      );
-      toast.error(`Add a field for "${missing?.name}".`);
-      return false;
-    }
-    return true;
-  }, [rawFile, fileUrl, title, parties, fields, allPartiesHaveFields]);
 
-  // ── Send ──────────────────────────────────────────────────
-  const handleSend = useCallback(async () => {
-    if (!validate()) return;
-    setProcessing(true);
+    setSending(true);
+    setUploadProgress(0);
 
     try {
+      // ✅ FormData — সঠিক ক্রমে append করতে হবে
       const formData = new FormData();
 
-      if (rawFile instanceof File) {
-        formData.append('file', rawFile);
-      }
-      formData.append('title',        title.trim());
-      formData.append('parties',      JSON.stringify(
-        parties.map(p => ({
-          name:  p.name.trim(),
-          email: p.email.trim().toLowerCase(),
-          color: p.color,
-        }))
-      ));
+      // ── Step 1: সব text/JSON data আগে append ──────────────
+      formData.append('title',       title.trim());
+      formData.append('companyName', companyName.trim());
+      formData.append('companyLogo', companyLogo || '');
+      formData.append('totalPages',  String(totalPages));
+
+      // parties array কে JSON string করে পাঠাও
+      formData.append(
+        'parties',
+        JSON.stringify(
+          parties.map((p, i) => ({
+            name:  p.name.trim(),
+            email: p.email.trim().toLowerCase(),
+            color: p.color || COLORS[i % COLORS.length],
+          }))
+        )
+      );
+
+      // fields array কে JSON string করে পাঠাও
+      formData.append('fields', JSON.stringify(fields));
+
+      // ccRecipients
       formData.append('ccRecipients', JSON.stringify(ccList));
-      formData.append('fields',       JSON.stringify(fields));
-      formData.append('totalPages',   String(totalPages));
-      formData.append('companyName',  companyName.trim());
 
-      // Upload logo first if new file
-      if (companyLogoFile instanceof File) {
-        try {
-          const logoForm = new FormData();
-          logoForm.append('logo', companyLogoFile);
-          const logoRes = await api.post(
-            '/documents/upload-logo', logoForm
-          );
-          if (logoRes.data?.logoUrl) {
-            formData.append('companyLogo', logoRes.data.logoUrl);
-          }
-        } catch {
-          toast.error('Logo upload failed — continuing without it.');
+      // ── Step 2: File সবার শেষে append ────────────────────
+      // ⚠️ এটি সবচেয়ে গুরুত্বপূর্ণ — Multer এর জন্য file
+      // সবার শেষে থাকতে হবে
+      formData.append('file', rawFile);
+
+      // ── Step 3: api.post — কোনো headers দেবেন না ─────────
+      // ⚠️ headers: { 'Content-Type': 'multipart/form-data' }
+      // দিলে boundary missing হয় এবং 400 আসে
+      const response = await api.post(
+        '/documents/upload-and-send',
+        formData,
+        {
+          onUploadProgress: (e) => {
+            const pct = Math.round((e.loaded * 100) / (e.total || 1));
+            setUploadProgress(pct);
+          },
+          // ⛔ DO NOT set Content-Type header here
+          // Axios automatically sets it with boundary
         }
-      } else if (companyLogo) {
-        formData.append('companyLogo', companyLogo);
+      );
+
+      if (response.data?.success) {
+        toast.success('Document sent successfully!');
+        navigate('/dashboard');
       }
-
-      // ✅ Optimistic navigation
-      navigate('/dashboard');
-      toast.success('🎉 Sending document in the background!');
-
-      // Invalidate cache — dashboard will refetch
-      apiCache.invalidate('/documents');
-
-      // ✅ Background API call
-      api.post('/documents/upload-and-send', formData)
-        .then(res => {
-          if (!res.data?.success) {
-            toast.error(res.data?.message || 'Send failed.');
-          }
-        })
-        .catch(err => {
-          toast.error(
-            err.response?.data?.message ||
-            err.message ||
-            'Failed to send document.'
-          );
-        });
-
     } catch (err) {
-      toast.error(err.message || 'Something went wrong.');
-      setProcessing(false);
+      console.error('Upload error:', err);
+      const msg = err.response?.data?.message || 'Upload failed. Please try again.';
+      toast.error(msg);
+      setSending(false);
+      setUploadProgress(0);
     }
-  }, [
-    validate, rawFile, title, parties, ccList,
-    fields, totalPages, companyName, companyLogoFile,
-    companyLogo, navigate,
-  ]);
+  };
 
-  // ── Keyboard shortcut — Ctrl+Enter to send ────────────────
-  useEffect(() => {
-    const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleSend();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [handleSend]);
-
-  if (docLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center
-                      bg-slate-50 dark:bg-slate-950">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-sky-500
-                              mx-auto mb-3" />
-          <p className="text-slate-500 text-sm font-medium">
-            Loading document...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
+  // ── Render ──────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950
-                    flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
 
       {/* ── Top Bar ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40
-                         bg-white dark:bg-slate-900
+      <header className="sticky top-0 z-50 bg-white dark:bg-slate-900
                          border-b border-slate-200 dark:border-slate-700
-                         shadow-sm shrink-0">
-        <div className="flex items-center justify-between
-                        gap-3 px-4 py-3">
-          {/* Back + Title */}
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Button
-              variant="ghost" size="icon"
-              onClick={() => navigate('/dashboard')}
-              className="rounded-xl shrink-0 w-9 h-9"
-              title="Back to Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
+                         px-4 py-3 flex items-center justify-between
+                         gap-3 shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button
+            variant="ghost" size="icon"
+            onClick={() => navigate('/dashboard')}
+            className="rounded-xl shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <Input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Document Title..."
+            className="h-9 rounded-xl border-slate-200 font-semibold
+                       max-w-xs focus:border-[#28ABDF]"
+          />
+        </div>
 
-            <Input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Document Title..."
-              maxLength={100}
-              className="h-9 rounded-xl border-slate-200
-                         dark:border-slate-600 font-semibold
-                         text-slate-800 dark:text-white
-                         max-w-xs focus:border-sky-400
-                         focus:ring-sky-400"
-            />
-          </div>
-
-          {/* Status + Send */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Field coverage indicator */}
-            {parties.length > 0 && fields.length > 0 && (
-              <div className={`hidden sm:flex items-center gap-1.5
-                               text-xs font-semibold px-2.5 py-1
-                               rounded-full
-                               ${allPartiesHaveFields
-                                 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20'
-                                 : 'bg-amber-50 text-amber-600 dark:bg-amber-900/20'
-                               }`}>
-                {allPartiesHaveFields
-                  ? <CheckCircle2 className="w-3.5 h-3.5" />
-                  : <AlertCircle  className="w-3.5 h-3.5" />
-                }
-                {allPartiesHaveFields ? 'Ready' : 'Missing fields'}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Upload Progress */}
+          {sending && uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#28ABDF] rounded-full transition-all"
+                  style={{ width: `${uploadProgress}%` }}
+                />
               </div>
-            )}
+              <span className="text-xs">{uploadProgress}%</span>
+            </div>
+          )}
 
-            <Button
-              onClick={handleSend}
-              disabled={processing}
-              className="bg-sky-500 hover:bg-sky-600
-                         active:bg-sky-700 text-white
-                         rounded-xl gap-2 px-5 h-9
-                         font-semibold shadow-lg
-                         shadow-sky-500/25
-                         transition-all active:scale-95
-                         disabled:opacity-70 shrink-0"
-              title="Send (Ctrl+Enter)"
-            >
-              {processing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Send
-                </>
-              )}
-            </Button>
-          </div>
+          <Button
+            onClick={handleSend}
+            disabled={sending}
+            className="bg-[#28ABDF] hover:bg-[#2399c8] text-white
+                       rounded-xl gap-2 px-6 h-9 font-semibold"
+          >
+            {sending ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+            ) : (
+              <><Send className="w-4 h-4" /> Send</>
+            )}
+          </Button>
         </div>
       </header>
 
-      {/* ── Body ────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Left Sidebar ──────────────────────────────────── */}
-        <aside className="w-72 xl:w-80 shrink-0
-                           border-r border-slate-200 dark:border-slate-700
-                           bg-slate-50 dark:bg-slate-950
-                           overflow-y-auto flex flex-col gap-3 p-3
-                           scrollbar-thin scrollbar-thumb-slate-200
-                           dark:scrollbar-thumb-slate-700">
+        {/* ── Sidebar ─────────────────────────────────────── */}
+        <aside className="w-80 shrink-0 border-r border-slate-200
+                          dark:border-slate-700 bg-white
+                          dark:bg-slate-900 overflow-y-auto p-4
+                          flex flex-col gap-4">
 
-          {/* ── Company Branding ───────────────────────────── */}
-          <SideCard>
-            <SideLabel>Company Branding</SideLabel>
-
-            {/* Logo */}
-            <div className="mb-3">
-              <Label className="text-xs text-slate-500 mb-1.5 block">
-                Logo
-              </Label>
-              {companyLogoPreview ? (
-                <div className="relative inline-flex">
-                  <img
-                    src={companyLogoPreview}
-                    alt="Logo"
-                    className="h-10 max-w-[140px] object-contain
-                               rounded-lg border border-slate-200
-                               dark:border-slate-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeLogo}
-                    className="absolute -top-1.5 -right-1.5
-                               w-5 h-5 bg-red-500 text-white
-                               rounded-full flex items-center
-                               justify-center shadow-md
-                               hover:bg-red-600 transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex items-center gap-2
-                                  cursor-pointer border-2 border-dashed
-                                  border-slate-200 dark:border-slate-700
-                                  rounded-xl p-3 hover:border-sky-400
-                                  transition-colors group">
-                  <ImagePlus className="w-4 h-4 text-slate-300
-                                        group-hover:text-sky-400
-                                        transition-colors" />
-                  <span className="text-xs text-slate-400
-                                   group-hover:text-slate-500">
-                    Upload logo (PNG/JPG)
-                  </span>
-                  <input
-                    type="file" accept="image/*"
-                    className="hidden"
-                    onChange={handleLogoSelect}
-                  />
-                </label>
-              )}
-            </div>
-
-            {/* Company Name */}
-            <div>
-              <Label className="text-xs text-slate-500 mb-1.5 block">
-                Company Name
-              </Label>
-              <Input
-                value={companyName}
-                onChange={e => setCompanyName(e.target.value)}
-                placeholder="Your Company"
-                className="h-9 rounded-xl text-sm
-                           border-slate-200 dark:border-slate-600
-                           focus:border-sky-400 focus:ring-sky-400"
-              />
-            </div>
-          </SideCard>
-
-          {/* ── PDF Upload ────────────────────────────────── */}
-          <SideCard>
-            <SideLabel>Document</SideLabel>
+          {/* PDF Upload */}
+          <Card className="p-4 rounded-2xl border-slate-100
+                           dark:border-slate-800">
+            <p className="text-xs font-bold text-slate-500
+                          uppercase tracking-wider mb-3">
+              Document PDF
+            </p>
             <label className="flex flex-col items-center gap-2
                               cursor-pointer border-2 border-dashed
-                              border-slate-200 dark:border-slate-700
-                              rounded-xl p-4 hover:border-sky-400
-                              transition-colors group">
+                              border-slate-200 rounded-xl p-4
+                              hover:border-[#28ABDF] transition-colors">
               {fileReady ? (
                 <>
-                  <div className="w-10 h-10 bg-sky-50 dark:bg-sky-900/20
-                                  rounded-xl flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-sky-500" />
-                  </div>
-                  <p className="text-xs font-bold text-sky-500">
+                  <FileText className="w-8 h-8 text-[#28ABDF]" />
+                  <p className="text-xs font-semibold text-[#28ABDF]">
                     PDF Loaded ✓
                   </p>
-                  <p className="text-[10px] text-slate-400">
-                    Click to replace
+                  <p className="text-[10px] text-slate-400 truncate
+                                max-w-[200px]">
+                    {rawFile?.name}
                   </p>
                 </>
               ) : (
                 <>
-                  <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800
-                                  rounded-xl flex items-center justify-center
-                                  group-hover:bg-sky-50 dark:group-hover:bg-sky-900/20
-                                  transition-colors">
-                    <Upload className="w-5 h-5 text-slate-300
-                                       group-hover:text-sky-400
-                                       transition-colors" />
-                  </div>
-                  <p className="text-xs font-semibold text-slate-400
-                                group-hover:text-slate-500">
-                    Upload PDF
+                  <Upload className="w-8 h-8 text-slate-300" />
+                  <p className="text-xs text-slate-400">
+                    Click to upload PDF
                   </p>
-                  <p className="text-[10px] text-slate-300">
-                    Max {MAX_PDF_MB}MB
+                  <p className="text-[10px] text-slate-400">
+                    Max 20MB
                   </p>
                 </>
               )}
               <input
-                type="file" accept="application/pdf"
+                type="file"
+                accept="application/pdf"
                 className="hidden"
                 onChange={handleFileSelect}
               />
             </label>
-          </SideCard>
+          </Card>
 
-          {/* ── Parties ───────────────────────────────────── */}
-          <SideCard>
-            <PartyManager
-              parties={parties}
-              onChange={setParties}
-            />
-          </SideCard>
-
-          {/* ── CC Recipients ─────────────────────────────── */}
-          <SideCard>
-            <div className="flex items-center gap-2 mb-3">
-              <Mail className="w-4 h-4 text-sky-500" />
-              <SideLabel>CC Recipients</SideLabel>
-            </div>
-
+          {/* Company Info */}
+          <Card className="p-4 rounded-2xl border-slate-100
+                           dark:border-slate-800">
+            <p className="text-xs font-bold text-slate-500
+                          uppercase tracking-wider mb-3">
+              Company Info
+            </p>
             <div className="space-y-2">
               <Input
-                placeholder="Email *"
+                value={companyName}
+                onChange={e => setCompanyName(e.target.value)}
+                placeholder="Company Name"
+                className="h-9 rounded-xl text-sm"
+              />
+              <label className="flex items-center gap-2 cursor-pointer
+                                border border-dashed border-slate-200
+                                rounded-xl p-2 hover:border-[#28ABDF]
+                                transition-colors">
+                <Upload className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs text-slate-400">
+                  {companyLogo ? 'Logo uploaded ✓' : 'Upload Logo'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoSelect}
+                />
+              </label>
+            </div>
+          </Card>
+
+          {/* Parties */}
+          <Card className="p-4 rounded-2xl border-slate-100
+                           dark:border-slate-800">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-slate-500
+                            uppercase tracking-wider">
+                Signers
+              </p>
+              <Button
+                size="sm" variant="outline"
+                onClick={addParty}
+                className="h-7 px-2 rounded-lg text-xs"
+              >
+                <Plus className="w-3 h-3 mr-1" /> Add
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {parties.map((party, i) => (
+                <div key={i}
+                     className="p-3 rounded-xl border-2 space-y-2"
+                     style={{ borderColor: party.color + '40' }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: party.color }}
+                      />
+                      <span className="text-xs font-bold text-slate-600
+                                       dark:text-slate-400">
+                        Party {i + 1}
+                      </span>
+                    </div>
+                    {parties.length > 1 && (
+                      <button
+                        onClick={() => removeParty(i)}
+                        className="text-slate-300 hover:text-red-500
+                                   transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <Input
+                    value={party.name}
+                    onChange={e => updateParty(i, 'name', e.target.value)}
+                    placeholder="Full Name"
+                    className="h-8 text-xs rounded-lg"
+                  />
+                  <Input
+                    value={party.email}
+                    onChange={e => updateParty(i, 'email', e.target.value)}
+                    placeholder="Email Address"
+                    type="email"
+                    className="h-8 text-xs rounded-lg"
+                  />
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* CC */}
+          <Card className="p-4 rounded-2xl border-slate-100
+                           dark:border-slate-800">
+            <div className="flex items-center gap-2 mb-3">
+              <Mail className="w-4 h-4 text-[#28ABDF]" />
+              <p className="text-xs font-bold text-slate-500
+                            uppercase tracking-wider">
+                CC Recipients
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Input
                 value={ccEmail}
                 onChange={e => setCcEmail(e.target.value)}
                 onKeyDown={e =>
-                  e.key === 'Enter' &&
-                  (e.preventDefault(), addCc())
+                  e.key === 'Enter' && (e.preventDefault(), addCc())
                 }
-                className="h-9 text-xs rounded-xl
-                           border-slate-200 dark:border-slate-600
-                           focus:border-sky-400"
+                placeholder="email@example.com"
+                className="h-9 text-xs rounded-xl flex-1"
               />
-              <Input
-                placeholder="Name"
-                value={ccName}
-                onChange={e => setCcName(e.target.value)}
-                className="h-9 text-xs rounded-xl
-                           border-slate-200 dark:border-slate-600"
-              />
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Designation"
-                  value={ccDesignation}
-                  onChange={e => setCcDesignation(e.target.value)}
-                  onKeyDown={e =>
-                    e.key === 'Enter' &&
-                    (e.preventDefault(), addCc())
-                  }
-                  className="h-9 text-xs rounded-xl flex-1
-                             border-slate-200 dark:border-slate-600"
-                />
-                <Button
-                  type="button" size="sm"
-                  onClick={addCc}
-                  className="h-9 px-3 text-xs bg-sky-500
-                             hover:bg-sky-600 text-white rounded-xl"
-                >
-                  Add
-                </Button>
-              </div>
+              <Button
+                size="sm" onClick={addCc}
+                className="h-9 px-3 bg-[#28ABDF] text-white rounded-xl"
+              >
+                Add
+              </Button>
             </div>
-
             {ccList.length > 0 && (
-              <div className="mt-3 space-y-1.5">
+              <div className="mt-2 space-y-1">
                 {ccList.map(r => (
-                  <div
-                    key={r.email}
-                    className="flex items-center justify-between
-                               bg-sky-50 dark:bg-sky-900/20
-                               border border-sky-100 dark:border-sky-900
-                               rounded-xl px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-bold
-                                    text-sky-700 dark:text-sky-300 truncate">
-                        {r.email}
-                      </p>
-                      {(r.name || r.designation) && (
-                        <p className="text-[9px] text-sky-500 truncate">
-                          {[r.name, r.designation]
-                            .filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                    </div>
+                  <div key={r.email}
+                       className="flex items-center justify-between
+                                  bg-sky-50 border border-sky-100
+                                  rounded-xl px-3 py-1.5">
+                    <span className="text-[11px] text-sky-700 truncate">
+                      {r.email}
+                    </span>
                     <button
-                      type="button"
-                      onClick={() => removeCc(r.email)}
-                      className="text-slate-400 hover:text-red-500
-                                 p-1 shrink-0 transition-colors"
+                      onClick={() =>
+                        setCcList(p =>
+                          p.filter(x => x.email !== r.email)
+                        )
+                      }
+                      className="text-slate-400 hover:text-red-500"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
               </div>
             )}
-          </SideCard>
+          </Card>
 
-          {/* ── Field Toolbar ─────────────────────────────── */}
-          {fileReady && parties.length > 0 && (
-            <SideCard>
+          {/* Field Toolbar */}
+          {fileReady && (
+            <Card className="p-4 rounded-2xl border-slate-100
+                             dark:border-slate-800">
               <FieldToolbar
-                parties={parties}
-                selectedPartyIndex={selectedPartyIndex}
-                onPartySelect={setSelectedPartyIndex}
-                onAddField={type => setPendingFieldType(type)}
-                pendingFieldType={pendingFieldType}
+                parties={parties.map((p, i) => ({
+                  name:  p.name || `Party ${i + 1}`,
+                  color: p.color,
+                  index: i,
+                }))}
+                selectedPartyIndex={selectedParty}
+                onPartySelect={setSelectedParty}
+                onAddField={type => setPendingType(type)}
+                pendingFieldType={pendingType}
               />
-            </SideCard>
+            </Card>
           )}
 
-          {/* ── Typography Panel ──────────────────────────── */}
-          {selectedField?.type === 'text' && (
-            <SideCard className="border-sky-200 dark:border-sky-800
-                                 bg-sky-50/50 dark:bg-sky-900/10">
-              <div className="flex items-center gap-2 mb-3">
-                <Type className="w-4 h-4 text-sky-500" />
-                <SideLabel>Text Style</SideLabel>
-              </div>
-              <p className="text-[10px] text-slate-400 mb-3 leading-relaxed">
-                Signer types text using these font settings.
-              </p>
-
-              <div className="space-y-3">
-                {/* Font Family */}
-                <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">
-                    Font Family
-                  </Label>
-                  <Select
-                    value={selectedField.fontFamily || 'Helvetica'}
-                    onValueChange={v =>
-                      updateFieldTypography('fontFamily', v)
-                    }
-                  >
-                    <SelectTrigger className="h-9 rounded-xl text-xs
-                                             border-slate-200
-                                             dark:border-slate-600">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FONT_FAMILIES.map(f => (
-                        <SelectItem key={f.value} value={f.value}>
-                          <span style={{ fontFamily: f.value }}>
-                            {f.label}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Font Size */}
-                <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">
-                    Font Size
-                  </Label>
-                  <Select
-                    value={String(selectedField.fontSize || 14)}
-                    onValueChange={v =>
-                      updateFieldTypography('fontSize', Number(v))
-                    }
-                  >
-                    <SelectTrigger className="h-9 rounded-xl text-xs
-                                             border-slate-200
-                                             dark:border-slate-600">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FONT_SIZES.map(s => (
-                        <SelectItem key={s} value={String(s)}>
-                          {s}px
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Live Preview */}
-                <div className="bg-white dark:bg-slate-800
-                                border border-slate-200 dark:border-slate-600
-                                rounded-xl p-3 min-h-[44px]
-                                flex items-center justify-center">
-                  <span
-                    style={{
-                      fontFamily: selectedField.fontFamily || 'Helvetica',
-                      fontSize:   `${selectedField.fontSize || 14}px`,
-                    }}
-                    className="text-slate-800 dark:text-white"
-                  >
-                    Preview Text
-                  </span>
-                </div>
-              </div>
-            </SideCard>
-          )}
-
-          {/* ── Fields Summary ────────────────────────────── */}
+          {/* Field Summary */}
           {fields.length > 0 && (
-            <SideCard>
-              <div className="flex items-center gap-2 mb-3">
-                <Users className="w-3.5 h-3.5 text-slate-400" />
-                <SideLabel>
-                  {fields.length} Field{fields.length !== 1 ? 's' : ''} Placed
-                </SideLabel>
-              </div>
-              <div className="space-y-1.5">
-                {fieldSummary.map((p, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: p.color || '#0ea5e9' }}
-                      />
-                      <span className="text-xs text-slate-600
-                                       dark:text-slate-400 truncate font-medium">
-                        {p.name || `Party ${i + 1}`}
-                      </span>
-                    </div>
-                    <span className={`text-xs font-bold shrink-0 ml-2
-                      ${p.count > 0
-                        ? 'text-sky-500'
-                        : 'text-red-400'
-                      }`}>
-                      {p.count > 0
-                        ? `${p.count} field${p.count !== 1 ? 's' : ''}`
-                        : '⚠ None'
-                      }
+            <div className="bg-slate-50 dark:bg-slate-900/50
+                            rounded-xl p-3 border border-slate-100
+                            dark:border-slate-800 text-xs">
+              <p className="font-bold text-slate-500 uppercase
+                            tracking-wide mb-1">
+                {fields.length} field
+                {fields.length !== 1 ? 's' : ''} placed
+              </p>
+              {parties.map((p, i) => {
+                const count = fields.filter(
+                  f => Number(f.partyIndex) === i
+                ).length;
+                return count > 0 ? (
+                  <div key={i}
+                       className="flex justify-between py-0.5">
+                    <span className="text-slate-500">
+                      {p.name || `Party ${i + 1}`}
+                    </span>
+                    <span
+                      className="font-bold"
+                      style={{ color: p.color }}
+                    >
+                      {count}
                     </span>
                   </div>
-                ))}
-              </div>
-            </SideCard>
+                ) : null;
+              })}
+            </div>
           )}
         </aside>
 
-        {/* ── PDF Viewer ───────────────────────────────────── */}
+        {/* ── PDF Viewer ─────────────────────────────────── */}
         <main className="flex-1 bg-slate-100 dark:bg-slate-950
                          overflow-hidden min-h-0">
           {fileReady ? (
@@ -1485,28 +1197,30 @@ export default function DocumentEditor() {
               currentPage={currentPage}
               onPageChange={setCurrentPage}
               onTotalPagesChange={setTotalPages}
-              pendingFieldType={pendingFieldType}
-              selectedPartyIndex={selectedPartyIndex}
-              parties={parties}
-              onFieldPlaced={() => setPendingFieldType(null)}
+              pendingFieldType={pendingType}
+              selectedPartyIndex={selectedParty}
+              parties={parties.map((p, i) => ({
+                name:  p.name || `Party ${i + 1}`,
+                color: p.color,
+                index: i,
+              }))}
+              onFieldPlaced={() => setPendingType(null)}
               selectedFieldId={selectedFieldId}
               onFieldSelect={setSelectedFieldId}
             />
           ) : (
             <div className="h-full flex flex-col items-center
-                            justify-center text-center px-8">
-              <div className="w-24 h-24 bg-slate-200 dark:bg-slate-800
-                              rounded-3xl flex items-center justify-center
-                              mb-6">
-                <FileText className="w-12 h-12 text-slate-300
-                                     dark:text-slate-600" />
+                            justify-center text-slate-300 px-8
+                            text-center gap-4">
+              <FileText className="w-16 h-16 opacity-20" />
+              <div>
+                <p className="font-semibold text-slate-400 text-lg">
+                  Upload a PDF to start
+                </p>
+                <p className="text-sm text-slate-400 mt-1">
+                  Then place signature fields for each party
+                </p>
               </div>
-              <p className="font-bold text-slate-400 text-lg mb-2">
-                No document yet
-              </p>
-              <p className="text-slate-300 dark:text-slate-600 text-sm">
-                Upload a PDF from the sidebar to get started.
-              </p>
             </div>
           )}
         </main>
