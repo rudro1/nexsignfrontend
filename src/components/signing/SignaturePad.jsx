@@ -242,45 +242,40 @@ import { Input }  from '@/components/ui/input';
 import {
   Tabs, TabsList, TabsTrigger, TabsContent,
 } from '@/components/ui/tabs';
-import {
-  Eraser, Check, Type as TypeIcon,
-  PenTool, RotateCcw,
-} from 'lucide-react';
+import { Check, Type as TypeIcon, PenTool, RotateCcw } from 'lucide-react';
 
-// ── Font options for typed signatures ─────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────
 const FONT_OPTIONS = [
-  {
-    label: 'Classic',
-    value: '"Times New Roman", Georgia, serif',
-    preview: 'Times',
-  },
-  {
-    label: 'Script',
-    value: '"Brush Script MT", cursive',
-    preview: 'Script',
-  },
-  {
-    label: 'Modern',
-    value: '"Helvetica Neue", Arial, sans-serif',
-    preview: 'Modern',
-  },
-  {
-    label: 'Mono',
-    value: '"Courier New", Courier, monospace',
-    preview: 'Mono',
-  },
+  { label: 'Classic', value: '"Times New Roman", Georgia, serif'   },
+  { label: 'Script',  value: '"Brush Script MT", cursive'          },
+  { label: 'Modern',  value: '"Helvetica Neue", Arial, sans-serif' },
+  { label: 'Mono',    value: '"Courier New", Courier, monospace'   },
 ];
+const PEN_COLORS = ['#1a1a1a', '#1d4ed8', '#7c3aed'];
+const PEN_WIDTHS = [1.5, 2.5, 4];
+const DPR        = () => Math.min(window.devicePixelRatio || 1, 2);
 
-// ── Stroke smoothing helper ───────────────────────────────────────
-function midPoint(p1, p2) {
-  return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+// ── Helpers ───────────────────────────────────────────────────────
+const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+function getPos(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const src  = e.touches ? e.touches[0] : e;
+  return {
+    x: src.clientX - rect.left,
+    y: src.clientY - rect.top,
+  };
 }
 
+// ════════════════════════════════════════════════════════════════
 export default function SignaturePad({ onSignatureComplete }) {
   const canvasRef   = useRef(null);
+  const ctxRef      = useRef(null);   // cached 2d context
   const pointsRef   = useRef([]);
+  const isDrawRef   = useRef(false);
+  const colorRef    = useRef('#1a1a1a');
+  const widthRef    = useRef(2.5);
 
-  const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawn,  setHasDrawn]  = useState(false);
   const [typedSig,  setTypedSig]  = useState('');
   const [mode,      setMode]      = useState('draw');
@@ -288,412 +283,405 @@ export default function SignaturePad({ onSignatureComplete }) {
   const [penColor,  setPenColor]  = useState('#1a1a1a');
   const [penWidth,  setPenWidth]  = useState(2.5);
 
-  // ── Init canvas (transparent background) ──────────────────
+  // keep refs in sync so event handlers never close over stale values
+  useEffect(() => { colorRef.current = penColor; }, [penColor]);
+  useEffect(() => { widthRef.current = penWidth; }, [penWidth]);
+
+  // ── Init / resize canvas ──────────────────────────────────
   const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const dpr  = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr  = DPR();
     const rect = canvas.getBoundingClientRect();
-
     canvas.width  = rect.width  * dpr;
     canvas.height = rect.height * dpr;
-
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, rect.width, rect.height);
-
-    // Style
-    ctx.strokeStyle = penColor;
-    ctx.lineWidth   = penWidth;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+    ctx.lineCap               = 'round';
+    ctx.lineJoin              = 'round';
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-  }, [penColor, penWidth]);
-
-  useEffect(() => {
-    if (mode === 'draw') {
-      const t = setTimeout(initCanvas, 50);
-      return () => clearTimeout(t);
-    }
-  }, [mode, initCanvas]);
-
-  // ── Get pointer position ──────────────────────────────────
-  const getPos = useCallback((e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const src  = e.touches ? e.touches[0] : e;
-    return {
-      x: src.clientX - rect.left,
-      y: src.clientY - rect.top,
-    };
+    ctxRef.current = ctx;
   }, []);
 
-  // ── Draw with quadratic curves (smooth) ───────────────────
-  const startDraw = useCallback((e) => {
-    e.preventDefault();
-    const pos = getPos(e);
-    pointsRef.current = [pos];
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    setIsDrawing(true);
-  }, [getPos]);
+  useEffect(() => {
+    if (mode !== 'draw') return;
+    // small delay so dialog animation finishes first
+    const t = setTimeout(initCanvas, 60);
+    return () => clearTimeout(t);
+  }, [mode, initCanvas]);
 
-  const draw = useCallback((e) => {
-    e.preventDefault();
-    if (!isDrawing) return;
+  // ── Native touch handlers — passive:false ─────────────────
+  // ✅ KEY FIX: React synthetic onTouch* cannot call preventDefault
+  //    because React registers them as passive by default.
+  //    We attach native listeners with { passive: false }.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || mode !== 'draw') return;
 
-    const pos = getPos(e);
-    const pts = pointsRef.current;
-    pts.push(pos);
+    const stroke = (pts, x, y) => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      ctx.strokeStyle = colorRef.current;
+      ctx.lineWidth   = widthRef.current;
+      pts.push({ x, y });
+      if (pts.length === 1) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      } else if (pts.length === 2) {
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      } else {
+        const prev = pts[pts.length - 2];
+        const curr = pts[pts.length - 1];
+        const m    = mid(prev, curr);
+        ctx.quadraticCurveTo(prev.x, prev.y, m.x, m.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(m.x, m.y);
+      }
+    };
 
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx || pts.length < 2) return;
+    const onStart = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const { x, y } = getPos(e, canvas);
+      pointsRef.current = [];
+      isDrawRef.current = true;
+      stroke(pointsRef.current, x, y);
+    };
 
-    ctx.strokeStyle = penColor;
-    ctx.lineWidth   = penWidth;
+    const onMove = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isDrawRef.current) return;
+      const { x, y } = getPos(e, canvas);
+      stroke(pointsRef.current, x, y);
+      setHasDrawn(true);
+    };
 
-    if (pts.length === 2) {
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-    } else {
-      // Smooth curve through points
-      const prev = pts[pts.length - 2];
-      const curr = pts[pts.length - 1];
-      const mid  = midPoint(prev, curr);
-
-      ctx.quadraticCurveTo(prev.x, prev.y, mid.x, mid.y);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(mid.x, mid.y);
-    }
-
-    setHasDrawn(true);
-  }, [isDrawing, getPos, penColor, penWidth]);
-
-  const endDraw = useCallback((e) => {
-    e?.preventDefault();
-    if (isDrawing) {
-      // Finish the last segment
+    const onEnd = (e) => {
+      e.preventDefault();
+      if (!isDrawRef.current) return;
       const pts = pointsRef.current;
-      if (pts.length >= 2) {
-        const ctx = canvasRef.current?.getContext('2d');
+      if (pts.length > 0) {
+        const ctx  = ctxRef.current;
         const last = pts[pts.length - 1];
         ctx?.lineTo(last.x, last.y);
         ctx?.stroke();
       }
       pointsRef.current = [];
-    }
-    setIsDrawing(false);
-  }, [isDrawing]);
+      isDrawRef.current = false;
+    };
 
+    // ✅ passive: false — allows preventDefault to work
+    const opts = { passive: false };
+    canvas.addEventListener('touchstart',  onStart, opts);
+    canvas.addEventListener('touchmove',   onMove,  opts);
+    canvas.addEventListener('touchend',    onEnd,   opts);
+    canvas.addEventListener('touchcancel', onEnd,   opts);
+
+    return () => {
+      canvas.removeEventListener('touchstart',  onStart);
+      canvas.removeEventListener('touchmove',   onMove);
+      canvas.removeEventListener('touchend',    onEnd);
+      canvas.removeEventListener('touchcancel', onEnd);
+    };
+  }, [mode]); // re-attach only when mode changes
+
+  // ── Mouse handlers (synthetic OK — no preventDefault needed) ──
+  const onMouseDown = useCallback((e) => {
+    const canvas = canvasRef.current;
+    const ctx    = ctxRef.current;
+    if (!canvas || !ctx) return;
+    const { x, y }    = getPos(e, canvas);
+    pointsRef.current  = [{ x, y }];
+    isDrawRef.current  = true;
+    ctx.strokeStyle    = colorRef.current;
+    ctx.lineWidth      = widthRef.current;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }, []);
+
+  const onMouseMove = useCallback((e) => {
+    if (!isDrawRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx    = ctxRef.current;
+    if (!canvas || !ctx) return;
+    const { x, y } = getPos(e, canvas);
+    const pts       = pointsRef.current;
+    pts.push({ x, y });
+    if (pts.length < 3) { ctx.lineTo(x, y); ctx.stroke(); }
+    else {
+      const prev = pts[pts.length - 2];
+      const curr = pts[pts.length - 1];
+      const m    = mid(prev, curr);
+      ctx.quadraticCurveTo(prev.x, prev.y, m.x, m.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(m.x, m.y);
+    }
+    setHasDrawn(true);
+  }, []);
+
+  const onMouseUp = useCallback(() => {
+    if (!isDrawRef.current) return;
+    const pts = pointsRef.current;
+    if (pts.length > 0) {
+      const ctx  = ctxRef.current;
+      const last = pts[pts.length - 1];
+      ctx?.lineTo(last.x, last.y);
+      ctx?.stroke();
+    }
+    pointsRef.current = [];
+    isDrawRef.current = false;
+  }, []);
+
+  // ── Clear ─────────────────────────────────────────────────
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    ctx.clearRect(
-      0, 0,
-      canvas.width  / dpr,
-      canvas.height / dpr
-    );
+    const ctx    = ctxRef.current;
+    if (!canvas || !ctx) return;
+    const dpr = DPR();
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     pointsRef.current = [];
+    isDrawRef.current = false;
     setHasDrawn(false);
   }, []);
 
-  // ── Confirm & export as transparent PNG ───────────────────
+  // ── Confirm ───────────────────────────────────────────────
   const handleConfirm = useCallback(() => {
-    let finalValue = '';
-
     if (mode === 'draw') {
       if (!hasDrawn) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
-      // ✅ Transparent PNG — no white background
-      finalValue = canvas.toDataURL('image/png');
-
-    } else {
-      // Typed signature on transparent canvas
-      if (!typedSig.trim()) return;
-
-      const offscreen = document.createElement('canvas');
-      offscreen.width  = 900;
-      offscreen.height = 200;
-      const ctx = offscreen.getContext('2d');
-
-      // ✅ DO NOT fillRect — stays transparent
-      ctx.clearRect(0, 0, 900, 200);
-
-      const fontFamily = FONT_OPTIONS[fontIndex]?.value ||
-                         FONT_OPTIONS[0].value;
-      ctx.font         = `italic 80px ${fontFamily}`;
-      ctx.fillStyle    = penColor;
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
-
-      // Draw text with slight shadow for depth
-      ctx.shadowColor   = 'rgba(0,0,0,0.08)';
-      ctx.shadowBlur    = 4;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      ctx.fillText(typedSig.trim(), 450, 100);
-
-      finalValue = offscreen.toDataURL('image/png');
+      onSignatureComplete(canvas.toDataURL('image/png'));
+      return;
     }
-
-    onSignatureComplete(finalValue);
-  }, [
-    mode, hasDrawn, typedSig,
-    fontIndex, penColor, onSignatureComplete,
-  ]);
+    // typed
+    const text = typedSig.trim();
+    if (!text) return;
+    const off = document.createElement('canvas');
+    off.width  = 900;
+    off.height = 200;
+    const ctx  = off.getContext('2d');
+    ctx.clearRect(0, 0, 900, 200);
+    ctx.font         = `italic 80px ${FONT_OPTIONS[fontIndex].value}`;
+    ctx.fillStyle    = penColor;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor   = 'rgba(0,0,0,0.08)';
+    ctx.shadowBlur    = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(text, 450, 100);
+    onSignatureComplete(off.toDataURL('image/png'));
+  }, [mode, hasDrawn, typedSig, fontIndex, penColor, onSignatureComplete]);
 
   const canConfirm = mode === 'draw'
     ? hasDrawn
     : typedSig.trim().length > 0;
 
+  // ── Color / width setters (also update refs) ──────────────
+  const handleColor = useCallback((c) => {
+    colorRef.current = c;
+    setPenColor(c);
+  }, []);
+
+  const handleWidth = useCallback((w) => {
+    widthRef.current = w;
+    setPenWidth(w);
+  }, []);
+
+  // ── Render ────────────────────────────────────────────────
   return (
     <div className="space-y-4">
 
-      {/* Mode tabs */}
       <Tabs
         value={mode}
         onValueChange={(v) => {
           setMode(v);
           setHasDrawn(false);
           setTypedSig('');
+          isDrawRef.current  = false;
+          pointsRef.current  = [];
         }}
-        className="w-full"
       >
         <TabsList className="grid grid-cols-2 w-full
-                             bg-slate-100 dark:bg-slate-800
-                             rounded-xl p-1 h-10">
-          <TabsTrigger
-            value="draw"
-            className="rounded-lg gap-2 text-sm font-semibold
+                             bg-slate-100 rounded-xl p-1 h-10">
+          <TabsTrigger value="draw"
+            className="rounded-lg gap-1.5 text-sm font-semibold
                        data-[state=active]:bg-white
-                       dark:data-[state=active]:bg-slate-700
-                       data-[state=active]:shadow-sm"
-          >
-            <PenTool className="w-4 h-4" />
-            Draw
+                       data-[state=active]:shadow-sm">
+            <PenTool className="w-4 h-4" /> Draw
           </TabsTrigger>
-          <TabsTrigger
-            value="type"
-            className="rounded-lg gap-2 text-sm font-semibold
+          <TabsTrigger value="type"
+            className="rounded-lg gap-1.5 text-sm font-semibold
                        data-[state=active]:bg-white
-                       dark:data-[state=active]:bg-slate-700
-                       data-[state=active]:shadow-sm"
-          >
-            <TypeIcon className="w-4 h-4" />
-            Type
+                       data-[state=active]:shadow-sm">
+            <TypeIcon className="w-4 h-4" /> Type
           </TabsTrigger>
         </TabsList>
 
-        {/* ── DRAW TAB ──────────────────────────────────── */}
+        {/* ── DRAW ─────────────────────────────────────── */}
         <TabsContent value="draw" className="mt-4 outline-none">
 
-          {/* Pen options */}
+          {/* Controls */}
           <div className="flex items-center gap-3 mb-3">
-            {/* Color presets */}
             <div className="flex gap-1.5">
-              {['#1a1a1a', '#1d4ed8', '#7c3aed'].map(c => (
-                <button
-                  key={c}
-                  onClick={() => setPenColor(c)}
+              {PEN_COLORS.map(c => (
+                <button key={c} onClick={() => handleColor(c)}
                   className={`w-6 h-6 rounded-full border-2
-                               transition-all
-                               ${penColor === c
-                                 ? 'border-sky-400 scale-110'
-                                 : 'border-transparent'
-                               }`}
+                    transition-all
+                    ${penColor === c
+                      ? 'border-sky-400 scale-110'
+                      : 'border-transparent'}`}
                   style={{ backgroundColor: c }}
-                  title={`Use ${c}`}
                 />
               ))}
             </div>
-
-            {/* Pen width */}
             <div className="flex gap-1.5 ml-auto">
-              {[1.5, 2.5, 4].map(w => (
-                <button
-                  key={w}
-                  onClick={() => setPenWidth(w)}
+              {PEN_WIDTHS.map(w => (
+                <button key={w} onClick={() => handleWidth(w)}
                   className={`w-7 h-7 rounded-lg border
-                               flex items-center justify-center
-                               transition-all
-                               ${penWidth === w
-                                 ? 'border-sky-400 bg-sky-50 dark:bg-sky-900/20'
-                                 : 'border-slate-200 dark:border-slate-700'
-                               }`}
-                  title={`Pen width ${w}`}
-                >
-                  <div
-                    className="rounded-full bg-slate-700
-                               dark:bg-slate-300"
+                    flex items-center justify-center transition-all
+                    ${penWidth === w
+                      ? 'border-sky-400 bg-sky-50'
+                      : 'border-slate-200'}`}>
+                  <div className="rounded-full bg-slate-700"
                     style={{
                       width:  `${Math.round(w * 2)}px`,
                       height: `${Math.round(w * 2)}px`,
-                    }}
-                  />
+                    }} />
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Canvas */}
+          {/* Canvas container */}
           <div
             className="relative border-2 border-slate-200
-                       dark:border-slate-600 rounded-2xl
-                       overflow-hidden shadow-inner
-                       hover:border-sky-300 transition-colors"
+                       rounded-2xl overflow-hidden shadow-inner
+                       hover:border-sky-300 transition-colors
+                       select-none"
             style={{
               background: 'repeating-linear-gradient(' +
                 '45deg,#f8fafc 0,#f8fafc 10px,' +
                 '#f0f4f8 10px,#f0f4f8 20px)',
+              touchAction: 'none', // ✅ prevent page scroll
             }}
           >
             <canvas
               ref={canvasRef}
-              className="w-full cursor-crosshair touch-none block"
+              className="w-full cursor-crosshair block"
               style={{
-                height:     '160px',
-                background: 'transparent',
+                height:      '160px',
+                background:  'transparent',
+                touchAction: 'none',  // ✅
+                userSelect:  'none',
               }}
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={endDraw}
-              onMouseLeave={endDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={endDraw}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseUp}
+              // ✅ NO onTouch* here — handled natively above
             />
-
-            {/* Placeholder */}
             {!hasDrawn && (
               <div className="absolute inset-0 flex items-center
                               justify-center pointer-events-none">
-                <p className="text-slate-300 text-sm font-medium
-                               select-none">
+                <p className="text-slate-300 text-sm
+                               font-medium select-none">
                   ✍️ Draw your signature here
                 </p>
               </div>
             )}
           </div>
 
-          {/* Clear */}
           <div className="flex justify-between items-center mt-2.5">
             <p className="text-[10px] text-slate-400 font-bold
                           uppercase tracking-widest">
               Sign inside the box
             </p>
-            <Button
-              variant="ghost" size="sm"
-              onClick={clearCanvas}
-              disabled={!hasDrawn}
+            <Button variant="ghost" size="sm"
+              onClick={clearCanvas} disabled={!hasDrawn}
               className="text-rose-500 hover:bg-rose-50
-                         dark:hover:bg-rose-900/20
                          rounded-xl gap-1.5 h-8 px-3
-                         disabled:opacity-40"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Clear
+                         disabled:opacity-40">
+              <RotateCcw className="w-3.5 h-3.5" /> Clear
             </Button>
           </div>
         </TabsContent>
 
-        {/* ── TYPE TAB ──────────────────────────────────── */}
-        <TabsContent
-          value="type"
-          className="mt-4 outline-none space-y-3"
-        >
-          {/* Font selector */}
-          <div>
-            <p className="text-[10px] font-bold text-slate-400
-                          uppercase tracking-widest mb-2">
-              Choose Font Style
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {FONT_OPTIONS.map((f, i) => (
-                <button
-                  key={i}
-                  onClick={() => setFontIndex(i)}
-                  className={`px-3 py-2.5 rounded-xl text-sm
-                               border-2 transition-all text-left
-                               ${fontIndex === i
-                                 ? 'border-sky-400 bg-sky-50 dark:bg-sky-900/20'
-                                 : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                               }`}
-                  style={{ fontFamily: f.value, fontStyle: 'italic' }}
-                >
-                  <span className={`text-base ${
-                    fontIndex === i
-                      ? 'text-sky-700 dark:text-sky-300'
-                      : 'text-slate-700 dark:text-slate-300'
-                  }`}>
-                    {typedSig || 'John Doe'}
-                  </span>
-                  <p className="text-[9px] text-slate-400 mt-0.5
-                                not-italic font-semibold uppercase
-                                tracking-wider">
-                    {f.label}
-                  </p>
-                </button>
-              ))}
-            </div>
+        {/* ── TYPE ─────────────────────────────────────── */}
+        <TabsContent value="type" className="mt-4 outline-none space-y-3">
+          <p className="text-[10px] font-bold text-slate-400
+                        uppercase tracking-widest">
+            Choose Font Style
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {FONT_OPTIONS.map((f, i) => (
+              <button key={i} onClick={() => setFontIndex(i)}
+                className={`px-3 py-2.5 rounded-xl border-2
+                  transition-all text-left
+                  ${fontIndex === i
+                    ? 'border-sky-400 bg-sky-50'
+                    : 'border-slate-200 hover:border-slate-300'}`}
+                style={{ fontFamily: f.value, fontStyle: 'italic' }}>
+                <span className={`text-base ${
+                  fontIndex === i
+                    ? 'text-sky-700' : 'text-slate-700'}`}>
+                  {typedSig || 'John Doe'}
+                </span>
+                <p className="text-[9px] text-slate-400 mt-0.5
+                              not-italic font-semibold
+                              uppercase tracking-wider">
+                  {f.label}
+                </p>
+              </button>
+            ))}
           </div>
 
-          {/* Input */}
-          <div
-            className="relative border-2 border-slate-200
-                       dark:border-slate-600 rounded-2xl
-                       overflow-hidden hover:border-sky-300
-                       transition-colors"
+          <div className="relative border-2 border-slate-200
+                         rounded-2xl overflow-hidden
+                         hover:border-sky-300 transition-colors"
             style={{
               background: 'repeating-linear-gradient(' +
                 '45deg,#f8fafc 0,#f8fafc 10px,' +
                 '#f0f4f8 10px,#f0f4f8 20px)',
-            }}
-          >
+            }}>
             <Input
               value={typedSig}
               onChange={e => setTypedSig(e.target.value)}
               placeholder="Type your full name..."
               maxLength={50}
               className="h-20 text-3xl text-center border-none
-                         bg-transparent focus-visible:ring-0
-                         dark:bg-transparent"
+                         bg-transparent focus-visible:ring-0"
               style={{
-                fontFamily:  FONT_OPTIONS[fontIndex]?.value,
-                fontStyle:   'italic',
-                color:       penColor,
+                fontFamily: FONT_OPTIONS[fontIndex].value,
+                fontStyle:  'italic',
+                color:      penColor,
               }}
               autoFocus
             />
           </div>
 
           {typedSig && (
-            <p className="text-[10px] text-slate-400 text-center italic">
-              Will be rendered in {FONT_OPTIONS[fontIndex]?.label} style
+            <p className="text-[10px] text-slate-400
+                          text-center italic">
+              Rendered in {FONT_OPTIONS[fontIndex].label} style
             </p>
           )}
         </TabsContent>
       </Tabs>
 
-      {/* Confirm button */}
-      <Button
-        onClick={handleConfirm}
-        disabled={!canConfirm}
+      <Button onClick={handleConfirm} disabled={!canConfirm}
         className="w-full h-12 bg-sky-500 hover:bg-sky-600
                    active:bg-sky-700 text-white rounded-2xl
                    shadow-lg shadow-sky-500/25 font-bold text-base
                    transition-all active:scale-[0.98]
                    disabled:opacity-40 disabled:cursor-not-allowed
-                   gap-2"
-      >
+                   gap-2">
         <Check className="w-5 h-5" />
         Use This Signature
       </Button>
