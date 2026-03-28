@@ -72,31 +72,61 @@
 //     Layout: __Layout,
 // };
 
-import { Landing } from './pages/Landing';
-import Dashboard from './pages/Dashboard';
-import DocumentEditor from './pages/DocumentEditor';
-import SignerView from './pages/SignerView';
-import AdminDashboard from './pages/AdminDashboard';
-import Templates from './pages/Templates';
-import Audit from './pages/Audit';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import __Layout from './Layout.jsx';
+// import { Landing } from './pages/Landing';
+// import Dashboard from './pages/Dashboard';
+// import DocumentEditor from './pages/DocumentEditor';
+// import SignerView from './pages/SignerView';
+// import AdminDashboard from './pages/AdminDashboard';
+// import Templates from './pages/Templates';
+// import Audit from './pages/Audit';
+// import Login from './pages/Login';
+// import Register from './pages/Register';
+// import __Layout from './Layout.jsx';
+
+// export const PAGES = {
+//     "landing": Landing,
+//     "dashboard": Dashboard,
+//     "DocumentEditor": DocumentEditor,
+//     "templates": Templates,
+//     "audit": Audit,
+//     "sign": SignerView,
+//     "admin": AdminDashboard, // ✅ এই কি-টি 'admin' হিসেবেই থাকবে
+//     "login": Login,
+//     "register": Register,
+// };
+
+// export const pagesConfig = {
+//     mainPage: "landing",
+//     Pages: PAGES,
+//     Layout: __Layout,
+// };
+// ✅ সব default import — named import নেই
+import Landing        from '@/pages/Landing';
+import Dashboard      from '@/pages/Dashboard';
+import DocumentEditor from '@/pages/DocumentEditor';
+import SignerView     from '@/pages/SignerView';
+import AdminDashboard from '@/pages/AdminDashboard';
+import Templates      from '@/pages/Templates';
+import Audit          from '@/pages/Audit';
+import Auth           from '@/pages/Auth';
+import NewTemplate    from '@/pages/NewTemplate';
+import Layout         from './Layout.jsx';
 
 export const PAGES = {
-    "landing": Landing,
-    "dashboard": Dashboard,
-    "DocumentEditor": DocumentEditor,
-    "templates": Templates,
-    "audit": Audit,
-    "sign": SignerView,
-    "admin": AdminDashboard, // ✅ এই কি-টি 'admin' হিসেবেই থাকবে
-    "login": Login,
-    "register": Register,
+  landing:        Landing,
+  dashboard:      Dashboard,
+  DocumentEditor: DocumentEditor,
+  templates:      Templates,
+  'new-template': NewTemplate,
+  audit:          Audit,
+  sign:           SignerView,
+  admin:          AdminDashboard,
+  login:          Auth,
+  register:       Auth,
 };
 
 export const pagesConfig = {
-    mainPage: "landing",
-    Pages: PAGES,
-    Layout: __Layout,
+  mainPage: 'landing',
+  Pages:    PAGES,
+  Layout:   Layout,
 };

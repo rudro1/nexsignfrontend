@@ -131,31 +131,209 @@
 //     </ThemeProvider>
 //   );
 // }
+// import React, {
+//   createContext, useContext, useEffect, useState,
+// } from 'react';
+// import {
+//   BrowserRouter as Router, Route, Routes, Navigate,
+// } from 'react-router-dom';
+// import { QueryClientProvider } from '@tanstack/react-query';
+// import { queryClientInstance } from '@/lib/query-client';
+// import { AuthProvider, useAuth } from '@/lib/AuthContext';
+// import { Toaster } from 'sonner';
+
+// // Pages
+// import { Landing }    from '@/pages/Landing';
+// import SignerView     from '@/pages/SignerView';
+// import PageNotFound   from './lib/PageNotFound';
+// import Pricing        from './pages/Pricing';
+// import Auth           from './pages/Auth';
+// import NewTemplate    from '@/pages/NewTemplate'; // ✅ New
+// import Dashboard      from '@/pages/Dashboard';
+// import DocumentEditor from '@/pages/DocumentEditor';
+// import Templates      from '@/pages/Templates';
+// import AdminDashboard from '@/pages/AdminDashboard';
+// import Audit          from '@/pages/Audit';
+
+// // ── Theme ────────────────────────────────────────────────────────
+// const ThemeContext = createContext({
+//   theme: 'light', toggleTheme: () => {},
+// });
+// export const useTheme = () => useContext(ThemeContext);
+
+// function ThemeProvider({ children }) {
+//   const [theme, setTheme] = useState(
+//     () => localStorage.getItem('theme') || 'light'
+//   );
+//   useEffect(() => {
+//     document.documentElement.classList.remove('light','dark');
+//     document.documentElement.classList.add(theme);
+//     localStorage.setItem('theme', theme);
+//   }, [theme]);
+
+//   return (
+//     <ThemeContext.Provider value={{
+//       theme,
+//       toggleTheme: () =>
+//         setTheme(p => p === 'light' ? 'dark' : 'light'),
+//     }}>
+//       {children}
+//     </ThemeContext.Provider>
+//   );
+// }
+
+// // ── Protected Route ──────────────────────────────────────────────
+// const ProtectedRoute = ({ children, adminOnly = false }) => {
+//   const { user, loading } = useAuth();
+//   if (loading) return null;
+//   if (!user) return <Navigate to="/login" replace />;
+//   if (adminOnly) {
+//     const ok =
+//       user.role === 'admin' || user.role === 'super_admin';
+//     if (!ok) return <Navigate to="/dashboard" replace />;
+//   }
+//   return children;
+// };
+
+// // ── Main App ─────────────────────────────────────────────────────
+// function AppRoutes() {
+//   const { loading, isAuthenticated } = useAuth();
+
+//   if (loading) return (
+//     <div className="h-screen flex flex-col items-center
+//                     justify-center gap-4 bg-slate-50
+//                     dark:bg-slate-950">
+//       <div className="w-12 h-12 border-4 border-[#28ABDF]
+//                       border-t-transparent rounded-full
+//                       animate-spin" />
+//       <p className="text-slate-500 font-medium animate-pulse">
+//         NeXsign is loading...
+//       </p>
+//     </div>
+//   );
+
+//   return (
+//     <Routes>
+//       {/* Public */}
+//       <Route path="/"        element={<Landing />} />
+//       <Route path="/pricing" element={<Pricing />} />
+
+//       {/* Auth */}
+//       <Route path="/login"
+//         element={isAuthenticated
+//           ? <Navigate to="/dashboard" replace />
+//           : <Auth initialMode="login" />
+//         }
+//       />
+//       <Route path="/register"
+//         element={isAuthenticated
+//           ? <Navigate to="/dashboard" replace />
+//           : <Auth initialMode="register" />
+//         }
+//       />
+
+//       {/* Public signing */}
+//       <Route path="/sign/:token" element={<SignerView />} />
+
+//       {/* Protected */}
+//       <Route path="/dashboard"
+//         element={
+//           <ProtectedRoute>
+//             <Dashboard />
+//           </ProtectedRoute>
+//         }
+//       />
+//       <Route path="/DocumentEditor"
+//         element={
+//           <ProtectedRoute>
+//             <DocumentEditor />
+//           </ProtectedRoute>
+//         }
+//       />
+//       <Route path="/templates"
+//         element={
+//           <ProtectedRoute>
+//             <Templates />
+//           </ProtectedRoute>
+//         }
+//       />
+//       {/* ✅ New Template route */}
+//       <Route path="/new-template"
+//         element={
+//           <ProtectedRoute>
+//             <NewTemplate />
+//           </ProtectedRoute>
+//         }
+//       />
+//       <Route path="/audit"
+//         element={
+//           <ProtectedRoute>
+//             <Audit />
+//           </ProtectedRoute>
+//         }
+//       />
+
+//       {/* Admin */}
+//       <Route path="/admin"
+//         element={
+//           <ProtectedRoute adminOnly>
+//             <AdminDashboard />
+//           </ProtectedRoute>
+//         }
+//       />
+
+//       <Route path="*" element={<PageNotFound />} />
+//     </Routes>
+//   );
+// }
+
+// export default function App() {
+//   return (
+//     <ThemeProvider>
+//       <AuthProvider>
+//         <QueryClientProvider client={queryClientInstance}>
+//           <Router>
+//             <Toaster
+//               position="top-right"
+//               richColors
+//               toastOptions={{
+//                 duration: 3000,
+//                 style: { zIndex: 9999 },
+//               }}
+//             />
+//             <AppRoutes />
+//           </Router>
+//         </QueryClientProvider>
+//       </AuthProvider>
+//     </ThemeProvider>
+//   );
+// }
 import React, {
   createContext, useContext, useEffect, useState,
 } from 'react';
 import {
-  BrowserRouter as Router, Route, Routes, Navigate,
+  BrowserRouter as Router,
+  Route, Routes, Navigate,
 } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { Toaster } from 'sonner';
 
-// Pages
-import { Landing }    from '@/pages/Landing';
+// ✅ Pages — সব default import
+import Landing        from '@/pages/Landing';
 import SignerView     from '@/pages/SignerView';
-import PageNotFound   from './lib/PageNotFound';
-import Pricing        from './pages/Pricing';
-import Auth           from './pages/Auth';
-import NewTemplate    from '@/pages/NewTemplate'; // ✅ New
+import PageNotFound   from '@/lib/PageNotFound';
+import Pricing        from '@/pages/Pricing';
+import Auth           from '@/pages/Auth';
+import NewTemplate    from '@/pages/NewTemplate';
 import Dashboard      from '@/pages/Dashboard';
 import DocumentEditor from '@/pages/DocumentEditor';
 import Templates      from '@/pages/Templates';
 import AdminDashboard from '@/pages/AdminDashboard';
 import Audit          from '@/pages/Audit';
 
-// ── Theme ────────────────────────────────────────────────────────
+// ── Theme Context ────────────────────────────────────────────────
 const ThemeContext = createContext({
   theme: 'light', toggleTheme: () => {},
 });
@@ -165,18 +343,21 @@ function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(
     () => localStorage.getItem('theme') || 'light'
   );
+
   useEffect(() => {
-    document.documentElement.classList.remove('light','dark');
+    document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
   return (
-    <ThemeContext.Provider value={{
-      theme,
-      toggleTheme: () =>
-        setTheme(p => p === 'light' ? 'dark' : 'light'),
-    }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        toggleTheme: () =>
+          setTheme(p => (p === 'light' ? 'dark' : 'light')),
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );
@@ -185,21 +366,20 @@ function ThemeProvider({ children }) {
 // ── Protected Route ──────────────────────────────────────────────
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const { user, loading } = useAuth();
+
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly) {
-    const ok =
+    const isAdmin =
       user.role === 'admin' || user.role === 'super_admin';
-    if (!ok) return <Navigate to="/dashboard" replace />;
+    if (!isAdmin) return <Navigate to="/dashboard" replace />;
   }
   return children;
 };
 
-// ── Main App ─────────────────────────────────────────────────────
-function AppRoutes() {
-  const { loading, isAuthenticated } = useAuth();
-
-  if (loading) return (
+// ── Loading Screen ───────────────────────────────────────────────
+function LoadingScreen() {
+  return (
     <div className="h-screen flex flex-col items-center
                     justify-center gap-4 bg-slate-50
                     dark:bg-slate-950">
@@ -211,61 +391,76 @@ function AppRoutes() {
       </p>
     </div>
   );
+}
+
+// ── App Routes ───────────────────────────────────────────────────
+function AppRoutes() {
+  const { loading, isAuthenticated } = useAuth();
+
+  if (loading) return <LoadingScreen />;
 
   return (
     <Routes>
-      {/* Public */}
+      {/* ── Public ─────────────────────────────────────────── */}
       <Route path="/"        element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
 
-      {/* Auth */}
-      <Route path="/login"
-        element={isAuthenticated
-          ? <Navigate to="/dashboard" replace />
-          : <Auth initialMode="login" />
+      {/* ── Auth ───────────────────────────────────────────── */}
+      <Route
+        path="/login"
+        element={
+          isAuthenticated
+            ? <Navigate to="/dashboard" replace />
+            : <Auth initialMode="login" />
         }
       />
-      <Route path="/register"
-        element={isAuthenticated
-          ? <Navigate to="/dashboard" replace />
-          : <Auth initialMode="register" />
+      <Route
+        path="/register"
+        element={
+          isAuthenticated
+            ? <Navigate to="/dashboard" replace />
+            : <Auth initialMode="register" />
         }
       />
 
-      {/* Public signing */}
+      {/* ── Public Signing ─────────────────────────────────── */}
       <Route path="/sign/:token" element={<SignerView />} />
 
-      {/* Protected */}
-      <Route path="/dashboard"
+      {/* ── Protected ──────────────────────────────────────── */}
+      <Route
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
           </ProtectedRoute>
         }
       />
-      <Route path="/DocumentEditor"
+      <Route
+        path="/DocumentEditor"
         element={
           <ProtectedRoute>
             <DocumentEditor />
           </ProtectedRoute>
         }
       />
-      <Route path="/templates"
+      <Route
+        path="/templates"
         element={
           <ProtectedRoute>
             <Templates />
           </ProtectedRoute>
         }
       />
-      {/* ✅ New Template route */}
-      <Route path="/new-template"
+      <Route
+        path="/new-template"
         element={
           <ProtectedRoute>
             <NewTemplate />
           </ProtectedRoute>
         }
       />
-      <Route path="/audit"
+      <Route
+        path="/audit"
         element={
           <ProtectedRoute>
             <Audit />
@@ -273,8 +468,9 @@ function AppRoutes() {
         }
       />
 
-      {/* Admin */}
-      <Route path="/admin"
+      {/* ── Admin ──────────────────────────────────────────── */}
+      <Route
+        path="/admin"
         element={
           <ProtectedRoute adminOnly>
             <AdminDashboard />
@@ -282,11 +478,13 @@ function AppRoutes() {
         }
       />
 
+      {/* ── 404 ────────────────────────────────────────────── */}
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
 }
 
+// ── Root App ─────────────────────────────────────────────────────
 export default function App() {
   return (
     <ThemeProvider>
