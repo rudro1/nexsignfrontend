@@ -304,13 +304,15 @@
 //     </div>
 //   );
 // }
-
+// ════════════════════════════════════════════════════════════════
+// FILE 1: src/pages/Dashboard.jsx
+// ════════════════════════════════════════════════════════════════
 import React, {
   useState, useEffect, useCallback,
   useMemo, useRef,
 } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { api, apiCache } from '@/api/apiClient';
+import { api, apiCache }     from '@/api/apiClient';
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -325,11 +327,12 @@ import DocumentCard from '@/components/dashboard/DocumentCard';
 import { useAuth }  from '@/lib/AuthContext';
 
 const LIMIT        = 6;
-const AUTO_REFRESH = 30_000; // 30s
+const AUTO_REFRESH = 30_000;
 
 // ── Offline Banner ────────────────────────────────────────────────
 function OfflineBanner() {
   const [offline, setOffline] = useState(!navigator.onLine);
+
   useEffect(() => {
     const on  = () => setOffline(false);
     const off = () => setOffline(true);
@@ -340,13 +343,16 @@ function OfflineBanner() {
       window.removeEventListener('offline', off);
     };
   }, []);
+
   if (!offline) return null;
+
   return (
     <div className="fixed top-0 left-0 right-0 z-50
                     bg-red-500 text-white py-2.5
                     animate-in slide-in-from-top-1 duration-200">
       <div className="max-w-7xl mx-auto px-4
-                      flex items-center justify-center gap-2 text-sm font-semibold">
+                      flex items-center justify-center
+                      gap-2 text-sm font-semibold">
         <WifiOff className="w-4 h-4" />
         No internet — showing cached data
       </div>
@@ -354,11 +360,13 @@ function OfflineBanner() {
   );
 }
 
+// ════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════
 export default function Dashboard() {
-  const navigate = useNavigate();
+  const navigate                    = useNavigate();
   const { user, isAdmin, loading: authLoading } = useAuth();
 
-  // ── State ──────────────────────────────────────────────────────
   const [documents,      setDocuments]      = useState([]);
   const [isLoading,      setIsLoading]      = useState(true);
   const [isSyncing,      setIsSyncing]      = useState(false);
@@ -369,21 +377,22 @@ export default function Dashboard() {
   const [search,         setSearch]         = useState('');
   const [statusFilter,   setStatusFilter]   = useState('all');
   const [lastFetched,    setLastFetched]    = useState(null);
-const [serverStats, setServerStats] = useState({
-  total: 0, inProgress: 0, completed: 0, templates: 0,
-});
-  const abortRef     = useRef(null);
-  const isMounted    = useRef(true);
-  const pageRef      = useRef(1);
+  const [serverStats,    setServerStats]    = useState({
+    total: 0, inProgress: 0, completed: 0, templates: 0,
+  });
+
+  const abortRef  = useRef(null);
+  const isMounted = useRef(true);
+  const pageRef   = useRef(1);
 
   useEffect(() => { pageRef.current = page; }, [page]);
   useEffect(() => () => { isMounted.current = false; }, []);
 
-  // ── Fetch ──────────────────────────────────────────────────────
+  // ── Fetch ─────────────────────────────────────────────────
   const fetchDocuments = useCallback(async ({
-    pageNum  = 1,
-    append   = false,
-    silent   = false,
+    pageNum = 1,
+    append  = false,
+    silent  = false,
   } = {}) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -426,7 +435,7 @@ const [serverStats, setServerStats] = useState({
 
       setFetchError(
         documents.length > 0
-          ? null   // already have data → silent fail
+          ? null
           : 'Failed to load. Please retry.'
       );
     } finally {
@@ -439,7 +448,7 @@ const [serverStats, setServerStats] = useState({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Auth guard + initial load ──────────────────────────────────
+  // ── Auth guard + initial load ──────────────────────────────
   useEffect(() => {
     if (authLoading) return;
     if (isAdmin) { navigate('/admin', { replace: true }); return; }
@@ -454,10 +463,9 @@ const [serverStats, setServerStats] = useState({
       clearInterval(id);
       abortRef.current?.abort();
     };
-  // fetchDocuments is stable (useCallback with no deps)
   }, [authLoading, isAdmin, navigate, fetchDocuments]);
 
-  // ── Come back online → refresh ─────────────────────────────────
+  // ── Online → refresh ──────────────────────────────────────
   useEffect(() => {
     const handler = () => {
       apiCache.clear();
@@ -467,28 +475,38 @@ const [serverStats, setServerStats] = useState({
     return () => window.removeEventListener('online', handler);
   }, [fetchDocuments]);
 
-  // ── Load more ──────────────────────────────────────────────────
   const handleLoadMore = useCallback(() => {
     if (!isFetchingMore && hasMore) {
       fetchDocuments({ pageNum: pageRef.current + 1, append: true });
     }
   }, [isFetchingMore, hasMore, fetchDocuments]);
 
-  // ── Manual refresh ─────────────────────────────────────────────
   const handleRefresh = useCallback(() => {
     apiCache.clear();
     fetchDocuments({ pageNum: 1 });
   }, [fetchDocuments]);
 
-  // ── Stats ──────────────────────────────────────────────────────
-const stats = useMemo(() => ({
-  total:      serverStats.total      || documents.filter(d => !d.isTemplate).length,
-  inProgress: serverStats.inProgress || documents.filter(d => d.status === 'in_progress' && !d.isTemplate).length,
-  completed:  serverStats.completed  || documents.filter(d => d.status === 'completed'   && !d.isTemplate).length,
-  templates:  serverStats.templates  || documents.filter(d => d.isTemplate).length,
-}), [serverStats, documents]);
+  // ── Document deleted handler ──────────────────────────────
+  const handleDocDeleted = useCallback((id) => {
+    setDocuments(prev => prev.filter(d => d._id !== id));
+    apiCache.clear();
+  }, []);
 
-  // ── Client-side filter ─────────────────────────────────────────
+  // ── Document updated handler (e.g. after resend) ──────────
+  // ✅ Triggers a silent refresh to get latest status
+  const handleDocRefresh = useCallback(() => {
+    fetchDocuments({ pageNum: 1, silent: true });
+  }, [fetchDocuments]);
+
+  // ── Stats ─────────────────────────────────────────────────
+  const stats = useMemo(() => ({
+    total:      serverStats.total      || documents.filter(d => !d.isTemplate).length,
+    inProgress: serverStats.inProgress || documents.filter(d => d.status === 'in_progress' && !d.isTemplate).length,
+    completed:  serverStats.completed  || documents.filter(d => d.status === 'completed'   && !d.isTemplate).length,
+    templates:  serverStats.templates  || documents.filter(d => d.isTemplate).length,
+  }), [serverStats, documents]);
+
+  // ── Client-side filter ────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return documents.filter(doc => {
@@ -502,7 +520,7 @@ const stats = useMemo(() => ({
     });
   }, [documents, search, statusFilter]);
 
-  // ── Last updated text ──────────────────────────────────────────
+  // ── Last updated text ─────────────────────────────────────
   const lastUpdatedText = useMemo(() => {
     if (!lastFetched) return '';
     const s = Math.floor((Date.now() - lastFetched) / 1000);
@@ -518,15 +536,17 @@ const stats = useMemo(() => ({
     <>
       <OfflineBanner />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto
+                      px-4 sm:px-6 lg:px-8 py-8">
 
-        {/* ── Header ────────────────────────────────────────────── */}
+        {/* ── Header ─────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-start
                         justify-between gap-4 mb-8">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl sm:text-3xl font-bold
-                             text-slate-900 dark:text-white tracking-tight">
+                             text-slate-900 dark:text-white
+                             tracking-tight">
                 Welcome back,{' '}
                 {user?.full_name?.split(' ')[0] || 'there'} 👋
               </h1>
@@ -542,7 +562,8 @@ const stats = useMemo(() => ({
               )}
             </div>
 
-            <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+            <p className="text-slate-500 dark:text-slate-400
+                          mt-1 text-sm">
               Manage and track your documents &amp; signatures.
               {lastUpdatedText && (
                 <span className="ml-2 text-slate-400 text-xs">
@@ -554,7 +575,6 @@ const stats = useMemo(() => ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Refresh */}
             <Button
               variant="ghost"
               size="icon"
@@ -598,8 +618,9 @@ const stats = useMemo(() => ({
           </div>
         </div>
 
-        {/* ── Stats ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        {/* ── Stats ──────────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4
+                        gap-3 sm:gap-4 mb-8">
           <StatsCard
             label="Total Docs"
             value={stats.total}
@@ -630,46 +651,46 @@ const stats = useMemo(() => ({
           />
         </div>
 
-        {/* ── Stale / Error Banner ──────────────────────────────── */}
+        {/* ── Error Banner ───────────────────────────────── */}
         {fetchError && documents.length === 0 && (
           <div className="flex items-center gap-3
                           bg-red-50 dark:bg-red-900/10
                           border border-red-200 dark:border-red-800
                           rounded-2xl px-4 py-3 mb-6 text-sm">
             <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-            <span className="text-red-600 dark:text-red-400 font-medium flex-1">
+            <span className="text-red-600 dark:text-red-400
+                             font-medium flex-1">
               {fetchError}
             </span>
             <Button
               variant="ghost" size="sm"
               onClick={handleRefresh}
-              className="text-red-500 hover:bg-red-100 h-8 px-3
-                         font-semibold shrink-0"
+              className="text-red-500 hover:bg-red-100
+                         h-8 px-3 font-semibold shrink-0"
             >
               Retry
             </Button>
           </div>
         )}
 
-        {/* ── Filters ───────────────────────────────────────────── */}
+        {/* ── Filters ────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6
                         items-stretch sm:items-center">
-          {/* Search */}
           <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2
-                               w-4 h-4 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2
+                               -translate-y-1/2 w-4 h-4
+                               text-slate-400 pointer-events-none" />
             <Input
               placeholder="Search documents..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9 h-10 rounded-xl
                          border-slate-200 dark:border-slate-700
-                         focus:border-[#28ABDF] focus:ring-[#28ABDF]
+                         focus:border-[#28ABDF]
                          bg-white dark:bg-slate-900"
             />
           </div>
 
-          {/* Tabs */}
           <Tabs
             value={statusFilter}
             onValueChange={v => setStatusFilter(v)}
@@ -698,7 +719,7 @@ const stats = useMemo(() => ({
           </Tabs>
         </div>
 
-        {/* ── Document Grid ──────────────────────────────────────── */}
+        {/* ── Document Grid ──────────────────────────────── */}
         {isLoading ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -711,8 +732,9 @@ const stats = useMemo(() => ({
                           bg-slate-50 dark:bg-slate-900/50
                           rounded-3xl border border-dashed
                           border-slate-200 dark:border-slate-800">
-            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800
-                            rounded-2xl flex items-center justify-center
+            <div className="w-16 h-16 bg-slate-100
+                            dark:bg-slate-800 rounded-2xl
+                            flex items-center justify-center
                             mx-auto mb-4">
               <FileText className="w-8 h-8 text-slate-300" />
             </div>
@@ -739,24 +761,19 @@ const stats = useMemo(() => ({
 
         ) : (
           <>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5
-                            animate-in fade-in
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3
+                            gap-5 animate-in fade-in
                             slide-in-from-bottom-2 duration-300">
               {filtered.map(doc => (
                 <DocumentCard
                   key={doc._id}
                   doc={doc}
-                  onDeleted={(id) => {
-                    setDocuments(prev =>
-                      prev.filter(d => d._id !== id)
-                    );
-                    apiCache.clear();
-                  }}
+                  onDeleted={handleDocDeleted}
+                  onRefresh={handleDocRefresh}  // ✅ pass refresh
                 />
               ))}
             </div>
 
-            {/* Load More */}
             {hasMore && (
               <div className="flex justify-center mt-10">
                 <Button

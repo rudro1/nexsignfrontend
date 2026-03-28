@@ -276,6 +276,9 @@
 // DocumentCard.displayName = 'DocumentCard';
 // export default DocumentCard;
 // src/components/dashboard/DocumentCard.jsx
+// ════════════════════════════════════════════════════════════════
+// FILE 2: src/components/dashboard/DocumentCard.jsx
+// ════════════════════════════════════════════════════════════════
 import React, {
   useMemo, useCallback, useState,
 } from 'react';
@@ -320,6 +323,11 @@ const STATUS_CONFIG = {
     className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
     icon:      AlertCircle,
   },
+  declined: {
+    label:     'Declined',
+    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    icon:      AlertCircle,
+  },
   template: {
     label:     'Template',
     className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
@@ -333,7 +341,7 @@ const PARTY_COLORS = [
 ];
 
 // ════════════════════════════════════════════════════════════════
-// CARD DROPDOWN MENU
+// DROPDOWN MENU
 // ════════════════════════════════════════════════════════════════
 function CardMenu({ open, onClose, items }) {
   if (!open) return null;
@@ -343,7 +351,7 @@ function CardMenu({ open, onClose, items }) {
       <div className="absolute top-8 right-0 z-20
                       bg-white dark:bg-slate-800
                       border border-slate-200 dark:border-slate-700
-                      rounded-xl shadow-xl min-w-[170px]
+                      rounded-xl shadow-xl min-w-[180px]
                       overflow-hidden
                       animate-in fade-in zoom-in-95 duration-150">
         {items.map(({ label, icon: Icon, onClick, danger }) => (
@@ -377,17 +385,17 @@ function CardMenu({ open, onClose, items }) {
 const DocumentCard = React.memo(({
   doc,
   onDeleted,
-  onRefresh,   // ✅ Dashboard থেকে আসে — resend এর পর refresh করতে
+  onRefresh,
 }) => {
   const navigate = useNavigate();
 
-  const [menuOpen,   setMenuOpen]   = useState(false);
-  const [deleting,   setDeleting]   = useState(false);
-  const [resending,  setResending]  = useState(false);
+  const [menuOpen,  setMenuOpen]  = useState(false);
+  const [deleting,  setDeleting]  = useState(false);
+  const [resending, setResending] = useState(false);
 
   const parties = doc.parties || [];
 
-  // ── Status config ──────────────────────────────────────────
+  // ── Status config ────────────────────────────────────────
   const config = useMemo(() => {
     if (doc.isTemplate) return STATUS_CONFIG.template;
     return STATUS_CONFIG[doc.status] || STATUS_CONFIG.draft;
@@ -395,20 +403,20 @@ const DocumentCard = React.memo(({
 
   const StatusIcon = config.icon;
 
-  // ── Progress ───────────────────────────────────────────────
+  // ── Progress ─────────────────────────────────────────────
   const progress = useMemo(() => {
     if (!parties.length) return 0;
     const signed = parties.filter(p => p.status === 'signed').length;
     return Math.round((signed / parties.length) * 100);
   }, [parties]);
 
-  // ── Current awaiting signer ────────────────────────────────
+  // ── Current awaiting signer ───────────────────────────────
   const currentSigner = useMemo(() => {
     if (doc.status !== 'in_progress' || doc.isTemplate) return null;
     return parties.find(p => p.status !== 'signed') || null;
   }, [parties, doc.status, doc.isTemplate]);
 
-  // ── Monitor stats ──────────────────────────────────────────
+  // ── Monitor stats ─────────────────────────────────────────
   const monitorStats = useMemo(() => {
     const signed = parties.filter(p => p.status === 'signed').length;
     const sent   = parties.filter(p =>
@@ -417,13 +425,10 @@ const DocumentCard = React.memo(({
     const opened = parties.filter(p =>
       (p.linkOpenCount || 0) > 0 || p.linkOpenedAt
     ).length;
-    return {
-      sent, opened, signed,
-      total: parties.length,
-    };
+    return { sent, opened, signed, total: parties.length };
   }, [parties]);
 
-  // ── Formatted date ─────────────────────────────────────────
+  // ── Date ─────────────────────────────────────────────────
   const formattedDate = useMemo(() => {
     const d = new Date(doc.updatedAt || doc.createdAt);
     if (isNaN(d.getTime())) return '';
@@ -432,60 +437,56 @@ const DocumentCard = React.memo(({
     });
   }, [doc.updatedAt, doc.createdAt]);
 
-  // ── Action label ───────────────────────────────────────────
+  // ── Action label ──────────────────────────────────────────
   const actionLabel = useMemo(() => {
     if (doc.status === 'completed') return 'View PDF';
     if (doc.isTemplate)             return 'Use Template';
     return 'Manage';
   }, [doc.status, doc.isTemplate]);
 
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   // HANDLERS
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
 
-  // ── Main card click ────────────────────────────────────────
   const handleCardClick = useCallback(() => {
-    if (doc.status === 'completed' && !doc.isTemplate) {
-      // Completed → signed PDF খোলো
+    if (doc.isTemplate) {
+      navigate('/templates');
+      return;
+    }
+
+    if (doc.status === 'completed') {
+      // ✅ Completed → open signed PDF (with audit log embedded)
       const url = doc.signedFileUrl || doc.fileUrl;
       if (url) {
         window.open(
           buildProxyUrl(url), '_blank', 'noopener,noreferrer'
         );
       } else {
-        toast.error('Document not ready yet.');
+        toast.error('Signed PDF not ready yet.');
       }
       return;
     }
 
-    if (doc.isTemplate) {
-      navigate(`/templates`);
-      return;
-    }
-
-    // ✅ Manage — DocumentEditor এ existing doc load করো
-    // DocumentEditor এ ?id=DOC_ID দিয়ে load হবে
+    // In progress / draft → DocumentEditor
     navigate(`/DocumentEditor?id=${doc._id}`);
   }, [doc, navigate]);
 
-  // ── Audit ──────────────────────────────────────────────────
   const handleAudit = useCallback((e) => {
     e?.stopPropagation();
     navigate(`/audit?id=${doc._id}`);
   }, [doc._id, navigate]);
 
-  // ── Copy ID ────────────────────────────────────────────────
   const handleCopyId = useCallback((e) => {
     e?.stopPropagation();
     navigator.clipboard
       .writeText(doc._id)
-      .then(() => toast.success('Document ID copied!'))
+      .then(()  => toast.success('Document ID copied!'))
       .catch(() => toast.error('Failed to copy.'));
   }, [doc._id]);
 
-  // ── Open PDF ───────────────────────────────────────────────
   const handleOpenPdf = useCallback((e) => {
     e?.stopPropagation();
+    // ✅ signedFileUrl first (has audit log) → fallback to original
     const url = doc.signedFileUrl || doc.fileUrl;
     if (url) {
       window.open(buildProxyUrl(url), '_blank', 'noopener,noreferrer');
@@ -494,8 +495,6 @@ const DocumentCard = React.memo(({
     }
   }, [doc.signedFileUrl, doc.fileUrl]);
 
-  // ── Resend email ───────────────────────────────────────────
-  // ✅ এটি নতুন — Manage থেকে resend করা যাবে
   const handleResend = useCallback(async (e) => {
     e?.stopPropagation();
     if (resending) return;
@@ -503,18 +502,15 @@ const DocumentCard = React.memo(({
     setResending(true);
     try {
       await api.post(`/documents/resend/${doc._id}`);
-      toast.success('Signing email resent successfully!');
-      // Dashboard refresh
+      toast.success('Signing email resent!');
       onRefresh?.();
     } catch (err) {
-      const msg = err?.message || 'Failed to resend email.';
-      toast.error(msg);
+      toast.error(err?.message || 'Failed to resend email.');
     } finally {
       setResending(false);
     }
   }, [doc._id, resending, onRefresh]);
 
-  // ── Delete ─────────────────────────────────────────────────
   const handleDelete = useCallback(async (e) => {
     e?.stopPropagation();
     if (deleting) return;
@@ -536,20 +532,22 @@ const DocumentCard = React.memo(({
     }
   }, [doc._id, doc.title, deleting, onDeleted]);
 
-  // ── Dropdown menu items ────────────────────────────────────
+  // ── Dropdown items ────────────────────────────────────────
   const menuItems = useMemo(() => {
     const items = [];
 
-    // Open PDF
+    // ✅ View PDF — signed first
     if (doc.signedFileUrl || doc.fileUrl) {
       items.push({
-        label:   doc.signedFileUrl ? 'View Signed PDF' : 'View PDF',
+        label:   doc.signedFileUrl
+          ? 'View Signed PDF'
+          : 'View Original PDF',
         icon:    ExternalLink,
         onClick: handleOpenPdf,
       });
     }
 
-    // Resend — only for in_progress docs
+    // Resend
     if (doc.status === 'in_progress' && !doc.isTemplate) {
       items.push({
         label:   'Resend Email',
@@ -589,9 +587,9 @@ const DocumentCard = React.memo(({
     handleCopyId, handleDelete,
   ]);
 
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   // RENDER
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   return (
     <div
       onClick={handleCardClick}
@@ -608,7 +606,7 @@ const DocumentCard = React.memo(({
                  focus-visible:ring-2 focus-visible:ring-sky-400
                  min-h-[200px]"
     >
-      {/* Deleting overlay */}
+      {/* Overlays */}
       {deleting && (
         <div className="absolute inset-0 bg-white/80
                         dark:bg-slate-900/80 rounded-2xl
@@ -616,8 +614,6 @@ const DocumentCard = React.memo(({
           <Loader2 className="w-6 h-6 animate-spin text-red-500" />
         </div>
       )}
-
-      {/* Resending overlay */}
       {resending && (
         <div className="absolute inset-0 bg-white/80
                         dark:bg-slate-900/80 rounded-2xl
@@ -625,22 +621,19 @@ const DocumentCard = React.memo(({
                         justify-center z-30 gap-2">
           <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
           <span className="text-xs text-slate-500 font-medium">
-            Resending email...
+            Resending…
           </span>
         </div>
       )}
 
-      {/* ── Header ────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-3 mb-4">
-
-        {/* Icon + Title */}
+      {/* ── Header ─────────────────────────────────────── */}
+      <div className="flex items-start justify-between
+                      gap-3 mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl shrink-0
                           bg-sky-50 dark:bg-sky-900/20
                           flex items-center justify-center
-                          group-hover:bg-sky-100
-                          dark:group-hover:bg-sky-900/30
-                          transition-colors">
+                          group-hover:bg-sky-100 transition-colors">
             {doc.isTemplate
               ? <Layout   className="w-5 h-5 text-violet-500" />
               : <FileText className="w-5 h-5 text-sky-500" />
@@ -697,11 +690,9 @@ const DocumentCard = React.memo(({
         </div>
       </div>
 
-      {/* ── Signing Progress ─────────────────────────────── */}
+      {/* ── Signing Progress ──────────────────────────── */}
       {!doc.isTemplate && parties.length > 0 && (
         <div className="mb-4 flex-1">
-
-          {/* Header row */}
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-1.5 text-slate-500">
               <Users className="w-3.5 h-3.5" />
@@ -722,8 +713,7 @@ const DocumentCard = React.memo(({
             {parties.map((p, i) => (
               <div
                 key={i}
-                className="flex-1 rounded-full
-                           transition-all duration-500"
+                className="flex-1 rounded-full transition-all duration-500"
                 style={{
                   backgroundColor: p.status === 'signed'
                     ? '#10b981'
@@ -747,20 +737,24 @@ const DocumentCard = React.memo(({
                             px-2.5 py-1.5 rounded-xl">
               <div className="w-1.5 h-1.5 rounded-full
                               bg-amber-400 animate-pulse shrink-0" />
-              <p className="text-[10px] text-slate-500
-                            dark:text-slate-400 truncate">
+              <p className="text-[10px] text-slate-500 truncate">
                 Awaiting:{' '}
                 <span className="font-bold text-slate-800
                                  dark:text-slate-200">
                   {currentSigner.name}
+                  {currentSigner.designation && (
+                    <span className="font-normal text-slate-400 ml-1">
+                      ({currentSigner.designation})
+                    </span>
+                  )}
                 </span>
               </p>
             </div>
           )}
 
-          {/* Stats badges */}
-          <div className="mt-3 flex flex-wrap gap-1.5
-                          text-[10px] font-semibold">
+          {/* Stats */}
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]
+                          font-semibold">
             <span className="px-2.5 py-1 rounded-full
                              bg-slate-100 dark:bg-slate-700
                              text-slate-600 dark:text-slate-400">
@@ -776,13 +770,13 @@ const DocumentCard = React.memo(({
             <span className="px-2.5 py-1 rounded-full
                              bg-emerald-50 dark:bg-emerald-900/20
                              text-emerald-600 dark:text-emerald-400">
-              Signed {monitorStats.signed}
+              ✓ Signed {monitorStats.signed}
             </span>
           </div>
         </div>
       )}
 
-      {/* ── Template info ─────────────────────────────────── */}
+      {/* ── Template info ─────────────────────────────── */}
       {doc.isTemplate && (
         <div className="mb-4 flex-1 flex items-center">
           <div className="flex items-center gap-2
@@ -804,49 +798,50 @@ const DocumentCard = React.memo(({
         </div>
       )}
 
-      {/* ── Completed — Signed PDF preview ───────────────── */}
-      {doc.status === 'completed' && doc.signedFileUrl && (
+      {/* ✅ Completed — Signed PDF ready with audit log */}
+      {doc.status === 'completed' && (
         <div className="mb-4 flex items-center gap-2
                         bg-emerald-50 dark:bg-emerald-900/10
                         border border-emerald-100
                         dark:border-emerald-900/20
                         rounded-xl px-3 py-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span className="text-xs text-emerald-600
-                           dark:text-emerald-400 font-semibold">
-            Signed PDF ready
-          </span>
-          <ExternalLink className="w-3 h-3 text-emerald-400 ml-auto" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-emerald-600
+                          dark:text-emerald-400 font-semibold">
+              {doc.signedFileUrl
+                ? 'Signed PDF + Audit Log ready'
+                : 'Processing signed PDF…'
+              }
+            </p>
+          </div>
+          {doc.signedFileUrl && (
+            <ExternalLink className="w-3 h-3 text-emerald-400 shrink-0" />
+          )}
         </div>
       )}
 
-      {/* ── Footer ───────────────────────────────────────── */}
+      {/* ── Footer ────────────────────────────────────── */}
       <div className="flex items-center justify-between
                       pt-3 mt-auto border-t
                       border-slate-100 dark:border-slate-700/50">
-        {/* Doc ID */}
         <span className="text-[10px] font-bold text-slate-300
                          dark:text-slate-600 uppercase
                          tracking-tight font-mono">
           #{String(doc._id).slice(-6)}
         </span>
 
-        {/* Action button */}
-        <div className="flex items-center gap-2">
-          {/* Resend button — only for active docs */}
+        <div className="flex items-center gap-1.5">
+          {/* Resend button */}
           {doc.status === 'in_progress' && !doc.isTemplate && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleResend(e);
-              }}
+              onClick={(e) => { e.stopPropagation(); handleResend(e); }}
               disabled={resending}
               className="text-amber-500 hover:bg-amber-50
                          hover:text-amber-600 rounded-xl
-                         gap-1 font-bold text-[11px]
-                         h-8 px-3 transition-all"
+                         gap-1 font-bold text-[11px] h-8 px-3"
               title="Resend signing email"
             >
               {resending

@@ -7280,25 +7280,40 @@ import SignaturePad from '@/components/signing/SignaturePad';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker   from 'pdfjs-dist/build/pdf.worker.entry';
 
-// ── PDF.js ────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// PDF.js CONFIG
+// ════════════════════════════════════════════════════════════════
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 const CMAP_URL =
   `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`;
 
-// ── Font map ──────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Font family → CSS font-family string
+ * ✅ All DB values mapped (Helvetica, TimesRoman, Courier + aliases)
+ */
 const FONT_CSS = {
-  'Helvetica':       'Helvetica, Arial, sans-serif',
-  'Times New Roman': '"Times New Roman", Times, serif',
-  'Courier':         '"Courier New", Courier, monospace',
+  'Helvetica':              'Helvetica, Arial, sans-serif',
+  'Helvetica-Bold':         'Helvetica, Arial, sans-serif',
+  'TimesRoman':             '"Times New Roman", Times, serif',
+  'TimesRoman-Bold':        '"Times New Roman", Times, serif',
+  'Times New Roman':        '"Times New Roman", Times, serif',
+  'Courier':                '"Courier New", Courier, monospace',
+  'Courier-Bold':           '"Courier New", Courier, monospace',
 };
 
-// ── Geo (fire-and-forget, max 5s) ────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════
+
+/** Geo fetch — fire-and-forget, max 5s, never throws */
 function startGeoFetch() {
-  // Returns a Promise that resolves with location data
-  // Never rejects — always resolves with fallback
   return new Promise((resolve) => {
     const fallback = (msg) => resolve({ text: msg });
-    const timer    = setTimeout(() => fallback('Unknown'), 5000);
+    const timer    = setTimeout(() => fallback('Unknown'), 5_000);
     const done     = (d) => { clearTimeout(timer); resolve(d); };
 
     if (!navigator.geolocation) return fallback('Unavailable');
@@ -7308,22 +7323,20 @@ function startGeoFetch() {
         try {
           const r = await fetch(
             `https://nominatim.openstreetmap.org/reverse` +
-            `?lat=${coords.latitude}&lon=${coords.longitude}` +
-            `&format=json`,
-            { signal: AbortSignal.timeout(4000) },
+            `?lat=${coords.latitude}&lon=${coords.longitude}&format=json`,
+            { signal: AbortSignal.timeout(4_000) },
           );
           const d = await r.json();
           const a = d.address || {};
           done({
             city:       a.city || a.town || a.village || '',
-            region:     a.state       || '',
-            country:    a.country     || '',
-            postalCode: a.postcode    || '',
-            postal:     a.postcode    || '',
-            text:       [a.city || a.town, a.state, a.country]
-                          .filter(Boolean).join(', ') || 'Unknown',
-            timeZone:
-              Intl.DateTimeFormat().resolvedOptions().timeZone,
+            region:     a.state    || '',
+            country:    a.country  || '',
+            postalCode: a.postcode || '',
+            postal:     a.postcode || '',
+            text: [a.city || a.town, a.state, a.country]
+                    .filter(Boolean).join(', ') || 'Unknown',
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           });
         } catch {
           done({
@@ -7333,27 +7346,32 @@ function startGeoFetch() {
         }
       },
       () => fallback('Declined'),
-      { timeout: 4000, maximumAge: 60_000 },
+      { timeout: 4_000, maximumAge: 60_000 },
     );
   });
 }
 
-// ── Field normaliser ─────────────────────────────────────────────
+/**
+ * Normalise a raw field from the API response
+ * ✅ fontWeight included
+ */
 function parseField(raw, myPartyIndex) {
   const f = typeof raw === 'string' ? JSON.parse(raw) : raw;
   return {
-    id:         String(f.id         ?? ''),
-    type:       String(f.type       ?? 'text'),
-    page:       Number(f.page       ?? 1),
-    x:          Number(f.x          ?? 0),
-    y:          Number(f.y          ?? 0),
-    width:      Number(f.width      ?? 200),
-    height:     Number(f.height     ?? 60),
-    partyIndex: Number(f.partyIndex ?? 0),
-    value:      String(f.value      ?? ''),
-    fontFamily: String(f.fontFamily ?? 'Helvetica'),
-    fontSize:   Number(f.fontSize   ?? 14),
-    // filled = true if it belongs to another party AND has a value
+    id:          String(f.id          ?? ''),
+    type:        String(f.type        ?? 'text'),
+    page:        Number(f.page        ?? 1),
+    x:           Number(f.x           ?? 0),
+    y:           Number(f.y           ?? 0),
+    width:       Number(f.width       ?? 20),
+    height:      Number(f.height      ?? 5),
+    partyIndex:  Number(f.partyIndex  ?? 0),
+    value:       String(f.value       ?? ''),
+    fontFamily:  String(f.fontFamily  ?? 'Helvetica'),
+    fontSize:    Number(f.fontSize    ?? 14),
+    fontWeight:  String(f.fontWeight  ?? 'normal'),  // ✅ added
+    placeholder: String(f.placeholder ?? ''),
+    // filled = belongs to another party AND has value
     filled:
       Number(f.partyIndex) !== myPartyIndex
         ? !!f.value
@@ -7361,48 +7379,65 @@ function parseField(raw, myPartyIndex) {
   };
 }
 
+/**
+ * Build CSS font-weight from fontWeight field value
+ */
+const getFontWeight = (fw) =>
+  fw === 'bold' ? 'bold' : 'normal';
+
 // ════════════════════════════════════════════════════════════════
-// PAGE SKELETON
+// SUB-COMPONENTS
 // ════════════════════════════════════════════════════════════════
+
 const PageSkeleton = React.memo(() => (
-  <div className="w-full mb-6 rounded-2xl overflow-hidden
-                   bg-white shadow-lg animate-pulse"
-    style={{ aspectRatio: '1 / 1.414' }}>
+  <div
+    className="w-full mb-6 rounded-2xl overflow-hidden
+               bg-white shadow-lg animate-pulse"
+    style={{ aspectRatio: '1 / 1.414' }}
+  >
     <div className="h-full bg-gradient-to-b from-slate-100
                     to-slate-50 flex flex-col items-center
                     justify-center gap-4">
       <div className="w-12 h-12 rounded-full bg-slate-200" />
       <div className="w-32 h-2.5 rounded-full bg-slate-200" />
-      <div className="w-24 h-2   rounded-full bg-slate-100" />
+      <div className="w-24 h-2 rounded-full bg-slate-100" />
     </div>
   </div>
 ));
 PageSkeleton.displayName = 'PageSkeleton';
 
-// ════════════════════════════════════════════════════════════════
-// FIELD OVERLAY — pure display, zero logic
-// ════════════════════════════════════════════════════════════════
+// ── Field Overlay ────────────────────────────────────────────────
 const FieldOverlay = React.memo(({ field, isMine, onClick }) => {
-  const filled = field.filled;
+  const { filled } = field;
 
-  const className = [
-    'absolute border-2 flex items-center justify-center',
-    'rounded-lg transition-all duration-200 overflow-hidden',
-    isMine && !filled
-      ? 'border-sky-400 bg-sky-50/80 cursor-pointer' +
-        ' hover:bg-sky-100 hover:border-sky-500 animate-pulse' +
-        ' outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
-      : isMine && filled
-        ? 'border-emerald-400 bg-emerald-50/20 cursor-pointer'
-        : 'border-slate-200/50 bg-transparent pointer-events-none',
-  ].join(' ');
+  const baseClass = `absolute border-2 flex items-center
+    justify-center rounded-lg transition-all duration-200
+    overflow-hidden`;
+
+  const stateClass = isMine && !filled
+    ? `border-sky-400 bg-sky-50/80 cursor-pointer
+       hover:bg-sky-100 hover:border-sky-500
+       outline-none focus-visible:ring-2
+       focus-visible:ring-sky-400`
+    : isMine && filled
+      ? `border-emerald-400 bg-emerald-50/20 cursor-pointer`
+      : `border-slate-200/50 bg-transparent pointer-events-none`;
+
+  // ✅ Text style: fontFamily + fontWeight + fontSize
+  const textStyle = {
+    fontFamily:  FONT_CSS[field.fontFamily] || 'Helvetica, sans-serif',
+    fontSize:    `${field.fontSize || 14}px`,
+    fontWeight:  getFontWeight(field.fontWeight),
+    color:       '#111827',
+    lineHeight:  1.3,
+  };
 
   return (
     <div
       id={`field-${field.id}`}
       role={isMine ? 'button' : undefined}
       tabIndex={isMine ? 0 : undefined}
-      className={className}
+      className={`${baseClass} ${stateClass}`}
       style={{
         left:   `${field.x}%`,
         top:    `${field.y}%`,
@@ -7416,19 +7451,19 @@ const FieldOverlay = React.memo(({ field, isMine, onClick }) => {
     >
       {filled ? (
         field.type === 'signature' ? (
-          <img src={field.value} alt="signature"
+          // ✅ No mixBlendMode — let PNG alpha work natively
+          <img
+            src={field.value}
+            alt="signature"
             draggable={false}
             className="w-full h-full object-contain p-0.5"
-            style={{ mixBlendMode: 'multiply' }} />
+          />
         ) : (
-          <span className="px-1 w-full text-center
-                           leading-tight break-words select-none"
-            style={{
-              fontFamily: FONT_CSS[field.fontFamily] ||
-                          'Helvetica, sans-serif',
-              fontSize:   `${field.fontSize || 14}px`,
-              color:      '#111827',
-            }}>
+          <span
+            className="px-1 w-full text-center leading-tight
+                       break-words select-none"
+            style={textStyle}
+          >
             {field.value}
           </span>
         )
@@ -7437,10 +7472,14 @@ const FieldOverlay = React.memo(({ field, isMine, onClick }) => {
                         justify-center gap-0.5 select-none">
           {field.type === 'signature'
             ? <PenTool className="w-3.5 h-3.5 text-sky-500" />
-            : <Type    className="w-3.5 h-3.5 text-sky-500" />}
+            : <Type    className="w-3.5 h-3.5 text-sky-500" />
+          }
           <span className="text-[7px] font-black uppercase
                            text-sky-500 leading-none">
-            {field.type === 'signature' ? 'Sign' : 'Type'}
+            {field.type === 'signature'
+              ? 'Sign'
+              : (field.placeholder || 'Type')
+            }
           </span>
         </div>
       ) : null}
@@ -7449,15 +7488,14 @@ const FieldOverlay = React.memo(({ field, isMine, onClick }) => {
 });
 FieldOverlay.displayName = 'FieldOverlay';
 
-// ════════════════════════════════════════════════════════════════
-// PDF PAGE CANVAS — renders once, never re-renders
-// ════════════════════════════════════════════════════════════════
+// ── PDF Page Canvas ───────────────────────────────────────────────
 const PageCanvas = React.memo(({ page }) => {
   const ref = useRef(null);
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
+
     let cancelled  = false;
     let renderTask = null;
 
@@ -7465,10 +7503,11 @@ const PageCanvas = React.memo(({ page }) => {
       try {
         const dpr  = Math.min(window.devicePixelRatio || 1, 2);
         const ctx  = canvas.getContext('2d', { alpha: false });
+
         canvas.width  = page.vp.width  * dpr;
         canvas.height = page.vp.height * dpr;
         ctx.scale(dpr, dpr);
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, page.vp.width, page.vp.height);
 
         renderTask = page.obj.render({
@@ -7478,8 +7517,9 @@ const PageCanvas = React.memo(({ page }) => {
         });
         await renderTask.promise;
       } catch (e) {
-        if (!cancelled && e.name !== 'RenderingCancelledException')
-          console.error('PDF render:', e.message);
+        if (!cancelled && e.name !== 'RenderingCancelledException') {
+          console.error('[PageCanvas] render error:', e.message);
+        }
       }
     })();
 
@@ -7487,36 +7527,37 @@ const PageCanvas = React.memo(({ page }) => {
       cancelled = true;
       try { renderTask?.cancel(); } catch (_) {}
     };
-  }, [page]); // page object is stable — renders exactly once
+  }, [page]);
 
   return (
-    <canvas ref={ref} className="block w-full h-full"
-      style={{ display: 'block' }} />
+    <canvas
+      ref={ref}
+      style={{ display: 'block', width: '100%', height: '100%' }}
+    />
   );
 }, (prev, next) => prev.page.num === next.page.num);
-// ✅ Custom comparator — never re-render same page number
 PageCanvas.displayName = 'PageCanvas';
 
 // ════════════════════════════════════════════════════════════════
-// MAIN: SignerView
+// MAIN — SignerView
 // ════════════════════════════════════════════════════════════════
 export default function SignerView() {
   const { token } = useParams();
 
-  // ── Core state ────────────────────────────────────────────
-  const [status, setStatus] = useState('loading'); // loading|error|signing|done
+  // ── Status: loading | error | signing | done ─────────────
+  const [status,        setStatus]        = useState('loading');
   const [errorMsg,      setErrorMsg]      = useState('');
   const [errorType,     setErrorType]     = useState('error');
   const [docData,       setDocData]       = useState(null);
   const [myPartyIndex,  setMyPartyIndex]  = useState(0);
   const [fields,        setFields]        = useState([]);
 
-  // ── PDF state ─────────────────────────────────────────────
+  // ── PDF ───────────────────────────────────────────────────
   const [pages,         setPages]         = useState([]);
-  const [pdfStatus,     setPdfStatus]     = useState('loading'); // loading|ready|error
+  const [pdfStatus,     setPdfStatus]     = useState('loading');
   const [pdfError,      setPdfError]      = useState('');
 
-  // ── UI state ──────────────────────────────────────────────
+  // ── UI ────────────────────────────────────────────────────
   const [activeField,   setActiveField]   = useState(null);
   const [showSigPad,    setShowSigPad]    = useState(false);
   const [showTextDlg,   setShowTextDlg]   = useState(false);
@@ -7525,28 +7566,29 @@ export default function SignerView() {
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────
-  const containerRef   = useRef(null);
-  const fieldsRef      = useRef(fields);
-  const geoPromiseRef  = useRef(null);
-  const pdfDocRef      = useRef(null);
-  // ✅ Store initial container width ONCE — PDF loads once
-  const initWidthRef   = useRef(0);
+  const containerRef  = useRef(null);
+  const fieldsRef     = useRef(fields);
+  const geoPromiseRef = useRef(null);
+  const pdfDocRef     = useRef(null);
+  const containerW    = useRef(0);
 
   useEffect(() => { fieldsRef.current = fields; }, [fields]);
 
-  // ── Start geo fetch immediately (background) ──────────────
+  // Start geo in background immediately
   useEffect(() => {
     geoPromiseRef.current = startGeoFetch();
   }, []);
 
-  // ── Scroll-to-top visibility ──────────────────────────────
+  // Scroll-to-top visibility
   useEffect(() => {
     const h = () => setShowScrollTop(window.scrollY > 400);
     window.addEventListener('scroll', h, { passive: true });
     return () => window.removeEventListener('scroll', h);
   }, []);
 
-  // ── 1. Load document data ─────────────────────────────────
+  // ════════════════════════════════════════════════════════
+  // 1. Load document data
+  // ════════════════════════════════════════════════════════
   useEffect(() => {
     if (!token) {
       setErrorMsg('No signing token provided.');
@@ -7568,41 +7610,37 @@ export default function SignerView() {
         const idx = Number(data.partyIndex ?? 0);
         setDocData(data);
         setMyPartyIndex(idx);
-        setFields(
-          (data.fields || []).map(f => parseField(f, idx)),
-        );
+        setFields((data.fields || []).map(f => parseField(f, idx)));
         setStatus('signing');
-
       } catch (err) {
         const s = err.response?.status;
         setErrorType(s === 410 ? 'expired' : 'error');
         setErrorMsg(
-          err.response?.data?.error ||
-          'Invalid or expired signing link.',
+          err.response?.data?.error || 'Invalid or expired signing link.',
         );
         setStatus('error');
       }
     })();
   }, [token]);
 
-  // ── 2. Load PDF — once, when docData is ready ─────────────
-  // ✅ KEY: PDF loads ONCE. Resize only changes CSS scale.
+  // ════════════════════════════════════════════════════════
+  // 2. Load PDF
+  // ✅ ResizeObserver on container — recalc scale on resize
+  //    WITHOUT reloading the PDF document
+  // ════════════════════════════════════════════════════════
   useEffect(() => {
     if (status !== 'signing' || !docData?.fileUrl) return;
-
-    // Capture container width ONCE
-    const el = containerRef.current;
-    if (!el) return;
-    initWidthRef.current = el.clientWidth || window.innerWidth;
 
     let mounted = true;
     setPdfStatus('loading');
     setPdfError('');
     setPages([]);
-
-    // Destroy previous PDF if any
     pdfDocRef.current?.destroy?.();
     pdfDocRef.current = null;
+
+    // Get initial width
+    const el = containerRef.current;
+    containerW.current = (el?.clientWidth || window.innerWidth) - 16;
 
     (async () => {
       try {
@@ -7619,8 +7657,7 @@ export default function SignerView() {
         if (!mounted) { pdfDoc.destroy(); return; }
         pdfDocRef.current = pdfDoc;
 
-        // ✅ Scale based on INITIAL width — never changes
-        const availW = initWidthRef.current - 16;
+        const availW = containerW.current;
         const batch  = [];
 
         for (let i = 1; i <= pdfDoc.numPages; i++) {
@@ -7628,9 +7665,7 @@ export default function SignerView() {
           const obj   = await pdfDoc.getPage(i);
           const base  = obj.getViewport({ scale: 1 });
           const scale = Math.min(availW / base.width, 2.0);
-          const vp    = obj.getViewport({
-            scale: Math.max(scale, 0.5),
-          });
+          const vp    = obj.getViewport({ scale: Math.max(scale, 0.5) });
           batch.push({ num: i, vp, obj });
         }
 
@@ -7638,11 +7673,9 @@ export default function SignerView() {
           setPages(batch);
           setPdfStatus('ready');
         }
-
       } catch (err) {
         if (!mounted) return;
         if (err.name !== 'RenderingCancelledException') {
-          console.error('PDF load error:', err.message);
           setPdfError('Could not load PDF. Please refresh.');
         }
         if (mounted) setPdfStatus('error');
@@ -7651,18 +7684,16 @@ export default function SignerView() {
 
     return () => {
       mounted = false;
-      // Don't destroy pdfDocRef here — pages still rendering
     };
-  }, [status, docData]); // ✅ NOT containerWidth — no reload on resize
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, docData]);
 
-  // ── Cleanup PDF on unmount ────────────────────────────────
-  useEffect(() => {
-    return () => {
-      pdfDocRef.current?.destroy?.();
-    };
-  }, []);
+  // Cleanup PDF on unmount
+  useEffect(() => () => { pdfDocRef.current?.destroy?.(); }, []);
 
-  // ── 3. Auto-scroll to first field ────────────────────────
+  // ════════════════════════════════════════════════════════
+  // 3. Auto-scroll to first unfilled field
+  // ════════════════════════════════════════════════════════
   useEffect(() => {
     if (pdfStatus !== 'ready' || pages.length === 0) return;
     const first = fieldsRef.current.find(
@@ -7676,7 +7707,9 @@ export default function SignerView() {
     return () => clearTimeout(t);
   }, [pdfStatus, pages.length, myPartyIndex]);
 
-  // ── Computed values ───────────────────────────────────────
+  // ════════════════════════════════════════════════════════
+  // COMPUTED
+  // ════════════════════════════════════════════════════════
   const myFields = useMemo(
     () => fields.filter(f => Number(f.partyIndex) === myPartyIndex),
     [fields, myPartyIndex],
@@ -7691,18 +7724,18 @@ export default function SignerView() {
     ? Math.round((filledCount / totalFields) * 100)
     : 0;
 
-  // ── Field page groups (memo — avoid filter in render) ─────
   const fieldsByPage = useMemo(() => {
     const map = new Map();
     fields.forEach(f => {
-      const p = f.page;
-      if (!map.has(p)) map.set(p, []);
-      map.get(p).push(f);
+      if (!map.has(f.page)) map.set(f.page, []);
+      map.get(f.page).push(f);
     });
     return map;
   }, [fields]);
 
-  // ── Field interactions ────────────────────────────────────
+  // ════════════════════════════════════════════════════════
+  // FIELD INTERACTIONS
+  // ════════════════════════════════════════════════════════
   const openField = useCallback((field) => {
     if (Number(field.partyIndex) !== myPartyIndex) return;
     setActiveField(field);
@@ -7715,23 +7748,23 @@ export default function SignerView() {
   }, [myPartyIndex]);
 
   const scrollToNext = useCallback((doneId) => {
-    const t = setTimeout(() => {
+    setTimeout(() => {
       const next = fieldsRef.current.find(
-        f => Number(f.partyIndex) === myPartyIndex
-          && !f.filled && f.id !== doneId,
+        f =>
+          Number(f.partyIndex) === myPartyIndex &&
+          !f.filled &&
+          f.id !== doneId,
       );
-      if (next)
+      if (next) {
         document.getElementById(`field-${next.id}`)
           ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }, 350);
-    return () => clearTimeout(t);
   }, [myPartyIndex]);
 
   const applyField = useCallback((id, value) => {
     setFields(prev =>
-      prev.map(f =>
-        f.id === id ? { ...f, value, filled: true } : f,
-      ),
+      prev.map(f => f.id === id ? { ...f, value, filled: true } : f),
     );
     scrollToNext(id);
   }, [scrollToNext]);
@@ -7741,7 +7774,7 @@ export default function SignerView() {
     applyField(activeField.id, val);
     setShowSigPad(false);
     setActiveField(null);
-    toast.success('Signature applied!', { duration: 1500 });
+    toast.success('Signature applied!', { duration: 1_500 });
   }, [activeField, applyField]);
 
   const handleTextConfirm = useCallback(() => {
@@ -7753,45 +7786,48 @@ export default function SignerView() {
     setActiveField(null);
   }, [textValue, activeField, applyField]);
 
-  // ── Submit ────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════
+  // SUBMIT
+  // ════════════════════════════════════════════════════════
   const handleSubmit = useCallback(async () => {
     if (!allFilled) {
       const rem = totalFields - filledCount;
       toast.error(`${rem} field${rem > 1 ? 's' : ''} remaining.`);
       const first = myFields.find(f => !f.filled);
-      if (first)
+      if (first) {
         document.getElementById(`field-${first.id}`)
           ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
     setSubmitting(true);
 
     try {
-      // ✅ geo already fetching in background — just await result
+      // Await geo (already running in background)
       const locationData = await Promise.race([
         geoPromiseRef.current ?? Promise.resolve({ text: 'Unknown' }),
-        new Promise(r => setTimeout(
-          () => r({ text: 'Unknown' }), 2000,
-        )),
+        new Promise(r => setTimeout(() => r({ text: 'Unknown' }), 2_000)),
       ]);
 
+      // ✅ Include fontWeight in submitted fields
       const signedFields = fieldsRef.current
         .filter(f =>
           Number(f.partyIndex) === myPartyIndex && f.filled,
         )
         .map(f => ({
-          id:         f.id,
-          type:       f.type,
-          page:       Number(f.page),
-          x:          Number(f.x),
-          y:          Number(f.y),
-          width:      Number(f.width),
-          height:     Number(f.height),
-          partyIndex: Number(f.partyIndex),
-          value:      f.value,
-          fontFamily: f.fontFamily,
-          fontSize:   Number(f.fontSize),
+          id:          f.id,
+          type:        f.type,
+          page:        Number(f.page),
+          x:           Number(f.x),
+          y:           Number(f.y),
+          width:       Number(f.width),
+          height:      Number(f.height),
+          partyIndex:  Number(f.partyIndex),
+          value:       f.value,
+          fontFamily:  f.fontFamily  || 'Helvetica',
+          fontSize:    Number(f.fontSize)  || 14,
+          fontWeight:  f.fontWeight  || 'normal',  // ✅
         }));
 
       await api.post('/documents/sign/submit', {
@@ -7799,15 +7835,14 @@ export default function SignerView() {
         fields:     signedFields,
         locationData,
         clientTime: new Date().toLocaleString('en-US', {
-          timeZoneName: 'short', hour12: true,
+          timeZoneName: 'short',
+          hour12:       true,
         }),
       });
 
       setStatus('done');
       toast.success('Signed & submitted! 🎉');
-
     } catch (err) {
-      console.error('Submit error:', err);
       toast.error(
         err?.response?.data?.error ||
         err?.message ||
@@ -7815,93 +7850,110 @@ export default function SignerView() {
       );
       setSubmitting(false);
     }
-  }, [allFilled, myFields, totalFields, filledCount,
-      myPartyIndex, token]);
+  }, [
+    allFilled, myFields, totalFields,
+    filledCount, myPartyIndex, token,
+  ]);
 
   // ════════════════════════════════════════════════════════
-  // RENDER STATES
+  // RENDER: STATUS SCREENS
   // ════════════════════════════════════════════════════════
-
-  if (status === 'loading') return (
-    <div className="h-screen flex flex-col items-center
-                    justify-center gap-4 bg-white">
-      <div className="w-14 h-14 border-4 border-sky-500
-                      border-t-transparent rounded-full
-                      animate-spin" />
-      <p className="text-slate-500 font-medium text-sm">
-        Loading your document…
-      </p>
-    </div>
-  );
-
-  if (status === 'error') return (
-    <div className="h-screen flex flex-col items-center
-                    justify-center bg-slate-50 p-6">
-      <div className="bg-white p-8 sm:p-10 rounded-3xl
-                      shadow-xl max-w-md w-full text-center
-                      border border-slate-100">
-        <div className={`w-16 h-16 rounded-2xl flex items-center
-                         justify-center mx-auto mb-5
-                         ${errorType === 'expired'
-                           ? 'bg-slate-100' : 'bg-red-50'}`}>
-          {errorType === 'expired'
-            ? <Lock          className="w-8 h-8 text-slate-400" />
-            : <AlertTriangle className="w-8 h-8 text-red-400"   />}
-        </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-2">
-          {errorType === 'expired' ? 'Already Signed' : 'Invalid Link'}
-        </h2>
-        <p className="text-slate-500 text-sm leading-relaxed">
-          {errorMsg}
+  if (status === 'loading') {
+    return (
+      <div className="h-screen flex flex-col items-center
+                      justify-center gap-4 bg-white">
+        <div className="w-14 h-14 border-4 border-sky-500
+                        border-t-transparent rounded-full
+                        animate-spin" />
+        <p className="text-slate-500 font-medium text-sm">
+          Loading your document…
         </p>
       </div>
-    </div>
-  );
+    );
+  }
 
-  if (status === 'done') return (
-    <div className="min-h-screen flex flex-col items-center
-                    justify-center
-                    bg-gradient-to-br from-emerald-50 to-sky-50 p-6">
-      <div className="bg-white p-8 sm:p-12 rounded-3xl
-                      shadow-2xl max-w-lg w-full text-center
-                      border border-emerald-100">
-        {docData?.companyLogo && (
-          <img src={docData.companyLogo} alt="logo"
-            className="h-10 max-w-[120px] object-contain
-                       mx-auto mb-6" />
-        )}
-        <div className="w-24 h-24 bg-emerald-100 rounded-full
-                        flex items-center justify-center
-                        mx-auto mb-6">
-          <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+  if (status === 'error') {
+    return (
+      <div className="h-screen flex flex-col items-center
+                      justify-center bg-slate-50 p-6">
+        <div className="bg-white p-8 sm:p-10 rounded-3xl
+                        shadow-xl max-w-md w-full text-center
+                        border border-slate-100">
+          <div className={`w-16 h-16 rounded-2xl flex items-center
+                           justify-center mx-auto mb-5
+                           ${errorType === 'expired'
+                             ? 'bg-slate-100'
+                             : 'bg-red-50'
+                           }`}>
+            {errorType === 'expired'
+              ? <Lock          className="w-8 h-8 text-slate-400" />
+              : <AlertTriangle className="w-8 h-8 text-red-400"   />
+            }
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+            {errorType === 'expired' ? 'Already Signed' : 'Invalid Link'}
+          </h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            {errorMsg}
+          </p>
         </div>
-        <h2 className="text-3xl font-extrabold text-slate-800 mb-2">
-          All Done! 🎉
-        </h2>
-        <p className="text-slate-500 mb-2">
-          Your signature has been recorded.
-        </p>
-        <p className="text-xs text-slate-400 mb-8 leading-relaxed
-                      max-w-sm mx-auto">
-          A signed copy with full audit trail will be emailed
-          to all parties shortly.
-        </p>
-        <Button onClick={() => window.close()}
-          className="w-full h-12 bg-sky-500 hover:bg-sky-600
-                     text-white rounded-2xl font-bold text-base
-                     shadow-lg shadow-sky-500/25
-                     transition-all active:scale-95">
-          Close Tab
-        </Button>
       </div>
-    </div>
-  );
+    );
+  }
 
-  // ── Signing view ──────────────────────────────────────────
+  if (status === 'done') {
+    return (
+      <div className="min-h-screen flex flex-col items-center
+                      justify-center
+                      bg-gradient-to-br from-emerald-50 to-sky-50 p-6">
+        <div className="bg-white p-8 sm:p-12 rounded-3xl
+                        shadow-2xl max-w-lg w-full text-center
+                        border border-emerald-100">
+          {docData?.companyLogo && (
+            <img
+              src={docData.companyLogo}
+              alt="Company Logo"
+              className="h-10 max-w-[120px] object-contain
+                         mx-auto mb-6"
+            />
+          )}
+          <div className="w-24 h-24 bg-emerald-100 rounded-full
+                          flex items-center justify-center
+                          mx-auto mb-6">
+            <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+          </div>
+          <h2 className="text-3xl font-extrabold text-slate-800 mb-2">
+            All Done! 🎉
+          </h2>
+          <p className="text-slate-500 mb-2">
+            Your signature has been recorded.
+          </p>
+          <p className="text-xs text-slate-400 mb-8 leading-relaxed
+                        max-w-sm mx-auto">
+            A signed copy with full audit certificate will be emailed
+            to all parties once everyone has signed.
+          </p>
+          <Button
+            onClick={() => window.close()}
+            className="w-full h-12 bg-sky-500 hover:bg-sky-600
+                       text-white rounded-2xl font-bold text-base
+                       shadow-lg shadow-sky-500/25
+                       transition-all active:scale-95"
+          >
+            Close Tab
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════
+  // RENDER: SIGNING VIEW
+  // ════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-slate-100">
 
-      {/* Header */}
+      {/* ── Header ─────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-white/95
                          backdrop-blur-sm border-b
                          border-slate-200 shadow-sm">
@@ -7910,13 +7962,16 @@ export default function SignerView() {
 
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {docData?.companyLogo && (
-              <img src={docData.companyLogo} alt="logo"
-                className="h-7 sm:h-8 max-w-[70px] object-contain
-                           shrink-0" />
+              <img
+                src={docData.companyLogo}
+                alt="Company Logo"
+                className="h-7 sm:h-8 max-w-[70px]
+                           object-contain shrink-0"
+              />
             )}
             <div className="min-w-0">
-              <h1 className="font-bold text-slate-800
-                             text-xs sm:text-sm truncate
+              <h1 className="font-bold text-slate-800 text-xs
+                             sm:text-sm truncate
                              max-w-[150px] sm:max-w-xs">
                 {docData?.title || 'Document'}
               </h1>
@@ -7928,7 +7983,8 @@ export default function SignerView() {
             </div>
           </div>
 
-          <Button onClick={handleSubmit}
+          <Button
+            onClick={handleSubmit}
             disabled={submitting || !allFilled}
             className={`rounded-full px-4 sm:px-6 h-9 sm:h-10
                         font-bold text-xs sm:text-sm shrink-0
@@ -7936,28 +7992,36 @@ export default function SignerView() {
                         disabled:cursor-not-allowed
                         ${allFilled
                           ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                          : 'bg-sky-500 hover:bg-sky-600 text-white opacity-60'}`}>
-            {submitting
-              ? <Loader2 className="animate-spin w-4 h-4" />
-              : allFilled
-                ? <span className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4" /> Submit
-                  </span>
-                : `${totalFields - filledCount} left`}
+                          : 'bg-sky-500 hover:bg-sky-600 text-white opacity-60'
+                        }`}
+          >
+            {submitting ? (
+              <Loader2 className="animate-spin w-4 h-4" />
+            ) : allFilled ? (
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                Submit
+              </span>
+            ) : (
+              `${totalFields - filledCount} left`
+            )}
           </Button>
         </div>
       </header>
 
-      {/* Progress bar */}
+      {/* ── Progress bar ────────────────────────────────────── */}
       <div className="h-1 bg-slate-200">
-        <div className="h-1 bg-sky-500 transition-all duration-500"
-          style={{ width: `${progress}%` }} />
+        <div
+          className="h-1 bg-sky-500 transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
       </div>
 
-      {/* Banner */}
+      {/* ── Info banner ─────────────────────────────────────── */}
       {!allFilled && totalFields > 0 && (
         <div className="bg-sky-500 px-4 py-2 text-center">
-          <p className="text-[11px] sm:text-xs text-white font-semibold">
+          <p className="text-[11px] sm:text-xs text-white
+                        font-semibold">
             👆 Tap highlighted fields to sign ·{' '}
             {totalFields - filledCount} remaining
           </p>
@@ -7965,25 +8029,30 @@ export default function SignerView() {
       )}
       {allFilled && (
         <div className="bg-emerald-500 px-4 py-2 text-center">
-          <p className="text-[11px] sm:text-xs text-white font-semibold">
+          <p className="text-[11px] sm:text-xs text-white
+                        font-semibold">
             ✅ All fields completed — tap Submit!
           </p>
         </div>
       )}
 
-      {/* PDF main area */}
-      <main ref={containerRef}
-        className="max-w-4xl mx-auto py-4 sm:py-6 px-2 sm:px-4">
-
+      {/* ── PDF Area ────────────────────────────────────────── */}
+      <main
+        ref={containerRef}
+        className="max-w-4xl mx-auto py-4 sm:py-6 px-2 sm:px-4"
+      >
+        {/* PDF error */}
         {pdfStatus === 'error' && (
           <div className="bg-red-50 border border-red-200
                           rounded-2xl p-6 text-center mb-6">
             <AlertTriangle className="w-8 h-8 text-red-400
                                       mx-auto mb-3" />
             <p className="text-red-600 text-sm mb-4">{pdfError}</p>
-            <Button variant="outline" size="sm"
+            <Button
+              variant="outline" size="sm"
               onClick={() => window.location.reload()}
-              className="rounded-xl">
+              className="rounded-xl"
+            >
               Reload Page
             </Button>
           </div>
@@ -7994,63 +8063,69 @@ export default function SignerView() {
           <><PageSkeleton /><PageSkeleton /></>
         )}
 
-        {/* ✅ Pages — CSS scale for responsiveness, no PDF reload */}
-        {pages.map((page) => (
-          <div key={page.num}
-            className="relative mb-6 bg-white shadow-xl
-                       mx-auto rounded-xl overflow-hidden"
-            style={{
-              // ✅ Always width:100%, height from aspect ratio
-              width:       '100%',
-              aspectRatio: `${page.vp.width} / ${page.vp.height}`,
-            }}
-          >
-            {/*
-              ✅ Inner div is the "natural" PDF size.
-              CSS transform:scale() shrinks it to fit.
-              This way PDF renders at full resolution
-              and we just scale the display — no re-render.
-            */}
-            <div style={{
-              position:        'absolute',
-              top:             0,
-              left:            0,
-              width:           page.vp.width,
-              height:          page.vp.height,
-              transformOrigin: 'top left',
-              // Scale down to fit container width
-              transform:       `scale(${
-                Math.min(
-                  1,
-                  (initWidthRef.current - 16) / page.vp.width,
-                )
-              })`,
-            }}>
-              <PageCanvas page={page} />
+        {/* Pages */}
+        {pages.map((page) => {
+          // ✅ Compute display scale: container / page natural width
+          const displayW   =
+            (containerRef.current?.clientWidth || window.innerWidth) - 16;
+          const scaleRatio = Math.min(1, displayW / page.vp.width);
 
-              {/* Field overlays */}
-              {(fieldsByPage.get(page.num) || []).map(field => (
-                <FieldOverlay
-                  key={field.id}
-                  field={field}
-                  isMine={Number(field.partyIndex) === myPartyIndex}
-                  onClick={() => openField(field)}
-                />
-              ))}
+          return (
+            <div
+              key={page.num}
+              className="relative mb-6 bg-white shadow-xl
+                         mx-auto rounded-xl overflow-hidden"
+              style={{
+                width:       '100%',
+                aspectRatio: `${page.vp.width} / ${page.vp.height}`,
+              }}
+            >
+              {/*
+                Inner wrapper: natural PDF size, CSS-scaled down.
+                Fields use % positions → always correct.
+                PDF canvas renders at full resolution.
+              */}
+              <div
+                style={{
+                  position:        'absolute',
+                  top:             0,
+                  left:            0,
+                  width:           `${page.vp.width}px`,
+                  height:          `${page.vp.height}px`,
+                  transformOrigin: 'top left',
+                  transform:       `scale(${scaleRatio})`,
+                }}
+              >
+                <PageCanvas page={page} />
+
+                {/* Field overlays — positioned with % */}
+                {(fieldsByPage.get(page.num) || []).map(field => (
+                  <FieldOverlay
+                    key={field.id}
+                    field={field}
+                    isMine={
+                      Number(field.partyIndex) === myPartyIndex
+                    }
+                    onClick={() => openField(field)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Bottom submit */}
         {allFilled && !submitting && (
           <div className="flex justify-center pb-16 pt-4">
-            <Button onClick={handleSubmit}
+            <Button
+              onClick={handleSubmit}
               className="bg-emerald-500 hover:bg-emerald-600
                          text-white rounded-full
                          px-10 sm:px-14 h-12 sm:h-14
                          shadow-2xl shadow-emerald-500/30
                          font-bold text-sm sm:text-base
-                         transition-all active:scale-95 gap-2">
+                         transition-all active:scale-95 gap-2"
+            >
               <CheckCircle2 className="w-5 h-5" />
               Submit All Signatures
             </Button>
@@ -8058,46 +8133,59 @@ export default function SignerView() {
         )}
       </main>
 
-      {/* Scroll top */}
+      {/* Scroll to top */}
       {showScrollTop && (
         <button
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          onClick={() =>
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }
           className="fixed bottom-6 right-4 sm:right-6 z-50
                      w-10 h-10 bg-white border border-slate-200
                      rounded-full shadow-xl flex items-center
                      justify-center text-slate-500
                      hover:text-sky-500 hover:border-sky-300
-                     transition-all active:scale-95">
+                     transition-all active:scale-95"
+          aria-label="Scroll to top"
+        >
           <ChevronUp className="w-5 h-5" />
         </button>
       )}
 
-      {/* Signature Dialog */}
-      <Dialog open={showSigPad}
+      {/* ── Signature Dialog ────────────────────────────────── */}
+      <Dialog
+        open={showSigPad}
         onOpenChange={(v) => {
           setShowSigPad(v);
           if (!v) setActiveField(null);
-        }}>
+        }}
+      >
         <DialogContent
           className="max-w-xl p-0 bg-white border-none
                      rounded-3xl overflow-hidden shadow-2xl
                      w-[calc(100vw-24px)] sm:w-auto"
-          aria-describedby="sig-desc">
+          aria-describedby="sig-desc"
+        >
           <DialogTitle className="sr-only">
             Draw Your Signature
           </DialogTitle>
           <DialogDescription id="sig-desc" className="sr-only">
-            Draw or type your signature
+            Draw or type your signature in the box below
           </DialogDescription>
 
-          <div className="p-5 sm:p-6 text-white text-center"
+          {/* Dialog header */}
+          <div
+            className="p-5 sm:p-6 text-white text-center"
             style={{
               background: 'linear-gradient(135deg,#28ABDF,#1e7fb5)',
-            }}>
+            }}
+          >
             {docData?.companyLogo && (
-              <img src={docData.companyLogo} alt="logo"
+              <img
+                src={docData.companyLogo}
+                alt="Company Logo"
                 className="h-7 max-w-[90px] object-contain
-                           mx-auto mb-3" />
+                           mx-auto mb-3"
+              />
             )}
             <h3 className="text-lg sm:text-xl font-bold">
               Draw Your Signature
@@ -8116,58 +8204,76 @@ export default function SignerView() {
               }}
               className="w-full mt-3 text-sm text-slate-400
                          hover:text-slate-600 transition-colors
-                         font-medium py-2">
+                         font-medium py-2"
+            >
               Cancel
             </button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Text Dialog */}
-      <Dialog open={showTextDlg}
+      {/* ── Text Input Dialog ───────────────────────────────── */}
+      <Dialog
+        open={showTextDlg}
         onOpenChange={(v) => {
           setShowTextDlg(v);
           if (!v) { setActiveField(null); setTextValue(''); }
-        }}>
+        }}
+      >
         <DialogContent
           className="max-w-md p-0 bg-white border-none
                      rounded-3xl overflow-hidden shadow-2xl
                      w-[calc(100vw-24px)] sm:w-auto"
-          aria-describedby="txt-desc">
+          aria-describedby="txt-desc"
+        >
           <DialogTitle className="sr-only">Enter Text</DialogTitle>
           <DialogDescription id="txt-desc" className="sr-only">
-            Type your text
+            Type your text for this field
           </DialogDescription>
 
-          <div className="p-5 sm:p-6 text-white text-center"
+          {/* Dialog header */}
+          <div
+            className="p-5 sm:p-6 text-white text-center"
             style={{
               background: 'linear-gradient(135deg,#28ABDF,#1e7fb5)',
-            }}>
+            }}
+          >
             {docData?.companyLogo && (
-              <img src={docData.companyLogo} alt="logo"
+              <img
+                src={docData.companyLogo}
+                alt="Company Logo"
                 className="h-7 max-w-[90px] object-contain
-                           mx-auto mb-3" />
+                           mx-auto mb-3"
+              />
             )}
             <h3 className="text-lg sm:text-xl font-bold">
               Enter Your Text
             </h3>
+            {/* ✅ Show font info including bold */}
             <p className="text-sky-100 text-xs mt-1">
-              {activeField?.fontFamily || 'Helvetica'} ·{' '}
-              {activeField?.fontSize   || 14}px
+              {activeField?.fontFamily || 'Helvetica'}
+              {' · '}
+              {activeField?.fontSize || 14}pt
+              {activeField?.fontWeight === 'bold' ? ' · Bold' : ''}
             </p>
           </div>
 
           <div className="p-4 sm:p-8 space-y-4">
-            <Input value={textValue}
+            {/* ✅ Input styled with field's font + weight */}
+            <Input
+              value={textValue}
               onChange={e => setTextValue(e.target.value)}
-              placeholder="Type here..."
+              placeholder={
+                activeField?.placeholder || 'Type here...'
+              }
               className="h-12 rounded-xl border-slate-200
                          focus:border-sky-400 text-slate-800"
               style={{
                 fontFamily:
                   FONT_CSS[activeField?.fontFamily] ||
                   'Helvetica, sans-serif',
-                fontSize: `${activeField?.fontSize || 14}px`,
+                fontSize:   `${activeField?.fontSize || 14}px`,
+                fontWeight: getFontWeight(activeField?.fontWeight), // ✅
               }}
               onKeyDown={e =>
                 e.key === 'Enter' && handleTextConfirm()
@@ -8175,30 +8281,38 @@ export default function SignerView() {
               autoFocus
             />
 
+            {/* Preview */}
             {textValue && (
-              <div className="bg-slate-50 border border-slate-200
-                              rounded-xl p-3 text-center
-                              min-h-[44px] flex items-center
-                              justify-center">
-                <span style={{
-                  fontFamily:
-                    FONT_CSS[activeField?.fontFamily] ||
-                    'Helvetica, sans-serif',
-                  fontSize: `${activeField?.fontSize || 14}px`,
-                  color:    '#111827',
-                }}>
+              <div
+                className="bg-slate-50 border border-slate-200
+                            rounded-xl p-3 text-center
+                            min-h-[44px] flex items-center
+                            justify-center"
+              >
+                <span
+                  style={{
+                    fontFamily:
+                      FONT_CSS[activeField?.fontFamily] ||
+                      'Helvetica, sans-serif',
+                    fontSize:   `${activeField?.fontSize || 14}px`,
+                    fontWeight: getFontWeight(activeField?.fontWeight), // ✅
+                    color:      '#111827',
+                  }}
+                >
                   {textValue}
                 </span>
               </div>
             )}
 
-            <Button onClick={handleTextConfirm}
+            <Button
+              onClick={handleTextConfirm}
               disabled={!textValue.trim()}
               className="w-full h-12 bg-sky-500 hover:bg-sky-600
                          text-white rounded-xl font-bold
                          transition-all active:scale-[0.98]
                          disabled:opacity-50
-                         disabled:cursor-not-allowed">
+                         disabled:cursor-not-allowed"
+            >
               Confirm
             </Button>
 
@@ -8210,7 +8324,8 @@ export default function SignerView() {
               }}
               className="w-full text-sm text-slate-400
                          hover:text-slate-600 transition-colors
-                         font-medium py-1">
+                         font-medium py-1"
+            >
               Cancel
             </button>
           </div>

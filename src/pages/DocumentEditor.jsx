@@ -665,35 +665,48 @@ import { toast }     from 'sonner';
 import {
   ArrowLeft, Send, Loader2, FileText,
   Upload, X, Plus, Mail, Eye,
-  CheckCircle2, RefreshCw,
+  CheckCircle2, RefreshCw, Type,
+  Bold, AlignLeft, ChevronDown,
 } from 'lucide-react';
 import PdfViewer    from '@/components/editor/PdfViewer';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 
-// ── Constants ─────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════════════════════════
 const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981'];
 
+const FONT_FAMILIES = [
+  { value: 'Helvetica',   label: 'Helvetica'   },
+  { value: 'TimesRoman',  label: 'Times Roman' },
+  { value: 'Courier',     label: 'Courier'     },
+];
+
+const FONT_SIZES = [8, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32];
+
 const EMPTY_PARTY = (i = 0) => ({
-  name:  '',
-  email: '',
-  color: COLORS[i % COLORS.length],
+  name:        '',
+  email:       '',
+  designation: '',          // ✅ added
+  color:       COLORS[i % COLORS.length],
 });
 
-// ── Status Badge ──────────────────────────────────────────────────
+const EMPTY_CC = () => ({
+  email:       '',
+  name:        '',
+  designation: '',          // ✅ added
+});
+
+// ════════════════════════════════════════════════════════════════
+// SUB-COMPONENTS
+// ════════════════════════════════════════════════════════════════
+
 function StatusBadge({ status }) {
   const map = {
-    in_progress: {
-      label: 'Active',
-      cls:   'bg-sky-100 text-sky-700',
-    },
-    completed: {
-      label: 'Completed',
-      cls:   'bg-emerald-100 text-emerald-700',
-    },
-    draft: {
-      label: 'Draft',
-      cls:   'bg-slate-100 text-slate-600',
-    },
+    in_progress: { label: 'Active',    cls: 'bg-sky-100 text-sky-700'         },
+    completed:   { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700' },
+    draft:       { label: 'Draft',     cls: 'bg-slate-100 text-slate-600'     },
+    cancelled:   { label: 'Cancelled', cls: 'bg-red-100 text-red-600'         },
   };
   const cfg = map[status] || map.draft;
   return (
@@ -701,6 +714,179 @@ function StatusBadge({ status }) {
                       px-2 py-1 rounded-lg ${cfg.cls}`}>
       {cfg.label}
     </span>
+  );
+}
+
+/**
+ * Field Properties Panel
+ * Shows when a text field is selected — font family, size, bold
+ * ✅ Only shown for 'text' type fields
+ */
+function FieldPropertiesPanel({ field, onUpdate, onDelete }) {
+  if (!field) return null;
+
+  return (
+    <div className="border border-[#28ABDF]/30 rounded-xl
+                    bg-sky-50 dark:bg-sky-900/10 p-3 space-y-2">
+
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-bold text-[#28ABDF]
+                      uppercase tracking-wider flex items-center gap-1">
+          <Type className="w-3 h-3" />
+          Field Properties
+        </p>
+        <button
+          onClick={onDelete}
+          className="text-[10px] text-red-400
+                     hover:text-red-600 font-medium"
+        >
+          Remove
+        </button>
+      </div>
+
+      {/* Font properties — text fields only */}
+      {field.type === 'text' && (
+        <>
+          {/* Font Family */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-slate-500
+                               font-semibold uppercase tracking-wide">
+              Font
+            </label>
+            <div className="relative">
+              <select
+                value={field.fontFamily || 'Helvetica'}
+                onChange={e =>
+                  onUpdate(field.id, { fontFamily: e.target.value })
+                }
+                className="w-full h-8 pl-2 pr-7 text-xs rounded-lg
+                           border border-slate-200 bg-white
+                           dark:bg-slate-800 dark:border-slate-700
+                           appearance-none cursor-pointer
+                           focus:outline-none focus:border-[#28ABDF]"
+              >
+                {FONT_FAMILIES.map(f => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-2
+                                      w-3.5 h-3.5 text-slate-400
+                                      pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Font Size + Bold row */}
+          <div className="flex gap-2">
+            {/* Font Size */}
+            <div className="space-y-1 flex-1">
+              <label className="text-[10px] text-slate-500
+                                 font-semibold uppercase tracking-wide">
+                Size
+              </label>
+              <div className="relative">
+                <select
+                  value={field.fontSize || 14}
+                  onChange={e =>
+                    onUpdate(field.id, {
+                      fontSize: Number(e.target.value),
+                    })
+                  }
+                  className="w-full h-8 pl-2 pr-7 text-xs rounded-lg
+                             border border-slate-200 bg-white
+                             dark:bg-slate-800 dark:border-slate-700
+                             appearance-none cursor-pointer
+                             focus:outline-none focus:border-[#28ABDF]"
+                >
+                  {FONT_SIZES.map(s => (
+                    <option key={s} value={s}>{s}pt</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-2
+                                        w-3.5 h-3.5 text-slate-400
+                                        pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Bold Toggle */}
+            <div className="space-y-1">
+              <label className="text-[10px] text-slate-500
+                                 font-semibold uppercase tracking-wide">
+                Style
+              </label>
+              <button
+                onClick={() =>
+                  onUpdate(field.id, {
+                    fontWeight:
+                      field.fontWeight === 'bold'
+                        ? 'normal'
+                        : 'bold',
+                  })
+                }
+                className={`h-8 w-10 rounded-lg border text-xs
+                            font-bold transition-colors
+                            flex items-center justify-center
+                            ${field.fontWeight === 'bold'
+                              ? 'bg-[#28ABDF] border-[#28ABDF] text-white'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-[#28ABDF]'
+                            }`}
+                title="Toggle Bold"
+              >
+                <Bold className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Placeholder text */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-slate-500
+                               font-semibold uppercase tracking-wide">
+              Placeholder
+            </label>
+            <Input
+              value={field.placeholder || ''}
+              onChange={e =>
+                onUpdate(field.id, { placeholder: e.target.value })
+              }
+              placeholder="Enter placeholder..."
+              className="h-8 text-xs rounded-lg"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Preview */}
+      <div className="text-[10px] text-slate-400 pt-1
+                      flex items-center gap-2 flex-wrap">
+        <span className="bg-slate-100 dark:bg-slate-700
+                         px-2 py-0.5 rounded-md">
+          {field.type === 'signature' ? '✍️ Signature' : '📝 Text'}
+        </span>
+        <span className="bg-slate-100 dark:bg-slate-700
+                         px-2 py-0.5 rounded-md">
+          Page {field.page}
+        </span>
+        {field.type === 'text' && (
+          <>
+            <span className="bg-slate-100 dark:bg-slate-700
+                             px-2 py-0.5 rounded-md">
+              {field.fontFamily || 'Helvetica'}
+            </span>
+            <span className="bg-slate-100 dark:bg-slate-700
+                             px-2 py-0.5 rounded-md">
+              {field.fontSize || 14}pt
+            </span>
+            {field.fontWeight === 'bold' && (
+              <span className="bg-[#28ABDF]/10 text-[#28ABDF]
+                               px-2 py-0.5 rounded-md font-bold">
+                Bold
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -712,7 +898,6 @@ export default function DocumentEditor() {
   const [searchParams]        = useSearchParams();
   const { user }              = useAuth();
 
-  // ── URL param — existing doc id ─────────────────────────────
   const docId = searchParams.get('id');
   const isNew = !docId || docId === 'new';
 
@@ -727,7 +912,10 @@ export default function DocumentEditor() {
   const [companyLogo,     setCompanyLogo]     = useState('');
   const [parties,         setParties]         = useState([EMPTY_PARTY(0)]);
   const [ccList,          setCcList]          = useState([]);
-  const [ccEmail,         setCcEmail]         = useState('');
+
+  // ── CC form state ────────────────────────────────────────────
+  const [ccForm,          setCcForm]          = useState(EMPTY_CC());
+
   const [fields,          setFields]          = useState([]);
   const [currentPage,     setCurrentPage]     = useState(1);
   const [totalPages,      setTotalPages]      = useState(1);
@@ -738,11 +926,17 @@ export default function DocumentEditor() {
   const [uploadProgress,  setUploadProgress]  = useState(0);
   const [resending,       setResending]       = useState(false);
 
+  // CC panel expand state
+  const [ccExpanded,      setCcExpanded]      = useState(false);
+
   const isMounted = useRef(true);
   useEffect(() => () => { isMounted.current = false; }, []);
 
+  // ── Derived: selected field object ──────────────────────────
+  const selectedField = fields.find(f => f.id === selectedFieldId) ?? null;
+
   // ════════════════════════════════════════════════════════════
-  // LOAD EXISTING DOCUMENT — ?id=DOC_ID
+  // LOAD EXISTING DOCUMENT
   // ════════════════════════════════════════════════════════════
   useEffect(() => {
     if (isNew) return;
@@ -750,34 +944,29 @@ export default function DocumentEditor() {
     const load = async () => {
       setLoadingDoc(true);
       try {
-        const res = await api.get(
-          `/documents/${docId}`,
-          { noCache: true }
-        );
+        const res = await api.get(`/documents/${docId}`, { noCache: true });
         const doc = res.data?.document;
         if (!doc || !isMounted.current) return;
 
-        // ✅ State populate করো
         setExistingDoc(doc);
-        setTitle(doc.title || '');
+        setTitle(doc.title          || '');
         setCompanyName(doc.companyName || '');
         setCompanyLogo(doc.companyLogo || '');
-        setCcList(doc.ccList || []);
-        setTotalPages(doc.totalPages || 1);
+        setCcList(doc.ccList         || []);
+        setTotalPages(doc.totalPages  || 1);
 
-        // Parties
         if (doc.parties?.length) {
           setParties(
             doc.parties.map((p, i) => ({
-              name:   p.name  || '',
-              email:  p.email || '',
-              color:  p.color || COLORS[i % COLORS.length],
-              status: p.status,
+              name:        p.name        || '',
+              email:       p.email       || '',
+              designation: p.designation || '',  // ✅
+              color:       p.color || COLORS[i % COLORS.length],
+              status:      p.status,
             }))
           );
         }
 
-        // Fields
         if (doc.fields?.length) {
           const parsed = doc.fields.map(f =>
             typeof f === 'string' ? JSON.parse(f) : f
@@ -785,15 +974,11 @@ export default function DocumentEditor() {
           setFields(parsed);
         }
 
-        // ✅ PDF — Cloudinary URL থেকে proxy দিয়ে load করো
         if (doc.fileUrl) {
-          const proxyUrl = buildProxyUrl(doc.fileUrl);
-          setFileUrl(proxyUrl);
+          setFileUrl(buildProxyUrl(doc.fileUrl));
           setFileReady(true);
         }
-
       } catch (err) {
-        console.error('Load doc error:', err);
         toast.error('Failed to load document.');
         navigate('/dashboard');
       } finally {
@@ -806,7 +991,7 @@ export default function DocumentEditor() {
   }, [docId]);
 
   // ════════════════════════════════════════════════════════════
-  // FILE SELECT
+  // FILE HANDLERS
   // ════════════════════════════════════════════════════════════
   const handleFileSelect = useCallback((e) => {
     const file = e.target.files?.[0];
@@ -833,9 +1018,6 @@ export default function DocumentEditor() {
     e.target.value = '';
   }, [fileUrl]);
 
-  // ════════════════════════════════════════════════════════════
-  // LOGO SELECT
-  // ════════════════════════════════════════════════════════════
   const handleLogoSelect = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -846,9 +1028,9 @@ export default function DocumentEditor() {
     }
 
     try {
-      const lf = new FormData();
-      lf.append('logo', file);
-      const res = await api.post('/documents/upload-logo', lf);
+      const fd = new FormData();
+      fd.append('logo', file);
+      const res = await api.post('/documents/upload-logo', fd);
       if (res.data?.logoUrl) {
         setCompanyLogo(res.data.logoUrl);
         toast.success('Logo uploaded!');
@@ -883,6 +1065,9 @@ export default function DocumentEditor() {
             : field.partyIndex,
         }))
     );
+    if (selectedParty >= i && selectedParty > 0) {
+      setSelectedParty(s => s - 1);
+    }
   };
 
   const updateParty = (i, key, val) =>
@@ -896,7 +1081,7 @@ export default function DocumentEditor() {
   // CC HELPERS
   // ════════════════════════════════════════════════════════════
   const addCc = () => {
-    const email = ccEmail.trim().toLowerCase();
+    const email = ccForm.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       toast.error('Invalid email address.');
       return;
@@ -905,19 +1090,45 @@ export default function DocumentEditor() {
       toast.error('Email already added.');
       return;
     }
-    setCcList(p => [...p, { email, name: '' }]);
-    setCcEmail('');
+    setCcList(p => [
+      ...p,
+      {
+        email,
+        name:        ccForm.name.trim(),
+        designation: ccForm.designation.trim(), // ✅
+      },
+    ]);
+    setCcForm(EMPTY_CC());
   };
 
+  const removeCc = (email) =>
+    setCcList(p => p.filter(x => x.email !== email));
+
   // ════════════════════════════════════════════════════════════
-  // RESEND — Existing doc এ email আবার পাঠাও
+  // FIELD UPDATE — font/size/bold/placeholder
+  // ════════════════════════════════════════════════════════════
+  const updateField = useCallback((fieldId, updates) => {
+    setFields(prev =>
+      prev.map(f =>
+        f.id === fieldId ? { ...f, ...updates } : f
+      )
+    );
+  }, []);
+
+  const deleteField = useCallback((fieldId) => {
+    setFields(prev => prev.filter(f => f.id !== fieldId));
+    setSelectedFieldId(null);
+  }, []);
+
+  // ════════════════════════════════════════════════════════════
+  // RESEND
   // ════════════════════════════════════════════════════════════
   const handleResend = async () => {
     if (!docId || isNew || resending) return;
     setResending(true);
     try {
       await api.post(`/documents/resend/${docId}`);
-      toast.success('Signing email resent successfully!');
+      toast.success('Signing email resent!');
     } catch (err) {
       toast.error(err?.message || 'Failed to resend email.');
     } finally {
@@ -926,10 +1137,10 @@ export default function DocumentEditor() {
   };
 
   // ════════════════════════════════════════════════════════════
-  // SEND / UPLOAD — New Document
+  // SEND / UPLOAD
   // ════════════════════════════════════════════════════════════
   const handleSend = async () => {
-    // ── Validation ──────────────────────────────────────────
+    // Validation
     if (!rawFile && isNew) {
       toast.error('Please upload a PDF file.');
       return;
@@ -942,6 +1153,14 @@ export default function DocumentEditor() {
       toast.error('All parties need a name and email.');
       return;
     }
+    // Email format validation
+    const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    for (const p of parties) {
+      if (!emailRx.test(p.email)) {
+        toast.error(`Invalid email: ${p.email}`);
+        return;
+      }
+    }
     if (fields.length === 0) {
       toast.error('Please place at least one field.');
       return;
@@ -953,55 +1172,76 @@ export default function DocumentEditor() {
     try {
       const formData = new FormData();
 
-      // ── Text fields আগে ─────────────────────────────────
       formData.append('title',       title.trim());
       formData.append('companyName', companyName.trim());
       formData.append('companyLogo', companyLogo || '');
       formData.append('totalPages',  String(totalPages));
 
+      // ✅ designation included
       formData.append(
         'parties',
         JSON.stringify(
           parties.map((p, i) => ({
-            name:  p.name.trim(),
-            email: p.email.trim().toLowerCase(),
-            color: p.color || COLORS[i % COLORS.length],
+            name:        p.name.trim(),
+            email:       p.email.trim().toLowerCase(),
+            designation: p.designation?.trim() || '',
+            color:       p.color || COLORS[i % COLORS.length],
           }))
         )
       );
 
-      formData.append('fields',       JSON.stringify(fields));
-      formData.append('ccRecipients', JSON.stringify(ccList));
+      // ✅ fields with font properties
+      formData.append('fields', JSON.stringify(
+        fields.map(f => ({
+          id:          f.id,
+          type:        f.type,
+          page:        f.page,
+          x:           f.x,
+          y:           f.y,
+          width:       f.width,
+          height:      f.height,
+          partyIndex:  f.partyIndex,
+          value:       f.value || '',
+          fontFamily:  f.fontFamily  || 'Helvetica',
+          fontSize:    f.fontSize    || 14,
+          fontWeight:  f.fontWeight  || 'normal',
+          placeholder: f.placeholder || '',
+        }))
+      ));
 
-      // ── File সবার শেষে ───────────────────────────────────
+      // ✅ CC with designation
+      formData.append(
+        'ccRecipients',
+        JSON.stringify(
+          ccList.map(c => ({
+            email:       c.email,
+            name:        c.name        || '',
+            designation: c.designation || '',
+          }))
+        )
+      );
+
       if (rawFile) {
         formData.append('file', rawFile);
       } else if (existingDoc?.fileUrl) {
-        // Existing doc — fileUrl পাঠাও
         formData.append('fileUrl', existingDoc.fileUrl);
       }
 
-      const endpoint = '/documents/upload-and-send';
-
-      const response = await api.post(endpoint, formData, {
+      const res = await api.post('/documents/upload-and-send', formData, {
         onUploadProgress: (e) => {
-          const pct = Math.round(
-            (e.loaded * 100) / (e.total || 1)
-          );
-          setUploadProgress(pct);
+          setUploadProgress(Math.round((e.loaded * 100) / (e.total || 1)));
         },
-        timeout: 60000,
+        timeout: 60_000,
       });
 
-      if (response.data?.success) {
+      if (res.data?.success) {
         toast.success('Document sent successfully!');
         navigate('/dashboard');
       }
     } catch (err) {
-      console.error('Upload error:', err);
       toast.error(
-        err?.message ||
         err?.response?.data?.message ||
+        err?.message ||
         'Upload failed. Please try again.'
       );
     } finally {
@@ -1021,17 +1261,12 @@ export default function DocumentEditor() {
                       flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 animate-spin text-[#28ABDF]" />
-          <p className="text-slate-500 font-medium">
-            Loading document...
-          </p>
+          <p className="text-slate-500 font-medium">Loading document...</p>
         </div>
       </div>
     );
   }
 
-  // ════════════════════════════════════════════════════════════
-  // VIEW MODE — Completed doc
-  // ════════════════════════════════════════════════════════════
   const isCompleted = existingDoc?.status === 'completed';
   const isViewOnly  = isCompleted;
 
@@ -1039,14 +1274,12 @@ export default function DocumentEditor() {
   // RENDER
   // ════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-slate-50
-                    dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950
+                    flex flex-col">
 
-      {/* ── Top Bar ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50
-                         bg-white dark:bg-slate-900
-                         border-b border-slate-200
-                         dark:border-slate-700
+      {/* ── Top Bar ──────────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 bg-white dark:bg-slate-900
+                         border-b border-slate-200 dark:border-slate-700
                          px-4 py-3 flex items-center
                          justify-between gap-3 shadow-sm">
 
@@ -1071,23 +1304,20 @@ export default function DocumentEditor() {
                 onChange={e => setTitle(e.target.value)}
                 placeholder="Document Title..."
                 className="h-9 rounded-xl border-slate-200
-                           font-semibold max-w-xs
+                           font-semibold max-w-[200px] sm:max-w-xs
                            focus:border-[#28ABDF]"
               />
             )}
-
-            {existingDoc && (
-              <StatusBadge status={existingDoc.status} />
-            )}
+            {existingDoc && <StatusBadge status={existingDoc.status} />}
           </div>
         </div>
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 shrink-0">
 
-          {/* Upload Progress */}
+          {/* Upload progress bar */}
           {sending && uploadProgress > 0 && uploadProgress < 100 && (
-            <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2">
               <div className="w-24 h-1.5 bg-slate-200
                               rounded-full overflow-hidden">
                 <div
@@ -1102,7 +1332,7 @@ export default function DocumentEditor() {
             </div>
           )}
 
-          {/* Resend button — existing in_progress doc */}
+          {/* Resend */}
           {!isNew && existingDoc?.status === 'in_progress' && (
             <Button
               variant="outline"
@@ -1112,52 +1342,51 @@ export default function DocumentEditor() {
                          border-amber-300 text-amber-600
                          hover:bg-amber-50 text-sm"
             >
-              {resending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-              Resend Email
+              {resending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <RefreshCw className="w-4 h-4" />
+              }
+              <span className="hidden sm:inline">Resend Email</span>
             </Button>
           )}
 
-          {/* View PDF — completed */}
+          {/* View signed PDF */}
           {isCompleted && existingDoc?.signedFileUrl && (
             <Button
               onClick={() =>
                 window.open(
                   buildProxyUrl(existingDoc.signedFileUrl),
-                  '_blank',
-                  'noopener,noreferrer'
+                  '_blank', 'noopener,noreferrer'
                 )
               }
               className="bg-emerald-500 hover:bg-emerald-600
-                         text-white rounded-xl gap-2 h-9
-                         font-semibold"
+                         text-white rounded-xl gap-2 h-9 font-semibold"
             >
               <Eye className="w-4 h-4" />
-              View Signed PDF
+              <span className="hidden sm:inline">View Signed PDF</span>
             </Button>
           )}
 
-          {/* Send button — new or re-upload */}
+          {/* Send */}
           {!isCompleted && (
             <Button
               onClick={handleSend}
               disabled={sending}
               className="bg-[#28ABDF] hover:bg-[#2399c8]
-                         text-white rounded-xl gap-2
-                         px-6 h-9 font-semibold"
+                         text-white rounded-xl gap-2 px-5 h-9
+                         font-semibold"
             >
               {sending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Sending...
+                  <span className="hidden sm:inline">Sending...</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  {isNew ? 'Send Document' : 'Resend'}
+                  <span className="hidden sm:inline">
+                    {isNew ? 'Send Document' : 'Resend'}
+                  </span>
                 </>
               )}
             </Button>
@@ -1167,34 +1396,32 @@ export default function DocumentEditor() {
 
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Sidebar ─────────────────────────────────────── */}
-        <aside className="w-80 shrink-0 border-r
+        {/* ── Sidebar ────────────────────────────────────────── */}
+        <aside className="w-72 xl:w-80 shrink-0 border-r
                           border-slate-200 dark:border-slate-700
                           bg-white dark:bg-slate-900
                           overflow-y-auto p-4 flex flex-col gap-4">
 
-          {/* PDF Upload — only for new docs */}
+          {/* ── PDF Upload ───────────────────────────────────── */}
           {isNew ? (
             <Card className="p-4 rounded-2xl border-slate-100
                              dark:border-slate-800">
-              <p className="text-xs font-bold text-slate-500
+              <p className="text-[11px] font-bold text-slate-500
                             uppercase tracking-wider mb-3">
                 Document PDF
               </p>
               <label className="flex flex-col items-center gap-2
                                 cursor-pointer border-2 border-dashed
                                 border-slate-200 rounded-xl p-4
-                                hover:border-[#28ABDF]
-                                transition-colors">
+                                hover:border-[#28ABDF] transition-colors">
                 {fileReady ? (
                   <>
                     <FileText className="w-8 h-8 text-[#28ABDF]" />
-                    <p className="text-xs font-semibold
-                                  text-[#28ABDF]">
+                    <p className="text-xs font-semibold text-[#28ABDF]">
                       PDF Loaded ✓
                     </p>
                     <p className="text-[10px] text-slate-400
-                                  truncate max-w-[200px]">
+                                  truncate max-w-[180px]">
                       {rawFile?.name}
                     </p>
                   </>
@@ -1204,35 +1431,28 @@ export default function DocumentEditor() {
                     <p className="text-xs text-slate-400">
                       Click to upload PDF
                     </p>
-                    <p className="text-[10px] text-slate-400">
-                      Max 20MB
-                    </p>
+                    <p className="text-[10px] text-slate-400">Max 20MB</p>
                   </>
                 )}
                 <input
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={handleFileSelect}
+                  type="file" accept="application/pdf"
+                  className="hidden" onChange={handleFileSelect}
                 />
               </label>
             </Card>
           ) : (
-            /* Existing doc info */
             <Card className="p-4 rounded-2xl border-slate-100
                              dark:border-slate-800">
-              <p className="text-xs font-bold text-slate-500
+              <p className="text-[11px] font-bold text-slate-500
                             uppercase tracking-wider mb-2">
                 Document
               </p>
-              <div className="flex items-center gap-3
-                              bg-sky-50 dark:bg-sky-900/20
-                              rounded-xl p-3">
+              <div className="flex items-center gap-3 bg-sky-50
+                              dark:bg-sky-900/20 rounded-xl p-3">
                 <FileText className="w-5 h-5 text-sky-500 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold
-                                text-slate-800 dark:text-slate-200
-                                truncate">
+                  <p className="text-sm font-semibold text-slate-800
+                                dark:text-slate-200 truncate">
                     {title}
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
@@ -1240,34 +1460,28 @@ export default function DocumentEditor() {
                   </p>
                 </div>
               </div>
-
-              {/* Re-upload option */}
               {!isCompleted && (
-                <label className="flex items-center gap-2
-                                  cursor-pointer mt-2
-                                  border border-dashed
-                                  border-slate-200 rounded-xl p-2
-                                  hover:border-[#28ABDF]
+                <label className="flex items-center gap-2 cursor-pointer
+                                  mt-2 border border-dashed border-slate-200
+                                  rounded-xl p-2 hover:border-[#28ABDF]
                                   transition-colors">
                   <Upload className="w-3.5 h-3.5 text-slate-400" />
                   <span className="text-xs text-slate-400">
                     {rawFile ? '✓ New PDF selected' : 'Replace PDF'}
                   </span>
                   <input
-                    type="file"
-                    accept="application/pdf"
-                    className="hidden"
-                    onChange={handleFileSelect}
+                    type="file" accept="application/pdf"
+                    className="hidden" onChange={handleFileSelect}
                   />
                 </label>
               )}
             </Card>
           )}
 
-          {/* Company Info */}
+          {/* ── Company Info ─────────────────────────────────── */}
           <Card className="p-4 rounded-2xl border-slate-100
                            dark:border-slate-800">
-            <p className="text-xs font-bold text-slate-500
+            <p className="text-[11px] font-bold text-slate-500
                           uppercase tracking-wider mb-3">
               Company Info
             </p>
@@ -1279,8 +1493,8 @@ export default function DocumentEditor() {
                 className="h-9 rounded-xl text-sm"
                 disabled={isViewOnly}
               />
-              <label className={`flex items-center gap-2
-                                 border border-dashed border-slate-200
+              <label className={`flex items-center gap-2 border
+                                 border-dashed border-slate-200
                                  rounded-xl p-2 transition-colors
                                  ${isViewOnly
                                    ? 'opacity-50 cursor-not-allowed'
@@ -1288,25 +1502,21 @@ export default function DocumentEditor() {
                                  }`}>
                 <Upload className="w-3.5 h-3.5 text-slate-400" />
                 <span className="text-xs text-slate-400">
-                  {companyLogo ? 'Logo uploaded ✓' : 'Upload Logo'}
+                  {companyLogo ? '✓ Logo uploaded' : 'Upload Logo'}
                 </span>
                 <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleLogoSelect}
-                  disabled={isViewOnly}
+                  type="file" accept="image/*" className="hidden"
+                  onChange={handleLogoSelect} disabled={isViewOnly}
                 />
               </label>
             </div>
           </Card>
 
-          {/* Parties / Signers */}
+          {/* ── Signers ──────────────────────────────────────── */}
           <Card className="p-4 rounded-2xl border-slate-100
                            dark:border-slate-800">
-            <div className="flex items-center
-                            justify-between mb-3">
-              <p className="text-xs font-bold text-slate-500
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] font-bold text-slate-500
                             uppercase tracking-wider">
                 Signers
               </p>
@@ -1326,22 +1536,29 @@ export default function DocumentEditor() {
               {parties.map((party, i) => (
                 <div
                   key={i}
-                  className="p-3 rounded-xl border-2 space-y-2"
-                  style={{ borderColor: party.color + '40' }}
+                  className={`p-3 rounded-xl border-2 space-y-2
+                              cursor-pointer transition-all
+                              ${selectedParty === i
+                                ? 'ring-2 ring-offset-1'
+                                : ''
+                              }`}
+                  style={{
+                    borderColor:   party.color + '40',
+                    // eslint-disable-next-line no-extra-parens
+                    '--tw-ring-color': party.color,
+                  }}
+                  onClick={() => !isViewOnly && setSelectedParty(i)}
                 >
-                  <div className="flex items-center
-                                  justify-between">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <div
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: party.color }}
                       />
                       <span className="text-xs font-bold
-                                       text-slate-600
-                                       dark:text-slate-400">
+                                       text-slate-600 dark:text-slate-400">
                         Party {i + 1}
                       </span>
-                      {/* Signed badge */}
                       {party.status === 'signed' && (
                         <span className="inline-flex items-center
                                          gap-1 text-[10px]
@@ -1353,9 +1570,11 @@ export default function DocumentEditor() {
                     </div>
                     {!isViewOnly && parties.length > 1 && (
                       <button
-                        onClick={() => removeParty(i)}
-                        className="text-slate-300
-                                   hover:text-red-500
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeParty(i);
+                        }}
+                        className="text-slate-300 hover:text-red-500
                                    transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -1365,100 +1584,172 @@ export default function DocumentEditor() {
 
                   <Input
                     value={party.name}
-                    onChange={e =>
-                      updateParty(i, 'name', e.target.value)
-                    }
+                    onChange={e => updateParty(i, 'name', e.target.value)}
                     placeholder="Full Name"
                     className="h-8 text-xs rounded-lg"
-                    disabled={isViewOnly ||
-                      party.status === 'signed'}
+                    disabled={isViewOnly || party.status === 'signed'}
+                    onClick={e => e.stopPropagation()}
                   />
                   <Input
                     value={party.email}
-                    onChange={e =>
-                      updateParty(i, 'email', e.target.value)
-                    }
+                    onChange={e => updateParty(i, 'email', e.target.value)}
                     placeholder="Email Address"
                     type="email"
                     className="h-8 text-xs rounded-lg"
-                    disabled={isViewOnly ||
-                      party.status === 'signed'}
+                    disabled={isViewOnly || party.status === 'signed'}
+                    onClick={e => e.stopPropagation()}
+                  />
+                  {/* ✅ Designation field */}
+                  <Input
+                    value={party.designation || ''}
+                    onChange={e =>
+                      updateParty(i, 'designation', e.target.value)
+                    }
+                    placeholder="Designation (optional)"
+                    className="h-8 text-xs rounded-lg"
+                    disabled={isViewOnly || party.status === 'signed'}
+                    onClick={e => e.stopPropagation()}
                   />
                 </div>
               ))}
             </div>
           </Card>
 
-          {/* CC Recipients */}
+          {/* ── CC Recipients ─────────────────────────────────── */}
           <Card className="p-4 rounded-2xl border-slate-100
                            dark:border-slate-800">
-            <div className="flex items-center gap-2 mb-3">
-              <Mail className="w-4 h-4 text-[#28ABDF]" />
-              <p className="text-xs font-bold text-slate-500
-                            uppercase tracking-wider">
-                CC Recipients
-              </p>
-            </div>
-
-            {!isViewOnly && (
-              <div className="flex gap-2 mb-2">
-                <Input
-                  value={ccEmail}
-                  onChange={e => setCcEmail(e.target.value)}
-                  onKeyDown={e =>
-                    e.key === 'Enter' &&
-                    (e.preventDefault(), addCc())
-                  }
-                  placeholder="email@example.com"
-                  className="h-9 text-xs rounded-xl flex-1"
-                />
-                <Button
-                  size="sm" onClick={addCc}
-                  className="h-9 px-3 bg-[#28ABDF]
-                             text-white rounded-xl"
-                >
-                  Add
-                </Button>
-              </div>
-            )}
-
-            {ccList.length > 0 ? (
-              <div className="space-y-1">
-                {ccList.map(r => (
-                  <div
-                    key={r.email}
-                    className="flex items-center justify-between
-                               bg-sky-50 border border-sky-100
-                               rounded-xl px-3 py-1.5"
-                  >
-                    <span className="text-[11px] text-sky-700
-                                     truncate">
-                      {r.email}
+            <button
+              onClick={() => setCcExpanded(e => !e)}
+              className="w-full flex items-center
+                         justify-between mb-2"
+            >
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-[#28ABDF]" />
+                <p className="text-[11px] font-bold text-slate-500
+                              uppercase tracking-wider">
+                  CC Recipients
+                  {ccList.length > 0 && (
+                    <span className="ml-1.5 bg-[#28ABDF] text-white
+                                     text-[9px] font-bold
+                                     px-1.5 py-0.5 rounded-full">
+                      {ccList.length}
                     </span>
-                    {!isViewOnly && (
-                      <button
-                        onClick={() =>
-                          setCcList(p =>
-                            p.filter(x => x.email !== r.email)
-                          )
-                        }
-                        className="text-slate-400
-                                   hover:text-red-500 ml-2"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  )}
+                </p>
               </div>
-            ) : (
-              <p className="text-[11px] text-slate-400 italic">
-                No CC recipients added.
-              </p>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400
+                             transition-transform
+                             ${ccExpanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {ccExpanded && (
+              <div className="space-y-3 mt-2">
+                {/* ✅ CC form: email + name + designation */}
+                {!isViewOnly && (
+                  <div className="space-y-2 p-3 bg-slate-50
+                                  dark:bg-slate-800/50 rounded-xl
+                                  border border-slate-100
+                                  dark:border-slate-700">
+                    <Input
+                      value={ccForm.email}
+                      onChange={e =>
+                        setCcForm(p => ({ ...p, email: e.target.value }))
+                      }
+                      onKeyDown={e =>
+                        e.key === 'Enter' &&
+                        (e.preventDefault(), addCc())
+                      }
+                      placeholder="Email Address *"
+                      type="email"
+                      className="h-8 text-xs rounded-lg"
+                    />
+                    <Input
+                      value={ccForm.name}
+                      onChange={e =>
+                        setCcForm(p => ({ ...p, name: e.target.value }))
+                      }
+                      placeholder="Name (optional)"
+                      className="h-8 text-xs rounded-lg"
+                    />
+                    {/* ✅ Designation */}
+                    <Input
+                      value={ccForm.designation}
+                      onChange={e =>
+                        setCcForm(p => ({
+                          ...p, designation: e.target.value,
+                        }))
+                      }
+                      placeholder="Designation (optional)"
+                      className="h-8 text-xs rounded-lg"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={addCc}
+                      className="w-full h-8 bg-[#28ABDF]
+                                 text-white rounded-lg text-xs
+                                 font-semibold"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add CC
+                    </Button>
+                  </div>
+                )}
+
+                {/* CC list */}
+                {ccList.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {ccList.map(r => (
+                      <div
+                        key={r.email}
+                        className="flex items-start justify-between
+                                   bg-sky-50 border border-sky-100
+                                   rounded-xl px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-sky-700
+                                        font-medium truncate">
+                            {r.email}
+                          </p>
+                          {r.name && (
+                            <p className="text-[10px] text-slate-500
+                                          truncate">
+                              {r.name}
+                            </p>
+                          )}
+                          {/* ✅ Designation shown */}
+                          {r.designation && (
+                            <p className="text-[10px] text-slate-400
+                                          truncate">
+                              🏷️ {r.designation}
+                            </p>
+                          )}
+                        </div>
+                        {!isViewOnly && (
+                          <button
+                            onClick={() => removeCc(r.email)}
+                            className="text-slate-300
+                                       hover:text-red-500 ml-2 mt-0.5
+                                       shrink-0"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400 italic
+                                text-center py-1">
+                    No CC recipients added.
+                  </p>
+                )}
+              </div>
             )}
           </Card>
 
-          {/* Field Toolbar — only when file ready & not completed */}
+          {/* ── Field Toolbar ──────────────────────────────────── */}
           {fileReady && !isCompleted && (
             <Card className="p-4 rounded-2xl border-slate-100
                              dark:border-slate-800">
@@ -1476,15 +1767,23 @@ export default function DocumentEditor() {
             </Card>
           )}
 
-          {/* Field Summary */}
+          {/* ✅ Field Properties Panel — shows when field selected */}
+          {selectedField && !isViewOnly && (
+            <FieldPropertiesPanel
+              field={selectedField}
+              onUpdate={updateField}
+              onDelete={() => deleteField(selectedField.id)}
+            />
+          )}
+
+          {/* ── Field Summary ─────────────────────────────────── */}
           {fields.length > 0 && (
             <div className="bg-slate-50 dark:bg-slate-900/50
                             rounded-xl p-3 border border-slate-100
                             dark:border-slate-800 text-xs">
               <p className="font-bold text-slate-500 uppercase
-                            tracking-wide mb-1">
-                {fields.length} field
-                {fields.length !== 1 ? 's' : ''} placed
+                            tracking-wide mb-2">
+                {fields.length} field{fields.length !== 1 ? 's' : ''} placed
               </p>
               {parties.map((p, i) => {
                 const count = fields.filter(
@@ -1492,14 +1791,19 @@ export default function DocumentEditor() {
                 ).length;
                 return count > 0 ? (
                   <div key={i}
-                       className="flex justify-between py-0.5">
-                    <span className="text-slate-500">
-                      {p.name || `Party ${i + 1}`}
-                    </span>
-                    <span
-                      className="font-bold"
-                      style={{ color: p.color }}
-                    >
+                       className="flex items-center justify-between
+                                  py-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: p.color }}
+                      />
+                      <span className="text-slate-500 truncate max-w-[120px]">
+                        {p.name || `Party ${i + 1}`}
+                      </span>
+                    </div>
+                    <span className="font-bold"
+                          style={{ color: p.color }}>
                       {count}
                     </span>
                   </div>
@@ -1509,7 +1813,7 @@ export default function DocumentEditor() {
           )}
         </aside>
 
-        {/* ── PDF Viewer ─────────────────────────────────── */}
+        {/* ── PDF Viewer ────────────────────────────────────────── */}
         <main className="flex-1 bg-slate-100 dark:bg-slate-950
                          overflow-hidden min-h-0">
           {fileReady ? (
@@ -1527,13 +1831,9 @@ export default function DocumentEditor() {
                 color: p.color,
                 index: i,
               }))}
-              onFieldPlaced={
-                isViewOnly ? undefined : () => setPendingType(null)
-              }
+              onFieldPlaced={isViewOnly ? undefined : () => setPendingType(null)}
               selectedFieldId={selectedFieldId}
-              onFieldSelect={
-                isViewOnly ? undefined : setSelectedFieldId
-              }
+              onFieldSelect={isViewOnly ? undefined : setSelectedFieldId}
               readOnly={isViewOnly}
             />
           ) : (
@@ -1543,14 +1843,11 @@ export default function DocumentEditor() {
               <FileText className="w-16 h-16 opacity-20" />
               <div>
                 <p className="font-semibold text-slate-400 text-lg">
-                  {isNew
-                    ? 'Upload a PDF to start'
-                    : 'Loading document...'
-                  }
+                  {isNew ? 'Upload a PDF to start' : 'Loading document...'}
                 </p>
                 <p className="text-sm text-slate-400 mt-1">
                   {isNew
-                    ? 'Then place signature fields for each party'
+                    ? 'Then place signature & text fields for each party'
                     : 'Please wait...'
                   }
                 </p>
