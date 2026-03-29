@@ -3,7 +3,6 @@ import React, {
 } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as pdfjsLib from 'pdfjs-dist';
-
 import {
   Loader2, CheckCircle2, XCircle, ChevronLeft,
   ChevronRight, ZoomIn, ZoomOut, PenLine, Send,
@@ -11,16 +10,19 @@ import {
   FileText, Lock, CheckSquare, Type, Calendar,
   Hash, Fingerprint,
 } from 'lucide-react';
-import { toast }   from 'sonner';
-import { Button }  from '@/components/ui/button';
-import { api }     from '@/api/apiClient';
+import { toast }  from 'sonner';
+import { Button } from '@/components/ui/button';
+import { api }    from '@/api/apiClient';
 
-// ✅ এটা দাও
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// ✅ CDN worker — Vite compatible
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
+const cn = (...c) => c.filter(Boolean).join(' ');
+
 function useDocumentTitle(title) {
   useEffect(() => {
     const prev = document.title;
@@ -35,8 +37,6 @@ function formatDate(d) {
   });
 }
 
-const cn = (...c) => c.filter(Boolean).join(' ');
-
 // ─────────────────────────────────────────────────────────────
 // Status Screen
 // ─────────────────────────────────────────────────────────────
@@ -47,30 +47,21 @@ function StatusScreen({ icon: Icon, color, title, message, children }) {
     amber: { bg: 'bg-amber-50',   ring: 'ring-amber-100',   icon: 'text-amber-500'   },
   };
   const p = palettes[color] || palettes.red;
-
   return (
     <div className="min-h-screen bg-gradient-to-br
                     from-slate-50 via-sky-50/30 to-slate-100
-                    dark:from-slate-950 dark:to-slate-900
                     flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl
-                      shadow-xl shadow-slate-200/60
-                      dark:shadow-black/40
-                      border border-slate-100 dark:border-slate-800
-                      p-8 max-w-md w-full text-center">
+      <div className="bg-white rounded-2xl shadow-xl
+                      border border-slate-100 p-8 max-w-md w-full text-center">
         <div className={`w-16 h-16 rounded-2xl ${p.bg} ${p.ring}
-                         ring-8 flex items-center justify-center
-                         mx-auto mb-5`}>
+                         ring-8 flex items-center justify-center mx-auto mb-5`}>
           <Icon className={`w-8 h-8 ${p.icon}`} />
         </div>
-        <h1 className="text-xl font-bold text-slate-900
-                       dark:text-white mb-2">{title}</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400
-                      leading-relaxed mb-6">{message}</p>
+        <h1 className="text-xl font-bold text-slate-900 mb-2">{title}</h1>
+        <p className="text-sm text-slate-500 leading-relaxed mb-6">{message}</p>
         {children}
         <div className="mt-6 pt-5 border-t border-slate-100
-                        dark:border-slate-800 flex items-center
-                        justify-center gap-2">
+                        flex items-center justify-center gap-2">
           <div className="w-5 h-5 bg-[#28ABDF] rounded-md
                           flex items-center justify-center">
             <Shield className="w-3 h-3 text-white" />
@@ -88,9 +79,9 @@ function StatusScreen({ icon: Icon, color, title, message, children }) {
 // Signature Modal
 // ─────────────────────────────────────────────────────────────
 function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) {
-  const canvasRef   = useRef(null);
-  const isDrawing   = useRef(false);
-  const lastPos     = useRef({ x: 0, y: 0 });
+  const canvasRef = useRef(null);
+  const isDrawing = useRef(false);
+  const lastPos   = useRef({ x: 0, y: 0 });
 
   const [isEmpty,      setIsEmpty]      = useState(true);
   const [inputMode,    setInputMode]    = useState('draw');
@@ -109,12 +100,10 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
 
   useEffect(() => {
     if (!isOpen) return;
-    setIsEmpty(true);
-    setTypedText('');
-    setInputMode('draw');
+    setIsEmpty(true); setTypedText(''); setInputMode('draw');
     const link = document.createElement('link');
-    link.rel   = 'stylesheet';
-    link.href  = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap';
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap';
     document.head.appendChild(link);
     return () => { try { document.head.removeChild(link); } catch {} };
   }, [isOpen]);
@@ -123,10 +112,10 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
     if (!isOpen || inputMode !== 'draw') return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect    = canvas.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     canvas.width  = rect.width  || 500;
     canvas.height = rect.height || 200;
-    const ctx     = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }, [isOpen, inputMode]);
@@ -150,12 +139,11 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
   const startDraw = useCallback((e) => {
     e.preventDefault();
     isDrawing.current = true;
-    const canvas    = canvasRef.current;
-    const ctx       = canvas.getContext('2d');
+    const canvas = canvasRef.current;
+    const ctx    = canvas.getContext('2d');
     ctx.strokeStyle = penColor;
     ctx.lineWidth   = penWidth;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     lastPos.current = getPos(e, canvas);
   }, [penColor, penWidth, getPos]);
 
@@ -190,14 +178,14 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
       onAccept(canvasRef.current.toDataURL('image/png'));
     } else {
       if (!typedText.trim()) { toast.error('Please type your signature.'); return; }
-      const c   = document.createElement('canvas');
-      c.width   = 500; c.height = 160;
+      const c = document.createElement('canvas');
+      c.width = 500; c.height = 160;
       const ctx = c.getContext('2d');
-      ctx.fillStyle    = '#ffffff';
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 500, 160);
-      ctx.font         = `52px ${selectedFont}`;
-      ctx.fillStyle    = '#1e293b';
-      ctx.textAlign    = 'center';
+      ctx.font = `52px ${selectedFont}`;
+      ctx.fillStyle = '#1e293b';
+      ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(typedText.trim().slice(0, 30), 250, 80);
       onAccept(c.toDataURL('image/png'));
@@ -205,26 +193,22 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
   }, [inputMode, isEmpty, typedText, selectedFont, onAccept]);
 
   if (!isOpen) return null;
-
   const isInitials = fieldType === 'initial';
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      role="dialog" aria-modal="true"
       className="fixed inset-0 z-50 flex items-end sm:items-center
                  justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
       onMouseDown={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white dark:bg-slate-900 w-full sm:rounded-2xl
-                      sm:max-w-lg shadow-2xl overflow-hidden rounded-t-3xl">
-
+      <div className="bg-white w-full sm:rounded-2xl sm:max-w-lg
+                      shadow-2xl overflow-hidden rounded-t-3xl">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#28ABDF] to-[#1a8cbf]
                         px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5 text-white">
-            <div className="w-8 h-8 rounded-xl bg-white/20
-                            flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
               <PenLine className="w-4 h-4" />
             </div>
             <div>
@@ -234,26 +218,23 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
               <p className="text-white/70 text-xs">This will be legally binding</p>
             </div>
           </div>
-          <button
-            type="button" onClick={onClose}
+          <button type="button" onClick={onClose}
             className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30
-                       text-white flex items-center justify-center
-                       transition-colors text-xl leading-none"
-          >×</button>
+                       text-white flex items-center justify-center text-xl">
+            ×
+          </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-slate-800">
+        <div className="flex border-b border-slate-100">
           {['draw', 'type'].map(m => (
-            <button
-              key={m} type="button" onClick={() => setInputMode(m)}
+            <button key={m} type="button" onClick={() => setInputMode(m)}
               className={cn(
                 'flex-1 py-3 text-sm font-semibold transition-colors border-b-2',
                 inputMode === m
                   ? 'border-[#28ABDF] text-[#28ABDF]'
                   : 'border-transparent text-slate-400 hover:text-slate-600',
-              )}
-            >
+              )}>
               {m === 'draw' ? 'Draw' : 'Type'}
             </button>
           ))}
@@ -264,16 +245,13 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
           {inputMode === 'draw' ? (
             <div className="space-y-3">
               <div className="relative rounded-xl overflow-hidden
-                              border-2 border-dashed border-slate-200
-                              dark:border-slate-700 bg-white">
-                <canvas
-                  ref={canvasRef}
+                              border-2 border-dashed border-slate-200 bg-white">
+                <canvas ref={canvasRef}
                   className="w-full touch-none cursor-crosshair block"
                   style={{ height: '180px' }}
                   onMouseDown={startDraw} onMouseMove={draw}
                   onMouseUp={stopDraw}   onMouseLeave={stopDraw}
-                  onTouchStart={startDraw} onTouchMove={draw}
-                  onTouchEnd={stopDraw}
+                  onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
                 />
                 {isEmpty && (
                   <div className="absolute inset-0 flex items-center
@@ -289,99 +267,77 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1.5">
                     {PEN_COLORS.map(c => (
-                      <button
-                        key={c} type="button" onClick={() => setPenColor(c)}
-                        className={cn(
-                          'w-5 h-5 rounded-full transition-all',
-                          penColor === c
-                            ? 'ring-2 ring-offset-1 ring-slate-400 scale-110'
-                            : 'hover:scale-110',
-                        )}
+                      <button key={c} type="button" onClick={() => setPenColor(c)}
+                        className={cn('w-5 h-5 rounded-full transition-all',
+                          penColor === c ? 'ring-2 ring-offset-1 ring-slate-400 scale-110' : 'hover:scale-110')}
                         style={{ backgroundColor: c }}
                       />
                     ))}
                   </div>
                   <div className="flex gap-1 ml-1">
                     {[1.5, 2.5, 4].map(w => (
-                      <button
-                        key={w} type="button" onClick={() => setPenWidth(w)}
-                        className={cn(
-                          'h-6 px-2 rounded-lg border text-[10px] font-bold transition-all',
+                      <button key={w} type="button" onClick={() => setPenWidth(w)}
+                        className={cn('h-6 px-2 rounded-lg border text-[10px] font-bold transition-all',
                           penWidth === w
                             ? 'border-[#28ABDF] bg-sky-50 text-[#28ABDF]'
-                            : 'border-slate-200 text-slate-400 hover:border-slate-300',
-                        )}
-                      >
+                            : 'border-slate-200 text-slate-400 hover:border-slate-300')}>
                         {w === 1.5 ? 'S' : w === 2.5 ? 'M' : 'L'}
                       </button>
                     ))}
                   </div>
                 </div>
-                <button
-                  type="button" onClick={clearCanvas}
+                <button type="button" onClick={clearCanvas}
                   className="flex items-center gap-1 text-xs text-red-400
-                             hover:text-red-500 font-medium transition-colors"
-                >
+                             hover:text-red-500 font-medium">
                   <RotateCcw className="w-3 h-3" /> Clear
                 </button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <input
-                type="text" value={typedText} maxLength={30}
+              <input type="text" value={typedText} maxLength={30}
                 onChange={e => setTypedText(e.target.value)}
                 placeholder="Type your full name"
-                className="w-full h-12 border-2 border-slate-200
-                           dark:border-slate-700 rounded-xl px-4 text-lg
-                           focus:border-[#28ABDF] focus:outline-none
-                           dark:bg-slate-800 dark:text-white transition-colors"
+                className="w-full h-12 border-2 border-slate-200 rounded-xl
+                           px-4 text-lg focus:border-[#28ABDF] focus:outline-none"
                 style={{ fontFamily: selectedFont }}
               />
               <div className="flex flex-wrap gap-2">
                 {FONTS.map(f => (
-                  <button
-                    key={f.value} type="button"
+                  <button key={f.value} type="button"
                     onClick={() => setSelectedFont(f.value)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg border text-sm transition-all',
+                    className={cn('px-3 py-1.5 rounded-lg border text-sm transition-all',
                       selectedFont === f.value
                         ? 'border-[#28ABDF] bg-sky-50 text-[#28ABDF] font-semibold'
-                        : 'border-slate-200 text-slate-500 hover:border-slate-300',
-                    )}
-                    style={{ fontFamily: f.value }}
-                  >{f.label}</button>
+                        : 'border-slate-200 text-slate-500')}
+                    style={{ fontFamily: f.value }}>
+                    {f.label}
+                  </button>
                 ))}
               </div>
               {typedText.trim() && (
-                <div
-                  className="rounded-xl border-2 border-slate-100
-                             dark:border-slate-700 p-4 text-center bg-white
-                             dark:bg-slate-800 text-4xl text-slate-800
-                             dark:text-white"
-                  style={{ fontFamily: selectedFont }}
-                >{typedText}</div>
+                <div className="rounded-xl border-2 border-slate-100 p-4
+                                text-center bg-white text-4xl text-slate-800"
+                     style={{ fontFamily: selectedFont }}>
+                  {typedText}
+                </div>
               )}
             </div>
           )}
 
           <div className="flex gap-3 mt-5">
-            <Button
-              type="button" variant="outline" onClick={onClose}
-              className="flex-1 rounded-xl h-11 border-slate-200 dark:border-slate-700"
-            >Cancel</Button>
-            <Button
-              type="button" onClick={handleAccept}
+            <Button type="button" variant="outline" onClick={onClose}
+              className="flex-1 rounded-xl h-11 border-slate-200">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleAccept}
               className="flex-1 h-11 rounded-xl bg-[#28ABDF]
-                         hover:bg-[#2399c8] text-white font-semibold
-                         gap-1.5 shadow-md shadow-sky-400/25
-                         transition-all hover:-translate-y-0.5 active:translate-y-0"
-            >
+                         hover:bg-[#2399c8] text-white font-semibold gap-1.5">
               <CheckCircle2 className="w-4 h-4" />
               Apply {isInitials ? 'Initials' : 'Signature'}
             </Button>
           </div>
-          <p className="text-center text-[11px] text-slate-400 mt-3 leading-relaxed">
+          <p className="text-center text-[11px] text-slate-400 mt-3">
             By clicking Apply, you agree this is your legal electronic signature.
           </p>
         </div>
@@ -391,118 +347,104 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
 }
 
 // ─────────────────────────────────────────────────────────────
-// Field Overlay — সব type support
+// Field Overlay
 // ─────────────────────────────────────────────────────────────
 const FIELD_META = {
-  signature: { icon: PenLine,      label: 'Click to sign', color: '#28ABDF', bg: 'bg-sky-50/80',     border: 'border-[#28ABDF]'  },
-  initial:   { icon: Fingerprint,  label: 'Initials',      color: '#8b5cf6', bg: 'bg-violet-50/80',  border: 'border-violet-400' },
-  text:      { icon: Type,         label: 'Text',          color: '#64748b', bg: 'bg-white/90',      border: 'border-slate-300'  },
-  date:      { icon: Calendar,     label: 'Date',          color: '#10b981', bg: 'bg-emerald-50/80', border: 'border-emerald-400'},
-  checkbox:  { icon: CheckSquare,  label: '',              color: '#f59e0b', bg: 'bg-amber-50/80',   border: 'border-amber-400'  },
-  number:    { icon: Hash,         label: 'Number',        color: '#6366f1', bg: 'bg-indigo-50/80',  border: 'border-indigo-400' },
+  signature: { icon: PenLine,     label: 'Click to sign', color: '#28ABDF', border: 'border-[#28ABDF]',  bg: 'bg-sky-50/90'     },
+  initial:   { icon: Fingerprint, label: 'Initials',      color: '#8b5cf6', border: 'border-violet-400', bg: 'bg-violet-50/90'  },
+  text:      { icon: Type,        label: 'Text',          color: '#64748b', border: 'border-slate-300',  bg: 'bg-white/95'      },
+  date:      { icon: Calendar,    label: 'Date',          color: '#10b981', border: 'border-emerald-400',bg: 'bg-emerald-50/90' },
+  checkbox:  { icon: CheckSquare, label: '',              color: '#f59e0b', border: 'border-amber-400',  bg: 'bg-amber-50/90'   },
+  number:    { icon: Hash,        label: 'Number',        color: '#6366f1', border: 'border-indigo-400', bg: 'bg-indigo-50/90'  },
 };
 
-function FieldOverlay({ field, isMine, onClick, onChange, containerSize }) {
-  const meta    = FIELD_META[field.type] || FIELD_META.text;
-  const Icon    = meta.icon;
-  const isFilled = !!field.value;
-
-  const style = {
-    left:   `${field.x      ?? 0}%`,
-    top:    `${field.y      ?? 0}%`,
-    width:  `${field.width  ?? 20}%`,
-    height: `${field.height ?? 6}%`,
-  };
-
-  // Pixel size for font scaling
-  const pxW = containerSize?.width
-    ? (field.width / 100) * containerSize.width
-    : 100;
+function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW }) {
+  const meta   = FIELD_META[field.type] || FIELD_META.text;
+  const Icon   = meta.icon;
+  const filled = !!field.value;
+  const pxW    = canvasW ? (field.width / 100) * canvasW : 100;
 
   return (
     <div
       className={cn(
-        'absolute rounded-lg transition-all duration-150',
+        'absolute rounded-lg transition-all duration-200',
         'flex items-center justify-center overflow-hidden select-none',
         'border-2',
-        isFilled ? 'border-opacity-40' : 'border-dashed',
+        filled ? 'border-opacity-50' : 'border-dashed',
         meta.border, meta.bg,
         isMine
-          ? 'cursor-pointer hover:brightness-95 hover:shadow-md'
-          : 'opacity-50 cursor-not-allowed',
+          ? 'cursor-pointer hover:brightness-95 hover:shadow-lg'
+          : 'opacity-40 cursor-not-allowed',
+        // ✅ Highlight — signer এর নিজের unfilled fields glow করবে
+        isHighlighted && !filled
+          ? 'ring-2 ring-offset-1 ring-yellow-400 animate-pulse shadow-lg shadow-yellow-200'
+          : '',
       )}
-      style={style}
+      style={{
+        left:   `${field.x      ?? 0}%`,
+        top:    `${field.y      ?? 0}%`,
+        width:  `${field.width  ?? 20}%`,
+        height: `${field.height ?? 6}%`,
+      }}
       onClick={() => isMine && onClick(field)}
-      title={isMine ? undefined : 'This field belongs to another signer'}
+      title={isMine ? `Click to fill ${field.type}` : 'Belongs to another signer'}
     >
-      {isFilled ? (
-        /* ── Filled ── */
+      {filled ? (
         field.type === 'signature' || field.type === 'initial' ? (
-          <img
-            src={field.value} alt={field.type}
-            className="w-full h-full object-contain p-0.5"
-            draggable={false}
-          />
+          <img src={field.value} alt={field.type}
+            className="w-full h-full object-contain p-0.5" draggable={false} />
         ) : field.type === 'checkbox' ? (
           <CheckSquare className="w-5 h-5 text-amber-500" />
         ) : (
-          <span
-            className="px-1.5 truncate w-full text-center font-medium text-slate-700"
-            style={{ fontSize: Math.min(pxW * 0.1, 13) }}
-          >{field.value}</span>
+          <span className="px-1.5 truncate w-full text-center font-medium text-slate-700"
+            style={{ fontSize: Math.min(pxW * 0.1, 13) }}>
+            {field.value}
+          </span>
         )
       ) : (
-        /* ── Empty ── */
         <div className="flex items-center gap-1 px-1.5 pointer-events-none">
           {field.required && (
             <span className="text-red-400 text-[9px] font-black leading-none">*</span>
           )}
           <Icon size={Math.min(pxW * 0.12, 13)} style={{ color: meta.color, flexShrink: 0 }} />
           {meta.label && (
-            <span
-              className="font-semibold truncate"
-              style={{ color: meta.color, fontSize: Math.min(pxW * 0.09, 11) }}
-            >{meta.label}</span>
+            <span className="font-semibold truncate"
+              style={{ color: meta.color, fontSize: Math.min(pxW * 0.09, 11) }}>
+              {meta.label}
+            </span>
           )}
         </div>
       )}
 
       {/* Inline inputs */}
-      {isMine && !isFilled && field.type === 'text' && (
-        <input
-          type="text"
-          className="absolute inset-0 w-full h-full bg-white/95
-                     px-2 text-xs border-none outline-none z-10
-                     text-slate-700"
+      {isMine && !filled && field.type === 'text' && (
+        <input type="text"
+          className="absolute inset-0 w-full h-full bg-white/95 px-2
+                     text-xs border-none outline-none z-10 text-slate-700"
           placeholder={field.placeholder || 'Type here...'}
           onClick={e => e.stopPropagation()}
           onChange={e => onChange(field.id, e.target.value)}
         />
       )}
-      {isMine && !isFilled && field.type === 'number' && (
-        <input
-          type="number"
-          className="absolute inset-0 w-full h-full bg-white/95
-                     px-2 text-xs border-none outline-none z-10
-                     text-slate-700"
+      {isMine && !filled && field.type === 'number' && (
+        <input type="number"
+          className="absolute inset-0 w-full h-full bg-white/95 px-2
+                     text-xs border-none outline-none z-10 text-slate-700"
           placeholder="0"
           onClick={e => e.stopPropagation()}
           onChange={e => onChange(field.id, e.target.value)}
         />
       )}
-      {isMine && !isFilled && field.type === 'date' && (
-        <input
-          type="date"
-          className="absolute inset-0 w-full h-full bg-white/95
-                     px-1 text-xs border-none outline-none z-10
-                     text-slate-700"
+      {isMine && !filled && field.type === 'date' && (
+        <input type="date"
+          className="absolute inset-0 w-full h-full bg-white/95 px-1
+                     text-xs border-none outline-none z-10 text-slate-700"
           onClick={e => e.stopPropagation()}
           onChange={e => onChange(field.id, e.target.value)}
         />
       )}
       {isMine && field.type === 'checkbox' && (
-        <input
-          type="checkbox"
+        <input type="checkbox"
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
           onClick={e => {
             e.stopPropagation();
@@ -515,41 +457,55 @@ function FieldOverlay({ field, isMine, onClick, onChange, containerSize }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PDF Renderer — pdfjs (no iframe)
+// PDF Renderer
 // ─────────────────────────────────────────────────────────────
 function PdfRenderer({
   pdfUrl, fields, signerIndex,
   onFieldClick, onFieldChange,
-  currentPage, onPageChange, totalPages, onTotalPages,
+  currentPage, onPageChange,
+  totalPages, onTotalPages,
 }) {
   const canvasRef    = useRef(null);
   const containerRef = useRef(null);
+  const scrollRef    = useRef(null);
   const pdfDocRef    = useRef(null);
   const renderRef    = useRef(null);
+  const debounceRef  = useRef(null);
 
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState(false);
-  const [scale,         setScale]         = useState(1);
-  const [canvasSize,    setCanvasSize]    = useState({ width: 0, height: 0 });
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState(false);
+  const [retryKey,   setRetryKey]   = useState(0);
+  const [scale,      setScale]      = useState(1);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
+  // ✅ Current page fields
   const pageFields = useMemo(
     () => fields.filter(f => (f.page || 1) === currentPage),
     [fields, currentPage],
   );
 
-  // ── Load PDF ────────────────────────────────────────────────
+  // ✅ First unfilled field of signer on this page (for highlight)
+  const firstUnfilledId = useMemo(() => {
+    const f = pageFields.find(
+      f => f.partyIndex === signerIndex && f.required && !f.value
+    );
+    return f?.id || null;
+  }, [pageFields, signerIndex]);
+
+  // ✅ Load PDF
   useEffect(() => {
     if (!pdfUrl) return;
     let cancelled = false;
     setLoading(true);
     setError(false);
+    pdfDocRef.current = null;
 
     (async () => {
       try {
         const doc = await pdfjsLib.getDocument({
           url:             pdfUrl,
           withCredentials: false,
+          cMapPacked:      true,
         }).promise;
 
         if (cancelled) return;
@@ -557,15 +513,15 @@ function PdfRenderer({
         onTotalPages?.(doc.numPages);
         setLoading(false);
       } catch (e) {
-        console.error('[SignerView PDF load]', e);
+        console.error('[PDF load error]', e?.message || e);
         if (!cancelled) { setError(true); setLoading(false); }
       }
     })();
 
     return () => { cancelled = true; };
-  }, [pdfUrl]); // eslint-disable-line
+  }, [pdfUrl, retryKey]); // eslint-disable-line
 
-  // ── Render page ─────────────────────────────────────────────
+  // ✅ Render page
   const renderPage = useCallback(async () => {
     const doc    = pdfDocRef.current;
     const canvas = canvasRef.current;
@@ -576,7 +532,7 @@ function PdfRenderer({
 
     try {
       const page  = await doc.getPage(currentPage);
-      const avail = Math.max(wrap.clientWidth - 16, 300);
+      const avail = Math.max(wrap.clientWidth - 32, 300);
       const base  = page.getViewport({ scale: 1 });
       const fit   = avail / base.width;
       const vp    = page.getViewport({ scale: fit * scale });
@@ -589,7 +545,6 @@ function PdfRenderer({
 
       const ctx = canvas.getContext('2d', { alpha: false });
       ctx.scale(dpr, dpr);
-
       setCanvasSize({ width: vp.width, height: vp.height });
 
       renderRef.current = page.render({ canvasContext: ctx, viewport: vp });
@@ -603,28 +558,49 @@ function PdfRenderer({
     if (!loading && !error) renderPage();
   }, [loading, error, renderPage]);
 
-  // ── ResizeObserver ──────────────────────────────────────────
+  // ResizeObserver
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const obs = new ResizeObserver(entries => {
-      const w = entries[0].contentRect.width;
-      setContainerSize({ width: w, height: entries[0].contentRect.height });
-      if (!loading && !error) renderPage();
+    const obs = new ResizeObserver(() => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        if (!loading && !error) renderPage();
+      }, 100);
     });
     obs.observe(el);
-    return () => obs.disconnect();
+    return () => { obs.disconnect(); clearTimeout(debounceRef.current); };
   }, [loading, error, renderPage]);
+
+  // ✅ Auto-scroll to first unfilled field when page renders
+  useEffect(() => {
+    if (!firstUnfilledId || !canvasSize.width || loading) return;
+    const field = pageFields.find(f => f.id === firstUnfilledId);
+    if (!field || !scrollRef.current) return;
+
+    // Short delay — canvas render শেষ হওয়ার পর scroll
+    const t = setTimeout(() => {
+      const top = (field.y / 100) * canvasSize.height;
+      scrollRef.current?.scrollTo({
+        top:      Math.max(0, top - 120),
+        behavior: 'smooth',
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [firstUnfilledId, canvasSize, loading, currentPage]); // eslint-disable-line
+
+  // ✅ Auto jump to page that has signer's first field
+  const myFields = fields.filter(f => f.partyIndex === signerIndex);
 
   const clamp = (delta) =>
     setScale(s => Math.min(2, Math.max(0.5, Math.round((s + delta) * 10) / 10)));
 
-  const myFieldCount = pageFields.filter(f => f.partyIndex === signerIndex).length;
+  const myPageFieldCount = pageFields.filter(f => f.partyIndex === signerIndex).length;
 
   return (
     <div className="flex flex-col h-full">
 
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div className="flex items-center justify-between
                       px-4 py-2.5 bg-white dark:bg-slate-900
                       border-b border-slate-200 dark:border-slate-800
@@ -635,126 +611,126 @@ function PdfRenderer({
           <Button variant="outline" size="icon"
             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage <= 1}
-            className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700"
-          ><ChevronLeft className="w-4 h-4" /></Button>
-
+            className="h-8 w-8 rounded-lg border-slate-200">
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
           <span className="text-sm font-medium text-slate-600
-                           dark:text-slate-400 min-w-[70px] text-center">
+                           min-w-[70px] text-center">
             {currentPage} / {totalPages || '?'}
           </span>
-
           <Button variant="outline" size="icon"
             onClick={() => onPageChange(Math.min(totalPages || 999, currentPage + 1))}
             disabled={currentPage >= (totalPages || 1)}
-            className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700"
-          ><ChevronRight className="w-4 h-4" /></Button>
+            className="h-8 w-8 rounded-lg border-slate-200">
+            <ChevronRight className="w-4 h-4" />
+          </Button>
         </div>
 
         {/* Zoom */}
         <div className="flex items-center gap-1.5">
           <Button variant="outline" size="icon"
             onClick={() => clamp(-0.1)} disabled={scale <= 0.5}
-            className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700"
-          ><ZoomOut className="w-3.5 h-3.5" /></Button>
-
+            className="h-8 w-8 rounded-lg border-slate-200">
+            <ZoomOut className="w-3.5 h-3.5" />
+          </Button>
           <button type="button" onClick={() => setScale(1)}
-            className="text-xs text-slate-500 font-medium w-12 text-center
-                       hover:text-slate-700 transition-colors"
-          >{Math.round(scale * 100)}%</button>
-
+            className="text-xs text-slate-500 font-medium w-12 text-center">
+            {Math.round(scale * 100)}%
+          </button>
           <Button variant="outline" size="icon"
             onClick={() => clamp(0.1)} disabled={scale >= 2}
-            className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700"
-          ><ZoomIn className="w-3.5 h-3.5" /></Button>
+            className="h-8 w-8 rounded-lg border-slate-200">
+            <ZoomIn className="w-3.5 h-3.5" />
+          </Button>
         </div>
 
         {/* Field count */}
-        <div className="hidden sm:flex items-center gap-1.5
-                        text-xs text-slate-400 font-medium">
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400">
           <FileText className="w-3.5 h-3.5" />
-          {myFieldCount} field{myFieldCount !== 1 ? 's' : ''} on page
+          {myPageFieldCount} field{myPageFieldCount !== 1 ? 's' : ''} on page
         </div>
       </div>
 
-      {/* ── Canvas ── */}
-      <div className="flex-1 overflow-auto bg-slate-200
-                      dark:bg-slate-950 p-3 sm:p-5"
-           ref={containerRef}>
+      {/* Canvas area */}
+      <div ref={scrollRef}
+           className="flex-1 overflow-auto bg-slate-200
+                      dark:bg-slate-950 p-3 sm:p-5">
 
-        {/* Loading skeleton */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center
-                          gap-4 py-20">
-            <div className="w-full max-w-2xl bg-white rounded-sm
-                            animate-pulse" style={{ height: 800 }}>
-              <div className="flex items-center justify-center h-full gap-3">
-                <Loader2 className="w-7 h-7 text-slate-300 animate-spin" />
-                <span className="text-sm text-slate-300 font-medium">
+        <div ref={containerRef}>
+
+          {/* Loading skeleton */}
+          {loading && (
+            <div className="w-full bg-white rounded-sm animate-pulse
+                            flex items-center justify-center"
+                 style={{ minHeight: 700 }}>
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 text-slate-300 animate-spin" />
+                <p className="text-sm text-slate-300 font-medium">
                   Loading document…
-                </span>
+                </p>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Error */}
-        {error && !loading && (
-          <div className="flex flex-col items-center justify-center
-                          h-full gap-4 py-16">
-            <AlertCircle className="w-10 h-10 text-red-400" />
-            <p className="font-semibold text-slate-600 dark:text-slate-400">
-              Failed to load PDF
-            </p>
-            <Button size="sm" variant="outline"
-              onClick={() => { setError(false); setLoading(true); }}
-              className="rounded-xl gap-1.5"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Retry
-            </Button>
-          </div>
-        )}
+          {/* Error */}
+          {error && !loading && (
+            <div className="flex flex-col items-center justify-center
+                            gap-4 py-20">
+              <AlertCircle className="w-10 h-10 text-red-400" />
+              <p className="font-semibold text-slate-600">Failed to load PDF</p>
+              <p className="text-xs text-slate-400 max-w-xs text-center">
+                Make sure your connection is stable and the link is valid.
+              </p>
+              <Button size="sm" variant="outline"
+                onClick={() => { setError(false); setLoading(true); setRetryKey(k => k + 1); }}
+                className="rounded-xl gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5" /> Retry
+              </Button>
+            </div>
+          )}
 
-        {/* PDF + Overlays */}
-        {!loading && !error && (
-          <div className="relative mx-auto bg-white shadow-2xl
-                          shadow-black/20 rounded-sm"
-               style={{
-                 width:  canvasSize.width  || 'auto',
-                 height: canvasSize.height || 'auto',
-               }}>
-            <canvas ref={canvasRef} className="block rounded-sm" />
+          {/* PDF + overlays */}
+          {!loading && !error && (
+            <div className="relative mx-auto bg-white shadow-2xl
+                            shadow-black/20 rounded-sm"
+                 style={{
+                   width:  canvasSize.width  || 'auto',
+                   height: canvasSize.height || 'auto',
+                 }}>
+              <canvas ref={canvasRef} className="block rounded-sm" />
 
-            {/* Field overlays */}
-            {canvasSize.width > 0 && pageFields.map(field => (
-              <FieldOverlay
-                key={field.id}
-                field={field}
-                isMine={field.partyIndex === signerIndex}
-                onClick={onFieldClick}
-                onChange={onFieldChange}
-                containerSize={canvasSize}
-              />
-            ))}
-          </div>
-        )}
+              {/* ✅ Field overlays */}
+              {canvasSize.width > 0 && pageFields.map(field => (
+                <FieldOverlay
+                  key={field.id}
+                  field={field}
+                  isMine={field.partyIndex === signerIndex}
+                  isHighlighted={field.id === firstUnfilledId}
+                  onClick={onFieldClick}
+                  onChange={onFieldChange}
+                  canvasW={canvasSize.width}
+                />
+              ))}
+            </div>
+          )}
 
-        {/* Page dots */}
-        {!loading && !error && totalPages > 1 && totalPages <= 20 && (
-          <div className="flex items-center justify-center gap-1.5 mt-4 mb-2">
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <button
-                key={i} type="button"
-                onClick={() => onPageChange(i + 1)}
-                className={cn(
-                  'transition-all duration-150 rounded-full',
-                  currentPage === i + 1
-                    ? 'w-5 h-2 bg-[#28ABDF]'
-                    : 'w-2 h-2 bg-slate-300 dark:bg-slate-600 hover:bg-slate-400',
-                )}
-              />
-            ))}
-          </div>
-        )}
+          {/* Page dots */}
+          {!loading && !error && totalPages > 1 && totalPages <= 20 && (
+            <div className="flex items-center justify-center gap-1.5 mt-4 mb-2">
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button key={i} type="button"
+                  onClick={() => onPageChange(i + 1)}
+                  className={cn(
+                    'transition-all duration-150 rounded-full',
+                    currentPage === i + 1
+                      ? 'w-5 h-2 bg-[#28ABDF]'
+                      : 'w-2 h-2 bg-slate-300 hover:bg-slate-400',
+                  )}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -764,10 +740,10 @@ function PdfRenderer({
 // Progress Bar
 // ─────────────────────────────────────────────────────────────
 function FieldProgress({ fields, signerIndex }) {
-  const mine    = fields.filter(f => f.partyIndex === signerIndex);
-  const filled  = mine.filter(f => f.value);
-  const pct     = mine.length ? Math.round((filled.length / mine.length) * 100) : 100;
-  const allDone = mine.length > 0 && filled.length === mine.length;
+  const mine   = fields.filter(f => f.partyIndex === signerIndex);
+  const filled = mine.filter(f => f.value);
+  const pct    = mine.length ? Math.round((filled.length / mine.length) * 100) : 100;
+  const done   = mine.length > 0 && filled.length === mine.length;
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5
@@ -775,23 +751,18 @@ function FieldProgress({ fields, signerIndex }) {
                     border-b border-slate-100 dark:border-slate-800">
       <div className="flex-1 h-1.5 rounded-full
                       bg-slate-100 dark:bg-slate-800 overflow-hidden">
-        <div
-          className={cn(
-            'h-full rounded-full transition-all duration-500',
-            allDone ? 'bg-emerald-500' : 'bg-[#28ABDF]',
-          )}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={cn(
+          'h-full rounded-full transition-all duration-500',
+          done ? 'bg-emerald-500' : 'bg-[#28ABDF]',
+        )} style={{ width: `${pct}%` }} />
       </div>
       <span className={cn(
         'text-xs font-semibold whitespace-nowrap',
-        allDone
-          ? 'text-emerald-600'
-          : 'text-slate-500 dark:text-slate-400',
+        done ? 'text-emerald-600' : 'text-slate-500',
       )}>
         {mine.length === 0
-          ? 'No fields'
-          : allDone
+          ? 'No fields assigned'
+          : done
             ? '✓ All fields complete'
             : `${filled.length} / ${mine.length} fields`
         }
@@ -804,8 +775,8 @@ function FieldProgress({ fields, signerIndex }) {
 // MAIN
 // ─────────────────────────────────────────────────────────────
 export default function SignerView() {
-  const { token }  = useParams();
-  const navigate   = useNavigate();
+  const { token } = useParams();
+  const navigate  = useNavigate();
 
   const [phase,       setPhase]       = useState('loading');
   const [docInfo,     setDocInfo]     = useState(null);
@@ -826,10 +797,19 @@ export default function SignerView() {
   }, []);
 
   useDocumentTitle(
-    docInfo
-      ? `Sign: ${docInfo.title} — NeXsign`
-      : 'Sign Document — NeXsign',
+    docInfo ? `Sign: ${docInfo.title} — NeXsign` : 'Sign Document — NeXsign',
   );
+
+  // ✅ Auto-jump to first page that has signer's fields
+  const jumpToFirstFieldPage = useCallback((allFields, idx, pages) => {
+    const myFields = allFields.filter(f => f.partyIndex === idx);
+    if (!myFields.length) return;
+    const pages_with_fields = [...new Set(myFields.map(f => f.page || 1))].sort();
+    const firstPage = pages_with_fields[0];
+    if (firstPage && firstPage !== 1) {
+      setCurrentPage(firstPage);
+    }
+  }, []);
 
   // ── Validate token ──────────────────────────────────────────
   useEffect(() => {
@@ -840,25 +820,32 @@ export default function SignerView() {
     }
 
     const ctrl = new AbortController();
-
     (async () => {
       try {
         const res = await api.get(
           `/documents/sign/validate/${token}`,
-          { signal: ctrl.signal },
+          { signal: ctrl.signal, noCache: true },
         );
         if (!mountedRef.current) return;
 
         const { document: doc, party } = res.data;
+        const allFields = (doc.fields || []).map(f => ({ ...f, value: f.value || '' }));
+
         setDocInfo(doc);
         setSignerInfo(party);
-        setFields((doc.fields || []).map(f => ({ ...f, value: f.value || '' })));
+        setFields(allFields);
         setTotalPages(doc.totalPages || 1);
 
-        // ✅ Proxy URL — CORS নেই, fast
-        const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-        setPdfUrl(`${base}/documents/sign/${token}/pdf`);
+        // ✅ Proxy URL — backend থেকে PDF serve করবে
+        const base = (import.meta.env.VITE_API_BASE_URL || '')
+          .replace(/\/api$/, '')
+          .replace(/\/$/, '');
+        setPdfUrl(`${base}/api/documents/sign/${token}/pdf`);
+
         setPhase('ready');
+
+        // ✅ Auto-jump to signer's first field page
+        jumpToFirstFieldPage(allFields, party.index, doc.totalPages || 1);
 
       } catch (err) {
         if (err.name === 'CanceledError' || err.name === 'AbortError') return;
@@ -871,13 +858,13 @@ export default function SignerView() {
     })();
 
     return () => ctrl.abort();
-  }, [token]);
+  }, [token, jumpToFirstFieldPage]);
 
   // ── Field handlers ──────────────────────────────────────────
   const handleFieldClick = useCallback((field) => {
     if (field.partyIndex !== signerInfo?.index) {
-      const ownerName = docInfo?.parties?.[field.partyIndex]?.name || 'another signer';
-      toast.info(`This field belongs to ${ownerName}.`);
+      const name = docInfo?.parties?.[field.partyIndex]?.name || 'another signer';
+      toast.info(`This field belongs to ${name}.`);
       return;
     }
     if (field.type === 'signature' || field.type === 'initial') {
@@ -905,8 +892,9 @@ export default function SignerView() {
 
     if (missing.length) {
       toast.error(
-        `Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`
+        `Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`,
       );
+      // Jump to first missing field page
       if (missing[0]?.page) setCurrentPage(missing[0].page);
       return;
     }
@@ -1009,7 +997,7 @@ export default function SignerView() {
     <div className="flex flex-col h-screen bg-slate-100
                     dark:bg-slate-950 overflow-hidden">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <header className="h-14 sm:h-16 bg-white dark:bg-slate-900
                          border-b border-slate-200 dark:border-slate-800
                          flex items-center justify-between
@@ -1039,13 +1027,11 @@ export default function SignerView() {
           </div>
 
           <Button
-            onClick={handleSubmit}
-            disabled={submitting}
+            onClick={handleSubmit} disabled={submitting}
             className={cn(
               'h-9 sm:h-10 px-4 sm:px-5 rounded-xl font-semibold text-sm',
               'gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0',
               'shadow-md disabled:opacity-60 disabled:cursor-not-allowed',
-              'disabled:hover:translate-y-0',
               allFilled
                 ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-400/30 text-white'
                 : 'bg-[#28ABDF] hover:bg-[#2399c8] shadow-sky-400/25 text-white',
@@ -1062,10 +1048,10 @@ export default function SignerView() {
         </div>
       </header>
 
-      {/* ── Progress ── */}
+      {/* Progress */}
       <FieldProgress fields={fields} signerIndex={signerInfo?.index} />
 
-      {/* ── PDF ── */}
+      {/* PDF */}
       <main className="flex-1 min-h-0">
         <PdfRenderer
           pdfUrl={pdfUrl}
@@ -1080,7 +1066,7 @@ export default function SignerView() {
         />
       </main>
 
-      {/* ── Modal ── */}
+      {/* Modal */}
       <SignatureModal
         isOpen={showModal}
         onClose={() => { setShowModal(false); setActiveField(null); }}
