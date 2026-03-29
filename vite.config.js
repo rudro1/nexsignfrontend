@@ -1,65 +1,77 @@
-// import base44 from "@base44/vite-plugin"
-// import react from '@vitejs/plugin-react'
-// import { defineConfig } from 'vite'
-
-// // https://vite.dev/config/
-// export default defineConfig({
-//   logLevel: 'error', // Suppress warnings, only show errors
-//   plugins: [
-//     base44({
-//       // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.
-//       // can be removed if the code has been updated to use the new SDK imports from @base44/sdk
-//       legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === 'true',
-//       hmrNotifier: true,
-//       navigationNotifier: true,
-//       analyticsTracker: true,
-//       visualEditAgent: true
-//     }),
-//     react(), 
-//   ]
-// });
-
-// import { defineConfig } from 'vite';
-// import react from '@vitejs/plugin-react';
-// import path from 'path';
-
-// export default defineConfig({
-//   plugins: [react()],
-//   resolve: {
-//     alias: {
-//       '@': path.resolve(__dirname, './src'),
-//     },
-//   },
-//   server: {
-//     port: 5173,
-//     proxy: {
-//       '/api': {
-//         target: 'http://localhost:5001',
-//         changeOrigin: true,
-//       },
-//     },
-//   },
-// });
-import { defineConfig } from 'vite';
+// vite.config.js
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
+import path  from 'path';
 
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: { '@': path.resolve(__dirname, './src') },
-  },
-  build: {
-    target: 'esnext',
-    commonjsOptions: { transformMixedEsModules: true },
-  },
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'https://nextsignbackendfinal.vercel.app/api',
-        changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  const backendOrigin = (env.VITE_API_BASE_URL || 'https://nextsignbackendfinal.vercel.app/api')
+    .replace(/\/api$/, ''); // → https://nextsignbackendfinal.vercel.app
+
+  return {
+    plugins: [react({ fastRefresh: true })],
+
+    // ── Aliases ───────────────────────────────────────────────
+    resolve: {
+      alias: { '@': path.resolve(__dirname, './src') },
+    },
+
+    // ── Dev server ────────────────────────────────────────────
+    server: {
+      port: 5173,
+      host: true,
+      proxy: {
+        '/api': {
+          target:       backendOrigin,  // https://nextsignbackendfinal.vercel.app
+          changeOrigin: true,
+          secure:       true,
+          // /api/users → /api/users (no rewrite needed)
+        },
       },
-    }
-  }
+    },
+
+    // ── Preview ───────────────────────────────────────────────
+    preview: {
+      port: 4173,
+      host: true,
+    },
+
+    // ── Build ─────────────────────────────────────────────────
+    build: {
+      outDir:    'dist',
+      target:    'esnext',
+      sourcemap: mode === 'development',
+      minify:    'esbuild',
+      commonjsOptions: { transformMixedEsModules: true },
+      chunkSizeWarningLimit: 1000,
+
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
+            'vendor-query':    ['@tanstack/react-query'],
+            'vendor-pdf':      ['pdfjs-dist'],
+            'vendor-motion':   ['framer-motion'],
+            'vendor-firebase': ['firebase/app', 'firebase/auth'],
+            'vendor-rnd':      ['react-rnd'],
+          },
+          chunkFileNames: 'assets/js/[name]-[hash].js',
+          entryFileNames: 'assets/js/[name]-[hash].js',
+          assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+        },
+      },
+    },
+
+    // ── Optimize deps ─────────────────────────────────────────
+    optimizeDeps: {
+      include: [
+        'react', 'react-dom', 'react-router-dom',
+        '@tanstack/react-query',
+        'framer-motion', 'lucide-react',
+        'sonner', 'date-fns', 'axios',
+      ],
+      exclude: ['pdfjs-dist'],
+    },
+  };
 });

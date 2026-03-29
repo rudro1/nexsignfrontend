@@ -95,18 +95,18 @@ export const AuthProvider = ({ children }) => {
   const tokenRefreshRef = useRef(null);
 
   // ── Load saved auth on mount ───────────────────────────────
-  useEffect(() => {
-    const savedUser  = storage.get('nexsign_user');
-    const savedToken = localStorage.getItem('token');
+ useEffect(() => {
+  const savedUser  = storage.get('nexsign_user');
+  const savedToken = localStorage.getItem('token');
 
-    if (savedUser && savedToken) {
-      setUser(savedUser);
-      setToken(savedToken);
-      // api interceptor কে token দাও
-      api.defaults.headers.common['Authorization'] =
-        `Bearer ${savedToken}`;
-    }
-  }, []);
+  if (savedUser && savedToken) {
+    setUser(savedUser);
+    setToken(savedToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+    setLoading(false); // ← এটা ADD করো (flash prevent)
+  }
+}, []);
+
 
   // ── Firebase Auth State Listener ──────────────────────────
   // Token expire / logout সব এখানে catch হবে
@@ -335,26 +335,37 @@ export const AuthProvider = ({ children }) => {
   // UPDATE USER — local state update (after profile edit)
   // ════════════════════════════════════════════════════════════
   const updateUser = useCallback((updates) => {
-    setUser(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, ...updates };
-      storage.set('nexsign_user', updated);
-      return updated;
-    });
-  }, []);
+  setUser(prev => {
+    if (!prev) return prev;
+    const updated = { ...prev, ...updates };
+    storage.set('nexsign_user', updated);
+    return updated;
+  });
+   if (updates.token) {
+    localStorage.setItem('token', updates.token);
+    setToken(updates.token);
+    api.defaults.headers.common['Authorization'] =
+      `Bearer ${updates.token}`;
+  }
+}, []);
 
   // ════════════════════════════════════════════════════════════
   // TOKEN VALID CHECK — component থেকে call করা যাবে
   // ════════════════════════════════════════════════════════════
-  const checkAuth = useCallback(() => {
-    const savedToken = localStorage.getItem('token');
-    if (!savedToken || isTokenExpired(savedToken)) {
-      clearAuth();
-      return false;
-    }
-    return true;
-  }, [isTokenExpired, clearAuth]);
-
+ const checkAuth = useCallback(() => {
+  const savedToken = localStorage.getItem('token');
+  if (!savedToken || isTokenExpired(savedToken)) {
+    clearAuth();
+    return false;
+  }
+  // Token ঠিক আছে, user set করো
+  const savedUser = storage.get('nexsign_user');
+  if (savedUser && !user) {
+    setUser(savedUser);
+    setToken(savedToken);
+  }
+  return true;
+}, [isTokenExpired, clearAuth, user]);
   // ════════════════════════════════════════════════════════════
   // COMPUTED VALUES
   // ════════════════════════════════════════════════════════════

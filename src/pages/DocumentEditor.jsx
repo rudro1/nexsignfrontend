@@ -1,10 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+// src/pages/DocumentEditor.jsx
+
+import React, {
+  useState, useEffect, useCallback,
+  useMemo, useRef,
+} from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Input }  from '@/components/ui/input';
+import { Label }  from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
@@ -12,74 +17,234 @@ import {
 import { toast } from 'sonner';
 import {
   Upload, Send, ArrowLeft, FileText,
-  Loader2, Mail, X, ImagePlus, ChevronRight,
-  ChevronLeft, CheckCircle2, Settings2, Users,
-  Plus, Trash2, PenTool, Type,
+  Loader2, Mail, Trash2, ImagePlus,
+  ChevronRight, CheckCircle2, Users,
+  PenTool, AlertCircle, Building2,
+  Type, Pen, Hash, Calendar,
+  Eye, EyeOff, RotateCcw,
 } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
-import FieldToolbar  from '@/components/editor/FieldToolbar';
-import PdfViewer     from '@/components/editor/PdfViewer';
+import FieldToolbar from '@/components/editor/FieldToolbar';
+import PdfViewer    from '@/components/editor/PdfViewer';
 
+// ─────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────
 const FONT_FAMILIES = [
-  { label: 'Helvetica',        value: 'Helvetica'       },
-  { label: 'Times New Roman',  value: 'Times New Roman' },
-  { label: 'Courier',          value: 'Courier'         },
+  { label: 'Helvetica',       value: 'Helvetica'       },
+  { label: 'Times New Roman', value: 'Times New Roman' },
+  { label: 'Courier',         value: 'Courier'         },
 ];
-const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24];
+const FONT_SIZES = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
 
+const STEPS = [
+  { id: 1, label: 'Upload',   desc: 'PDF & Branding',   icon: Upload       },
+  { id: 2, label: 'Signers',  desc: 'Signing Parties',  icon: Users        },
+  { id: 3, label: 'CC',       desc: 'Carbon Copy',      icon: Mail         },
+  { id: 4, label: 'Fields',   desc: 'Place Fields',     icon: PenTool      },
+  { id: 5, label: 'Review',   desc: 'Finalize & Send',  icon: CheckCircle2 },
+];
+
+const isValidEmail = (v) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
+function revokeBlob(url) {
+  if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Step Progress (desktop top bar)
+// ─────────────────────────────────────────────────────────────────
+function StepProgress({ current, onStepClick, maxReached }) {
+  return (
+    <div className="hidden lg:flex items-center gap-0">
+      {STEPS.map((s, idx) => {
+        const done    = current > s.id;
+        const active  = current === s.id;
+        const canGo   = s.id <= maxReached;
+        const Icon    = s.icon;
+
+        return (
+          <React.Fragment key={s.id}>
+            <button
+              type="button"
+              disabled={!canGo}
+              onClick={() => canGo && onStepClick(s.id)}
+              className={`flex flex-col items-center gap-1.5
+                          transition-all duration-200
+                          ${canGo ? 'cursor-pointer' : 'cursor-default opacity-40'}`}
+            >
+              <div className={`w-8 h-8 rounded-xl flex items-center
+                              justify-center transition-all duration-200
+                ${done
+                  ? 'bg-emerald-500 text-white'
+                  : active
+                    ? 'bg-[#28ABDF] text-white shadow-md shadow-sky-400/40'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                }`}>
+                {done
+                  ? <CheckCircle2 className="w-3.5 h-3.5" />
+                  : <Icon className="w-3.5 h-3.5" />
+                }
+              </div>
+              <span className={`text-[9px] font-semibold tracking-wide
+                transition-colors whitespace-nowrap
+                ${active  ? 'text-[#28ABDF]'
+                : done    ? 'text-emerald-500'
+                           : 'text-slate-400'
+                }`}>
+                {s.label}
+              </span>
+            </button>
+
+            {idx < STEPS.length - 1 && (
+              <div className={`w-10 h-px mx-1 mb-5 rounded-full transition-all duration-500
+                ${current > s.id
+                  ? 'bg-emerald-400'
+                  : 'bg-slate-200 dark:bg-slate-700'
+                }`}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section Header helper
+// ─────────────────────────────────────────────────────────────────
+function SectionHeader({ icon: Icon, iconBg, iconColor, title, subtitle }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className={`w-9 h-9 rounded-xl flex items-center
+                      justify-center shrink-0 ${iconBg}`}>
+        <Icon className={`w-4 h-4 ${iconColor}`} />
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800
+                       dark:text-white leading-tight">
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Review Row
+// ─────────────────────────────────────────────────────────────────
+function ReviewRow({ label, value, valueClass = '' }) {
+  return (
+    <div className="flex items-center justify-between
+                    py-3 border-b border-slate-50
+                    dark:border-slate-700/60 last:border-0">
+      <span className="text-xs text-slate-400 font-medium">{label}</span>
+      <span className={`text-xs font-semibold text-slate-800
+                        dark:text-white text-right max-w-[60%]
+                        truncate ${valueClass}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────
 export default function DocumentEditor() {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { id: pathId } = useParams();
   const { user }  = useAuth();
 
-  const [docId] = useState(() => {
+  // ── Resolve doc ID ────────────────────────────────────────────
+  const docId = useMemo(() => {
     if (pathId && pathId !== 'new') return pathId;
-    const qId = new URLSearchParams(location.search).get('id');
-    return qId === 'new' ? null : qId;
-  });
+    const q = new URLSearchParams(location.search).get('id');
+    return q === 'new' ? null : q;
+  }, [pathId, location.search]);
 
-  // ── Wizard State ───────────────────────────────────────────
-  const [step, setStep] = useState(1);
+  // ── Wizard ────────────────────────────────────────────────────
+  const [step,       setStep]       = useState(1);
+  const [maxReached, setMaxReached] = useState(1);
 
-  // ── Core state ───────────────────────────────────────────────
+  // ── Core ──────────────────────────────────────────────────────
   const [rawFile,    setRawFile]    = useState(null);
   const [title,      setTitle]      = useState('');
   const [fileUrl,    setFileUrl]    = useState('');
   const [fileReady,  setFileReady]  = useState(false);
-  const [parties,    setParties]    = useState([{ name: user?.full_name || '', email: user?.email || '', order: 0, status: 'pending', color: '#0ea5e9' }]);
+  const [parties,    setParties]    = useState([{
+    name: user?.full_name || '', email: user?.email || '',
+    order: 0, status: 'pending', color: '#0ea5e9',
+  }]);
   const [fields,     setFields]     = useState([]);
   const [ccList,     setCcList]     = useState([]);
-  const [companyLogo,    setCompanyLogo]    = useState('');
-  const [companyLogoFile, setCompanyLogoFile] = useState(null);
-  const [companyLogoPreview, setCompanyLogoPreview] = useState('');
-  const [companyName,    setCompanyName]    = useState('');
+  const [companyLogo,         setCompanyLogo]         = useState('');
+  const [companyLogoFile,     setCompanyLogoFile]     = useState(null);
+  const [companyLogoPreview,  setCompanyLogoPreview]  = useState('');
+  const [companyName,         setCompanyName]         = useState('');
 
-  // ── CC input ─────────────────────────────────────────────────
-  const [ccEmail,       setCcEmail]       = useState('');
-  const [ccName,        setCcName]        = useState('');
-  const [ccDesignation, setCcDesignation] = useState('');
+  // ── CC inputs ─────────────────────────────────────────────────
+  const [ccForm, setCcForm] = useState({
+    name: '', email: '', designation: '',
+  });
 
-  // ── Editor state ─────────────────────────────────────────────
+  // ── Editor ────────────────────────────────────────────────────
   const [currentPage,        setCurrentPage]        = useState(1);
   const [totalPages,         setTotalPages]          = useState(1);
   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
   const [pendingFieldType,   setPendingFieldType]   = useState(null);
   const [processing,         setProcessing]         = useState(false);
   const [selectedFieldId,    setSelectedFieldId]    = useState(null);
+  const [docLoading,         setDocLoading]         = useState(false);
 
-  const selectedField = useMemo(() => fields.find(f => f.id === selectedFieldId), [fields, selectedFieldId]);
+  // Mobile: show sidebar or viewer
+  const [mobilePanelView, setMobilePanelView] = useState('sidebar'); // 'sidebar' | 'viewer'
 
-  // ── Load existing doc ────────────────────────────────────────
+  const fileUrlRef       = useRef(fileUrl);
+  const logoPreviewRef   = useRef(companyLogoPreview);
+  const mountedRef       = useRef(true);
+
+  useEffect(() => { fileUrlRef.current = fileUrl; },     [fileUrl]);
+  useEffect(() => { logoPreviewRef.current = companyLogoPreview; }, [companyLogoPreview]);
+
+  // ── Cleanup blobs on unmount ──────────────────────────────────
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      revokeBlob(fileUrlRef.current);
+      revokeBlob(logoPreviewRef.current);
+    };
+  }, []);
+
+  // ── Selected field ────────────────────────────────────────────
+  const selectedField = useMemo(
+    () => fields.find(f => f.id === selectedFieldId),
+    [fields, selectedFieldId]
+  );
+
+  // ── Load existing doc ─────────────────────────────────────────
   useEffect(() => {
     if (!docId) return;
+    setDocLoading(true);
     api.get(`/documents/${docId}`)
       .then(res => {
+        if (!mountedRef.current) return;
         const d = res.data.document || res.data;
         setTitle(d.title || '');
         setFileUrl(d.fileUrl || '');
-        setFileReady(true);
-        setParties(d.parties?.length ? d.parties : [{ name: user?.full_name || '', email: user?.email || '', order: 0, status: 'pending', color: '#0ea5e9' }]);
+        setFileReady(!!d.fileUrl);
+        setParties(d.parties?.length
+          ? d.parties
+          : [{ name: user?.full_name || '', email: user?.email || '',
+               order: 0, status: 'pending', color: '#0ea5e9' }]
+        );
         setCcList(d.ccList || []);
         setCompanyLogo(d.companyLogo || '');
         setCompanyLogoPreview(d.companyLogo || '');
@@ -87,360 +252,1008 @@ export default function DocumentEditor() {
         setFields((d.fields || []).map(f =>
           typeof f === 'string' ? JSON.parse(f) : f
         ));
-        // If it has a file, jump to step 4 or stay at 1?
-        // Let's stay at 1 but show it's ready.
+        setMaxReached(d.fileUrl ? 4 : 1);
       })
-      .catch(() => toast.error('Failed to load document'));
-  }, [docId, user]);
+      .catch(() => toast.error('Failed to load document.'))
+      .finally(() => { if (mountedRef.current) setDocLoading(false); });
+  }, [docId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── File select ───────────────────────────────────────────────
   const handleFileSelect = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== 'application/pdf') {
-      toast.error('Please upload a valid PDF.');
+      toast.error('Please upload a valid PDF file.');
       return;
     }
-    if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('PDF must be under 20 MB.');
+      return;
+    }
+    revokeBlob(fileUrlRef.current);
+    const url = URL.createObjectURL(file);
     setRawFile(file);
     setTitle(prev => prev || file.name.replace(/\.pdf$/i, ''));
-    setFileUrl(URL.createObjectURL(file));
+    setFileUrl(url);
     setFileReady(true);
     setFields([]);
     setCurrentPage(1);
     e.target.value = '';
-  }, [fileUrl]);
+  }, []);
 
   const handleLogoSelect = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    revokeBlob(logoPreviewRef.current);
     setCompanyLogoFile(file);
     setCompanyLogoPreview(URL.createObjectURL(file));
     e.target.value = '';
   }, []);
 
-  const addCc = () => {
-    const email = ccEmail.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error('Invalid email address.');
+  // ── CC ────────────────────────────────────────────────────────
+  const addCc = useCallback(() => {
+    const email = ccForm.email.trim().toLowerCase();
+    if (!isValidEmail(email)) {
+      toast.error('Please enter a valid email address.');
       return;
     }
-    setCcList(prev => [...prev, { email, name: ccName.trim(), designation: ccDesignation.trim() }]);
-    setCcEmail(''); setCcName(''); setCcDesignation('');
-  };
+    if (ccList.some(c => c.email === email)) {
+      toast.error('This email is already in the CC list.');
+      return;
+    }
+    setCcList(prev => [...prev, {
+      email,
+      name:        ccForm.name.trim(),
+      designation: ccForm.designation.trim(),
+    }]);
+    setCcForm({ name: '', email: '', designation: '' });
+  }, [ccForm, ccList]);
 
-  const updateFieldTypography = (key, value) => {
+  const removeCc = useCallback((idx) => {
+    setCcList(prev => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  // ── Typography ────────────────────────────────────────────────
+  const updateFieldTypography = useCallback((key, value) => {
     if (!selectedFieldId) return;
-    setFields(prev => prev.map(f => f.id === selectedFieldId ? { ...f, [key]: value } : f));
-  };
+    setFields(prev =>
+      prev.map(f => f.id === selectedFieldId ? { ...f, [key]: value } : f)
+    );
+  }, [selectedFieldId]);
 
-  const validate = () => {
-    if (!fileUrl) { toast.error('Please upload a PDF.'); return false; }
-    if (!title.trim()) { toast.error('Please enter a title.'); return false; }
-    if (!parties.length) { toast.error('Add at least one signer.'); return false; }
-    if (parties.some(p => !p.name?.trim() || !p.email?.trim())) { toast.error('All signers need name and email.'); return false; }
-    if (!fields.length) { toast.error('Place at least one field.'); return false; }
+  const removeField = useCallback((id) => {
+    setFields(prev => prev.filter(f => f.id !== id));
+    if (selectedFieldId === id) setSelectedFieldId(null);
+  }, [selectedFieldId]);
+
+  // ── Step navigation ───────────────────────────────────────────
+  const goToStep = useCallback((target) => {
+    setStep(target);
+    setMaxReached(prev => Math.max(prev, target));
+  }, []);
+
+  const nextStep = useCallback(() => {
+    if (step === 1) {
+      if (!fileUrl)       return toast.error('Please upload a PDF first.');
+      if (!title.trim())  return toast.error('Please enter a document title.');
+    }
+    if (step === 2) {
+      if (!parties.length)
+        return toast.error('Add at least one signer.');
+      if (parties.some(p => !p.name?.trim() || !p.email?.trim()))
+        return toast.error('All signers need a name and email.');
+      if (parties.some(p => !isValidEmail(p.email)))
+        return toast.error('One or more signer emails are invalid.');
+    }
+    if (step === 4 && !fields.length) {
+      toast.error('Place at least one field on the PDF.');
+      return;
+    }
+    if (step < 5) goToStep(step + 1);
+  }, [step, fileUrl, title, parties, fields, goToStep]);
+
+  const prevStep = useCallback(() => {
+    if (step > 1) setStep(s => s - 1);
+  }, [step]);
+
+  // ── Send ──────────────────────────────────────────────────────
+  const validate = useCallback(() => {
+    if (!fileUrl)          { toast.error('No PDF uploaded.');              return false; }
+    if (!title.trim())     { toast.error('Document title is required.');   return false; }
+    if (!parties.length)   { toast.error('Add at least one signer.');      return false; }
+    if (parties.some(p => !p.name?.trim() || !p.email?.trim())) {
+      toast.error('All signers need a name and email.'); return false;
+    }
+    if (!fields.length)    { toast.error('Place at least one field.');     return false; }
     return true;
-  };
+  }, [fileUrl, title, parties, fields]);
 
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     if (!validate()) return;
     setProcessing(true);
     try {
       const formData = new FormData();
-      if (rawFile) formData.append('file', rawFile);
-      formData.append('title', title.trim());
-      formData.append('parties', JSON.stringify(parties));
+      if (rawFile)          formData.append('file',         rawFile);
+      formData.append('title',        title.trim());
+      formData.append('parties',      JSON.stringify(parties));
       formData.append('ccRecipients', JSON.stringify(ccList));
-      formData.append('fields', JSON.stringify(fields));
-      formData.append('totalPages', String(totalPages));
-      formData.append('companyName', companyName.trim());
-      formData.append('docId', docId || '');
+      formData.append('fields',       JSON.stringify(fields));
+      formData.append('totalPages',   String(totalPages));
+      formData.append('companyName',  companyName.trim());
+      if (docId)            formData.append('docId',        docId);
 
       if (companyLogoFile) {
-        const logoForm = new FormData();
-        logoForm.append('logo', companyLogoFile);
-        const logoRes = await api.post('/documents/upload-logo', logoForm);
-        if (logoRes.data?.logoUrl) formData.append('companyLogo', logoRes.data.logoUrl);
+        const lf = new FormData();
+        lf.append('logo', companyLogoFile);
+        const lr = await api.post('/documents/upload-logo', lf);
+        if (lr.data?.logoUrl) formData.append('companyLogo', lr.data.logoUrl);
       } else if (companyLogo) {
         formData.append('companyLogo', companyLogo);
       }
 
       await api.post('/documents/upload-and-send', formData);
+      toast.success('Document sent for signing! ✉️');
       navigate('/dashboard');
-      toast.success('Document sent successfully!');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send.');
+      toast.error(err.response?.data?.message || 'Failed to send document.');
     } finally {
-      setProcessing(false);
+      if (mountedRef.current) setProcessing(false);
     }
-  };
+  }, [
+    validate, rawFile, title, parties, ccList,
+    fields, totalPages, companyName, docId,
+    companyLogoFile, companyLogo, navigate,
+  ]);
 
-  const nextStep = () => {
-    if (step === 1 && (!fileUrl || !title.trim())) return toast.error('Upload PDF and enter title');
-    if (step === 2 && parties.some(p => !p.name.trim() || !p.email.trim())) return toast.error('Fill all signer details');
-    if (step < 5) setStep(step + 1);
-  };
+  // ── Loading screen ────────────────────────────────────────────
+  if (docLoading) {
+    return (
+      <div className="h-screen flex flex-col items-center
+                      justify-center bg-slate-50 dark:bg-slate-950 gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-[#28ABDF]" />
+        <p className="text-sm text-slate-500 font-medium">
+          Loading document…
+        </p>
+      </div>
+    );
+  }
 
-  const prevStep = () => {
-    if (step > 1) setStep(step - 1);
-  };
+  const currentStepMeta = STEPS[step - 1];
 
+  // ─────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-screen bg-[#F8FAFC] dark:bg-slate-950 overflow-hidden font-sans">
-      {/* ── TOP NAV ── */}
-      <header className="h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between z-50 shadow-sm">
-        <div className="flex items-center gap-6 flex-1 mr-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-2xl h-12 w-12 shrink-0 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100">
-            <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-300" />
+    <div className="flex flex-col h-screen bg-slate-50
+                    dark:bg-slate-950 overflow-hidden">
+
+      {/* ══════════════════════════════════════════════════════════
+          HEADER
+      ══════════════════════════════════════════════════════════ */}
+      <header className="h-16 bg-white dark:bg-slate-900
+                         border-b border-slate-200 dark:border-slate-800
+                         px-4 sm:px-6 flex items-center justify-between
+                         gap-4 z-50 shrink-0 shadow-sm">
+
+        {/* Left: back + title */}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/dashboard')}
+            className="h-9 w-9 rounded-xl shrink-0
+                       bg-slate-50 dark:bg-slate-800
+                       hover:bg-slate-100 dark:hover:bg-slate-700"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-600
+                                   dark:text-slate-300" />
           </Button>
-          <div className="flex flex-col min-w-0">
+
+          <div className="min-w-0 flex-1">
             <input
-              type="text" value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="Enter Document Title..."
-              className="bg-transparent border-none focus:ring-0 font-black text-slate-900 dark:text-white truncate text-xl p-0 uppercase tracking-tight"
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Untitled Document"
+              className="w-full bg-transparent border-none outline-none
+                         text-sm font-semibold text-slate-900
+                         dark:text-white truncate placeholder:text-slate-300
+                         dark:placeholder:text-slate-600"
             />
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Step {step} of 5:</span>
-              <span className="text-[10px] font-black text-[#28ABDF] uppercase tracking-[0.2em]">
-                {step === 1 && 'Upload & Branding'}
-                {step === 2 && 'Signing Parties'}
-                {step === 3 && 'CC Recipients'}
-                {step === 4 && 'PDF Editor'}
-                {step === 5 && 'Review & Finalize'}
-              </span>
-            </div>
+            {/* Mobile step indicator */}
+            <p className="text-[10px] text-slate-400 lg:hidden">
+              Step {step} of 5 · {currentStepMeta.desc}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Center: step progress (desktop) */}
+        <StepProgress
+          current={step}
+          onStepClick={goToStep}
+          maxReached={maxReached}
+        />
+
+        {/* Right: actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Mobile: toggle sidebar/viewer (only step 4) */}
+          {step === 4 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMobilePanelView(
+                v => v === 'sidebar' ? 'viewer' : 'sidebar'
+              )}
+              className="lg:hidden h-9 px-3 rounded-xl
+                         border-slate-200 dark:border-slate-700
+                         text-slate-600 dark:text-slate-300 gap-1.5
+                         text-xs font-medium"
+            >
+              {mobilePanelView === 'sidebar'
+                ? <><Eye className="w-3.5 h-3.5" /> Preview</>
+                : <><PenTool className="w-3.5 h-3.5" /> Edit</>
+              }
+            </Button>
+          )}
+
           {step > 1 && (
-            <Button variant="outline" onClick={prevStep} className="rounded-2xl h-12 px-6 font-black uppercase tracking-widest border-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={prevStep}
+              className="h-9 px-4 rounded-xl
+                         border-slate-200 dark:border-slate-700
+                         text-slate-600 dark:text-slate-300
+                         font-medium text-sm"
+            >
               Back
             </Button>
           )}
+
           {step < 5 ? (
-            <Button onClick={nextStep} className="bg-slate-900 dark:bg-white dark:text-slate-900 text-white rounded-2xl h-12 px-8 font-black uppercase tracking-widest gap-2 shadow-xl">
-              Next <ChevronRight className="w-5 h-5" />
+            <Button
+              size="sm"
+              onClick={nextStep}
+              className="h-9 px-4 rounded-xl
+                         bg-slate-900 dark:bg-white
+                         dark:text-slate-900 text-white
+                         font-semibold text-sm gap-1.5
+                         shadow-md hover:shadow-lg
+                         transition-all hover:-translate-y-0.5
+                         active:translate-y-0"
+            >
+              Next
+              <ChevronRight className="w-3.5 h-3.5" />
             </Button>
           ) : (
             <Button
-              onClick={handleSend} disabled={processing || !fileReady}
-              className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-2xl h-12 px-10 font-black uppercase tracking-widest gap-2 shadow-xl shadow-sky-500/20"
+              size="sm"
+              onClick={handleSend}
+              disabled={processing || !fileReady}
+              className="h-9 px-5 rounded-xl
+                         bg-[#28ABDF] hover:bg-[#2399c8] text-white
+                         font-semibold text-sm gap-1.5
+                         shadow-md shadow-sky-400/30
+                         hover:shadow-sky-400/40
+                         transition-all hover:-translate-y-0.5
+                         active:translate-y-0
+                         disabled:opacity-60 disabled:cursor-not-allowed
+                         disabled:hover:translate-y-0"
             >
-              {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-              Send Now
+              {processing
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Send className="w-3.5 h-3.5" />
+              }
+              {processing ? 'Sending…' : 'Send Now'}
             </Button>
           )}
         </div>
       </header>
 
-      {/* ── MAIN CONTENT ── */}
-      <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        
-        {/* SIDEBAR WIZARD */}
-        <aside className="w-full md:w-[400px] border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto flex-shrink-0 z-40 shadow-lg">
-          
-          {/* STEP 1: UPLOAD & BRANDING */}
+      {/* ══════════════════════════════════════════════════════════
+          BODY
+      ══════════════════════════════════════════════════════════ */}
+      <main className="flex-1 flex overflow-hidden">
+
+        {/* ── SIDEBAR ───────────────────────────────────────────── */}
+        <aside className={`
+          w-full lg:w-[360px] xl:w-[400px]
+          border-r border-slate-200 dark:border-slate-800
+          bg-white dark:bg-slate-900
+          overflow-y-auto shrink-0
+          ${step === 4 && mobilePanelView === 'viewer'
+            ? 'hidden lg:block'
+            : 'block'
+          }
+        `}>
+
+          {/* ── Step pill (mobile) ── */}
+          <div className="lg:hidden flex items-center gap-2
+                          px-4 pt-4 pb-0">
+            <div className="flex items-center gap-1.5 px-3 py-1.5
+                            rounded-full bg-[#28ABDF]/10
+                            text-[#28ABDF] text-xs font-semibold">
+              <currentStepMeta.icon className="w-3 h-3" />
+              {currentStepMeta.desc}
+            </div>
+          </div>
+
+          {/* ╔══════════════════════════════════════════════════════╗
+              STEP 1 — Upload & Branding
+          ╚══════════════════════════════════════════════════════╝ */}
           {step === 1 && (
-            <div className="p-8 space-y-10 animate-in fade-in slide-in-from-left-4 duration-300">
-              <section className="space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-2xl bg-sky-50 dark:bg-sky-900/30 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-[#28ABDF]" />
-                  </div>
-                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">1. Document Source</h3>
-                </div>
-                
+            <div className="p-5 sm:p-6 space-y-8">
+
+              {/* Document upload */}
+              <div className="space-y-4">
+                <SectionHeader
+                  icon={FileText}
+                  iconBg="bg-sky-50 dark:bg-sky-900/30"
+                  iconColor="text-[#28ABDF]"
+                  title="Document"
+                  subtitle="Upload the PDF to be signed"
+                />
+
                 {!fileReady ? (
-                  <label className="flex flex-col items-center justify-center w-full h-48 border-4 border-dashed border-slate-100 dark:border-slate-800 rounded-[2.5rem] cursor-pointer hover:border-[#28ABDF] hover:bg-sky-50/30 transition-all group">
-                    <Upload className="w-12 h-12 text-slate-200 group-hover:text-[#28ABDF] mb-4 transition-transform group-hover:-translate-y-1" />
-                    <span className="text-xs font-black text-slate-400 group-hover:text-slate-600 uppercase tracking-widest">Drop PDF here or click</span>
-                    <input type="file" className="hidden" accept=".pdf" onChange={handleFileSelect} />
+                  <label className="
+                    flex flex-col items-center justify-center
+                    w-full h-44 rounded-2xl border-2 border-dashed
+                    border-slate-200 dark:border-slate-700
+                    cursor-pointer group
+                    hover:border-[#28ABDF] hover:bg-sky-50/40
+                    dark:hover:bg-sky-900/10
+                    transition-all duration-200
+                  ">
+                    <div className="w-12 h-12 rounded-2xl
+                                    bg-slate-100 dark:bg-slate-800
+                                    flex items-center justify-center
+                                    mb-3 group-hover:bg-sky-100
+                                    dark:group-hover:bg-sky-900/30
+                                    transition-colors">
+                      <Upload className="w-5 h-5 text-slate-400
+                                         group-hover:text-[#28ABDF]
+                                         transition-colors" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-600
+                                  dark:text-slate-400
+                                  group-hover:text-slate-800
+                                  dark:group-hover:text-slate-200">
+                      Click to upload PDF
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Max file size: 20 MB
+                    </p>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,application/pdf"
+                      onChange={handleFileSelect}
+                    />
                   </label>
                 ) : (
-                  <div className="p-6 bg-sky-50/50 dark:bg-sky-900/10 border-2 border-sky-100 dark:border-sky-800 rounded-[2rem] flex items-center gap-4 relative group">
-                    <div className="h-14 w-14 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-                      <FileText className="w-7 h-7 text-[#28ABDF]" />
+                  <div className="relative p-4 rounded-2xl
+                                  bg-sky-50 dark:bg-sky-900/20
+                                  border border-sky-200
+                                  dark:border-sky-800/60
+                                  flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl
+                                    bg-white dark:bg-slate-800
+                                    flex items-center justify-center
+                                    shadow-sm shrink-0">
+                      <FileText className="w-5 h-5 text-[#28ABDF]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black text-slate-900 dark:text-white truncate">{title}.pdf</p>
-                      <button onClick={() => setFileReady(false)} className="text-[10px] font-black text-[#28ABDF] hover:underline uppercase tracking-widest mt-1">Replace Document</button>
+                      <p className="text-sm font-semibold
+                                    text-slate-800 dark:text-white
+                                    truncate">
+                        {title || 'document'}.pdf
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          revokeBlob(fileUrl);
+                          setFileReady(false);
+                          setFileUrl('');
+                          setRawFile(null);
+                          setFields([]);
+                        }}
+                        className="text-xs text-[#28ABDF]
+                                   hover:underline font-medium mt-0.5"
+                      >
+                        Replace
+                      </button>
                     </div>
-                    <div className="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full shadow-lg">
-                      <CheckCircle2 className="w-4 h-4" />
+                    <div className="absolute -top-2 -right-2
+                                    w-6 h-6 bg-emerald-500 rounded-full
+                                    flex items-center justify-center
+                                    shadow-md">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                     </div>
                   </div>
                 )}
-              </section>
 
-              <section className="space-y-6 pt-10 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
-                    <ImagePlus className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">2. Brand Identity</h3>
+                {/* Title input */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-500
+                                    dark:text-slate-400">
+                    Document Title
+                  </Label>
+                  <Input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder="e.g. Employment Contract 2024"
+                    className="h-10 rounded-xl border-slate-200
+                               dark:border-slate-700 text-sm
+                               focus-visible:ring-[#28ABDF]/30
+                               focus-visible:border-[#28ABDF]"
+                  />
                 </div>
-                
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name</Label>
-                    <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="e.g. Acme Corporation" className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold px-5 focus:ring-[#28ABDF] focus:border-[#28ABDF]" />
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-slate-100
+                              dark:border-slate-800" />
+
+              {/* Brand identity */}
+              <div className="space-y-4">
+                <SectionHeader
+                  icon={Building2}
+                  iconBg="bg-amber-50 dark:bg-amber-900/30"
+                  iconColor="text-amber-500"
+                  title="Brand Identity"
+                  subtitle="Optional — appears in emails"
+                />
+
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-slate-500
+                                      dark:text-slate-400">
+                      Company Name
+                    </Label>
+                    <Input
+                      value={companyName}
+                      onChange={e => setCompanyName(e.target.value)}
+                      placeholder="e.g. Acme Corporation"
+                      className="h-10 rounded-xl border-slate-200
+                                 dark:border-slate-700 text-sm
+                                 focus-visible:ring-[#28ABDF]/30
+                                 focus-visible:border-[#28ABDF]"
+                    />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Logo</Label>
-                    <div className="flex items-center gap-5">
-                      <label className="cursor-pointer h-20 w-20 rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 flex items-center justify-center hover:border-[#28ABDF] transition-all shrink-0 overflow-hidden bg-white dark:bg-slate-800 shadow-sm group">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-slate-500
+                                      dark:text-slate-400">
+                      Company Logo
+                    </Label>
+                    <div className="flex items-center gap-4">
+                      <label className="
+                        relative h-16 w-16 rounded-xl cursor-pointer
+                        border-2 border-dashed
+                        border-slate-200 dark:border-slate-700
+                        flex items-center justify-center shrink-0
+                        overflow-hidden
+                        bg-slate-50 dark:bg-slate-800
+                        hover:border-[#28ABDF] transition-colors group
+                      ">
                         {companyLogoPreview ? (
-                          <img src={companyLogoPreview} alt="Logo" className="h-full w-full object-contain p-2" />
+                          <img
+                            src={companyLogoPreview}
+                            alt="Logo preview"
+                            className="w-full h-full object-contain p-1.5"
+                          />
                         ) : (
-                          <ImagePlus className="w-8 h-8 text-slate-200 group-hover:text-[#28ABDF]" />
+                          <ImagePlus className="w-5 h-5 text-slate-300
+                                                group-hover:text-[#28ABDF]
+                                                transition-colors" />
                         )}
-                        <input type="file" className="hidden" accept="image/*" onChange={handleLogoSelect} />
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleLogoSelect}
+                        />
                       </label>
-                      <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-wider">
-                        Recommended: Transparent PNG.<br/>Will appear in request emails.
-                      </p>
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-slate-600
+                                      dark:text-slate-300">
+                          Upload logo
+                        </p>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          PNG with transparent background recommended.
+                          Shown in signing emails.
+                        </p>
+                        {companyLogoPreview && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              revokeBlob(companyLogoPreview);
+                              setCompanyLogoPreview('');
+                              setCompanyLogoFile(null);
+                            }}
+                            className="text-xs text-red-400
+                                       hover:text-red-500 font-medium"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </section>
+              </div>
             </div>
           )}
 
-          {/* STEP 2: PARTIES */}
+          {/* ╔══════════════════════════════════════════════════════╗
+              STEP 2 — Signing Parties
+          ╚══════════════════════════════════════════════════════╝ */}
           {step === 2 && (
-            <div className="p-8 space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-purple-500" />
-                </div>
-                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Signing Workflow</h3>
-              </div>
+            <div className="p-5 sm:p-6 space-y-5">
+              <SectionHeader
+                icon={Users}
+                iconBg="bg-purple-50 dark:bg-purple-900/30"
+                iconColor="text-purple-500"
+                title="Signing Parties"
+                subtitle="Define who signs and in what order"
+              />
               <PartyManager parties={parties} onChange={setParties} />
             </div>
           )}
 
-          {/* STEP 3: CC */}
+          {/* ╔══════════════════════════════════════════════════════╗
+              STEP 3 — CC Recipients
+          ╚══════════════════════════════════════════════════════╝ */}
           {step === 3 && (
-            <div className="p-8 space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-                  <Mail className="w-5 h-5 text-[#28ABDF]" />
+            <div className="p-5 sm:p-6 space-y-5">
+              <SectionHeader
+                icon={Mail}
+                iconBg="bg-blue-50 dark:bg-blue-900/30"
+                iconColor="text-[#28ABDF]"
+                title="CC Recipients"
+                subtitle="These people receive a copy but don't sign"
+              />
+
+              {/* Add form */}
+              <div className="bg-slate-50 dark:bg-slate-800/60
+                              rounded-2xl p-4 space-y-3
+                              border border-slate-100
+                              dark:border-slate-700">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium
+                                      text-slate-500 dark:text-slate-400">
+                      Full Name
+                    </Label>
+                    <Input
+                      value={ccForm.name}
+                      onChange={e => setCcForm(p => ({
+                        ...p, name: e.target.value,
+                      }))}
+                      placeholder="Jane Smith"
+                      className="h-9 rounded-xl text-sm
+                                 border-slate-200 dark:border-slate-700
+                                 focus-visible:ring-[#28ABDF]/30
+                                 focus-visible:border-[#28ABDF]"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium
+                                      text-slate-500 dark:text-slate-400">
+                      Designation
+                    </Label>
+                    <Input
+                      value={ccForm.designation}
+                      onChange={e => setCcForm(p => ({
+                        ...p, designation: e.target.value,
+                      }))}
+                      placeholder="Manager"
+                      className="h-9 rounded-xl text-sm
+                                 border-slate-200 dark:border-slate-700
+                                 focus-visible:ring-[#28ABDF]/30
+                                 focus-visible:border-[#28ABDF]"
+                    />
+                  </div>
                 </div>
-                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Carbon Copy (CC)</h3>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium
+                                    text-slate-500 dark:text-slate-400">
+                    Email Address
+                  </Label>
+                  <Input
+                    value={ccForm.email}
+                    type="email"
+                    onChange={e => setCcForm(p => ({
+                      ...p, email: e.target.value,
+                    }))}
+                    onKeyDown={e => e.key === 'Enter' && addCc()}
+                    placeholder="jane@company.com"
+                    className="h-9 rounded-xl text-sm
+                               border-slate-200 dark:border-slate-700
+                               focus-visible:ring-[#28ABDF]/30
+                               focus-visible:border-[#28ABDF]"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={addCc}
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-9 rounded-xl text-sm font-medium
+                             border-slate-200 dark:border-slate-700
+                             hover:border-[#28ABDF] hover:text-[#28ABDF]
+                             transition-colors gap-1.5"
+                >
+                  + Add CC Recipient
+                </Button>
               </div>
-              
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</Label>
-                    <Input value={ccName} onChange={e => setCcName(e.target.value)} placeholder="Recipient Name" className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold px-5" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</Label>
-                    <Input value={ccEmail} onChange={e => setCcEmail(e.target.value)} placeholder="email@company.com" className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold px-5" />
-                  </div>
-                </div>
-                <Button onClick={addCc} variant="outline" className="w-full h-12 rounded-2xl border-2 font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">+ Add Recipient</Button>
-                
-                <div className="space-y-3 pt-4">
+
+              {/* CC list */}
+              {ccList.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-400
+                                px-0.5">
+                    {ccList.length} recipient{ccList.length !== 1 ? 's' : ''} added
+                  </p>
                   {ccList.map((cc, i) => (
-                    <div key={i} className="flex items-center justify-between p-5 bg-white dark:bg-slate-800 rounded-[1.5rem] border border-slate-100 dark:border-slate-700 shadow-sm group">
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{cc.name || 'No Name'}</p>
-                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">{cc.email}</p>
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 p-3
+                                 rounded-xl bg-white dark:bg-slate-800
+                                 border border-slate-100
+                                 dark:border-slate-700"
+                    >
+                      <div className="w-8 h-8 rounded-lg
+                                      bg-[#28ABDF]/10 flex items-center
+                                      justify-center shrink-0">
+                        <Mail className="w-3.5 h-3.5 text-[#28ABDF]" />
                       </div>
-                      <button onClick={() => setCcList(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-200 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-5 h-5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold
+                                      text-slate-800 dark:text-white
+                                      truncate">
+                          {cc.name || 'No name'}
+                          {cc.designation && (
+                            <span className="text-slate-400
+                                             font-normal ml-1">
+                              · {cc.designation}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-slate-400
+                                      truncate">
+                          {cc.email}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeCc(i)}
+                        className="p-1 rounded-lg text-slate-300
+                                   hover:text-red-500
+                                   hover:bg-red-50 dark:hover:bg-red-900/20
+                                   transition-colors"
+                        aria-label="Remove"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
+
+              {ccList.length === 0 && (
+                <div className="text-center py-8 text-slate-400">
+                  <Mail className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">No CC recipients yet</p>
+                  <p className="text-xs opacity-70">
+                    CC is optional
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* STEP 4: PDF EDITOR */}
+          {/* ╔══════════════════════════════════════════════════════╗
+              STEP 4 — Field Placement
+          ╚══════════════════════════════════════════════════════╝ */}
           {step === 4 && (
-            <div className="p-8 space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
-                  <PenTool className="w-5 h-5 text-indigo-500" />
-                </div>
-                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Field Placement</h3>
-              </div>
-              
+            <div className="p-5 sm:p-6 space-y-5">
+              <SectionHeader
+                icon={PenTool}
+                iconBg="bg-indigo-50 dark:bg-indigo-900/30"
+                iconColor="text-indigo-500"
+                title="Field Placement"
+                subtitle="Click a field type, then click on the PDF"
+              />
+
               <FieldToolbar
                 parties={parties}
                 selectedPartyIndex={selectedPartyIndex}
                 onPartySelect={setSelectedPartyIndex}
-                onAddField={type => setPendingFieldType(type)}
+                onAddField={type => {
+                  setPendingFieldType(type);
+                  // Auto-switch to viewer on mobile
+                  setMobilePanelView('viewer');
+                }}
               />
 
-              {selectedField?.type === 'text' && (
-                <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Text Configuration</p>
-                  <div className="grid grid-cols-1 gap-3">
-                    <Select value={selectedField.fontFamily || 'Helvetica'} onValueChange={v => updateFieldTypography('fontFamily', v)}>
-                      <SelectTrigger className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold"><SelectValue /></SelectTrigger>
-                      <SelectContent>{FONT_FAMILIES.map(f => (<SelectItem key={f.value} value={f.value} className="font-bold">{f.label}</SelectItem>))}</SelectContent>
-                    </Select>
-                    <Select value={String(selectedField.fontSize || 12)} onValueChange={v => updateFieldTypography('fontSize', Number(v))}>
-                      <SelectTrigger className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold"><SelectValue /></SelectTrigger>
-                      <SelectContent>{FONT_SIZES.map(s => (<SelectItem key={s} value={String(s)} className="font-bold">{s}px</SelectItem>))}</SelectContent>
-                    </Select>
+              {/* Pending field indicator */}
+              {pendingFieldType && (
+                <div className="flex items-center justify-between
+                                p-3 rounded-xl
+                                bg-[#28ABDF]/10
+                                border border-[#28ABDF]/30">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full
+                                    bg-[#28ABDF] animate-ping" />
+                    <p className="text-xs font-semibold text-[#28ABDF]">
+                      Click on PDF to place{' '}
+                      <span className="font-bold capitalize">
+                        {pendingFieldType}
+                      </span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPendingFieldType(null)}
+                    className="text-[#28ABDF] hover:text-sky-700"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Selected field config */}
+              {selectedField && (
+                <div className="space-y-3 pt-4
+                                border-t border-slate-100
+                                dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-600
+                                  dark:text-slate-300 capitalize">
+                      {selectedField.type} field settings
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => removeField(selectedField.id)}
+                      className="text-xs text-red-400 hover:text-red-500
+                                 font-medium flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Remove
+                    </button>
+                  </div>
+
+                  {selectedField.type === 'text' && (
+                    <div className="space-y-2.5">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-slate-400
+                                          font-medium">
+                          Font Family
+                        </Label>
+                        <Select
+                          value={selectedField.fontFamily || 'Helvetica'}
+                          onValueChange={v =>
+                            updateFieldTypography('fontFamily', v)
+                          }
+                        >
+                          <SelectTrigger className="h-9 rounded-xl text-sm
+                                                     border-slate-200
+                                                     dark:border-slate-700">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FONT_FAMILIES.map(f => (
+                              <SelectItem key={f.value} value={f.value}>
+                                {f.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-slate-400
+                                          font-medium">
+                          Font Size
+                        </Label>
+                        <Select
+                          value={String(selectedField.fontSize || 12)}
+                          onValueChange={v =>
+                            updateFieldTypography('fontSize', Number(v))
+                          }
+                        >
+                          <SelectTrigger className="h-9 rounded-xl text-sm
+                                                     border-slate-200
+                                                     dark:border-slate-700">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FONT_SIZES.map(s => (
+                              <SelectItem key={s} value={String(s)}>
+                                {s}px
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Fields summary */}
+              {fields.length > 0 && (
+                <div className="pt-4 border-t border-slate-100
+                                dark:border-slate-800">
+                  <p className="text-xs font-medium text-slate-400 mb-2">
+                    {fields.length} field{fields.length !== 1 ? 's' : ''} placed
+                  </p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {fields.map((f, i) => {
+                      const party = parties[f.partyIndex] || parties[0];
+                      return (
+                        <div
+                          key={f.id}
+                          onClick={() => setSelectedFieldId(f.id)}
+                          className={`flex items-center gap-2 p-2
+                                      rounded-lg cursor-pointer
+                                      transition-colors text-xs
+                                      ${selectedFieldId === f.id
+                                        ? 'bg-[#28ABDF]/10 text-[#28ABDF]'
+                                        : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                      }`}
+                        >
+                          <div
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: party.color }}
+                          />
+                          <span className="capitalize font-medium">
+                            {f.type}
+                          </span>
+                          <span className="text-slate-400 ml-auto">
+                            p.{f.page}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 5: REVIEW */}
+          {/* ╔══════════════════════════════════════════════════════╗
+              STEP 5 — Final Review
+          ╚══════════════════════════════════════════════════════╝ */}
           {step === 5 && (
-            <div className="p-8 space-y-10 animate-in fade-in slide-in-from-left-4 duration-300">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-2xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+            <div className="p-5 sm:p-6 space-y-5">
+              <SectionHeader
+                icon={CheckCircle2}
+                iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+                iconColor="text-emerald-500"
+                title="Final Review"
+                subtitle="Confirm details before sending"
+              />
+
+              {/* Summary card */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl
+                              border border-slate-100 dark:border-slate-700
+                              overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-50
+                                dark:border-slate-700 bg-slate-50/50
+                                dark:bg-slate-800/50">
+                  <p className="text-xs font-semibold text-slate-500
+                                dark:text-slate-400 uppercase
+                                tracking-wide">
+                    Document Summary
+                  </p>
                 </div>
-                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Final Review</h3>
+                <div className="px-4 py-1">
+                  <ReviewRow label="Title" value={title || '—'} />
+                  <ReviewRow
+                    label="Fields"
+                    value={`${fields.length} placed`}
+                    valueClass="text-[#28ABDF]"
+                  />
+                  <ReviewRow
+                    label="CC"
+                    value={`${ccList.length} recipient${ccList.length !== 1 ? 's' : ''}`}
+                  />
+                  {companyName && (
+                    <ReviewRow label="Company" value={companyName} />
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="p-6 bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm space-y-4">
-                  <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-700">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Document</span>
-                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{title}</span>
+              {/* Signers */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-500
+                              dark:text-slate-400 uppercase tracking-wide">
+                  Signing Order ({parties.length})
+                </p>
+                {parties.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 p-3 rounded-xl
+                               bg-white dark:bg-slate-800
+                               border border-slate-100 dark:border-slate-700"
+                  >
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center
+                                  justify-center text-white text-xs
+                                  font-bold shrink-0"
+                      style={{ backgroundColor: p.color }}
+                    >
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-800
+                                    dark:text-white truncate">
+                        {p.name}
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {p.email}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-700">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Signers</span>
-                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{parties.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-700">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fields</span>
-                    <span className="text-xs font-black text-[#28ABDF] uppercase tracking-tight">{fields.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CC Recipients</span>
-                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{ccList.length}</span>
-                  </div>
-                </div>
+                ))}
+              </div>
 
-                <div className="p-6 bg-sky-50/50 dark:bg-sky-900/10 rounded-[2rem] border border-sky-100 dark:border-sky-800 text-center">
-                  <p className="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-[0.15em] leading-relaxed">
-                    Once sent, signers will receive an email in the defined order to securely sign this document.
+              {/* Info box */}
+              <div className="p-4 rounded-2xl
+                              bg-sky-50 dark:bg-sky-900/20
+                              border border-sky-100 dark:border-sky-800">
+                <div className="flex gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-sky-500
+                                          shrink-0 mt-0.5" />
+                  <p className="text-xs text-sky-700 dark:text-sky-400
+                                leading-relaxed">
+                    Signers will receive an email in the defined order.
+                    Once all sign, everyone gets a completed copy.
                   </p>
                 </div>
               </div>
+
+              {/* Send button (also in header, duplicated here for UX) */}
+              <Button
+                onClick={handleSend}
+                disabled={processing || !fileReady}
+                className="w-full h-11 rounded-xl
+                           bg-[#28ABDF] hover:bg-[#2399c8] text-white
+                           font-semibold gap-2 shadow-md shadow-sky-400/25
+                           transition-all hover:-translate-y-0.5
+                           active:translate-y-0
+                           disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {processing
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Send className="w-4 h-4" />
+                }
+                {processing ? 'Sending…' : 'Send for Signing'}
+              </Button>
             </div>
           )}
         </aside>
 
-        {/* CENTER VIEWER (Always visible if PDF exists) */}
-        <section className="flex-1 flex flex-col min-w-0 bg-slate-100 dark:bg-slate-950 order-1 md:order-2">
-          <div className="flex-1 overflow-auto p-4 md:p-12 flex justify-center items-start min-h-0">
-            {fileReady ? (
-              <div className="max-w-full w-fit shadow-2xl shadow-slate-300/50 dark:shadow-black/50 rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800">
+        {/* ── PDF VIEWER ────────────────────────────────────────── */}
+        <section className={`
+          flex-1 flex flex-col min-w-0 overflow-hidden
+          bg-slate-100 dark:bg-slate-950
+          ${step === 4 && mobilePanelView === 'sidebar'
+            ? 'hidden lg:flex'
+            : 'flex'
+          }
+        `}>
+          {fileReady ? (
+            <div className="flex-1 overflow-auto
+                            flex justify-center items-start
+                            p-4 lg:p-8">
+              <div className="shadow-2xl shadow-slate-300/40
+                              dark:shadow-black/60 rounded-xl
+                              overflow-hidden
+                              ring-1 ring-slate-200/80
+                              dark:ring-slate-700/50">
                 <PdfViewer
                   fileUrl={fileUrl}
                   fields={fields}
@@ -451,21 +1264,40 @@ export default function DocumentEditor() {
                   selectedPartyIndex={selectedPartyIndex}
                   pendingFieldType={pendingFieldType}
                   parties={parties}
-                  onFieldPlaced={() => setPendingFieldType(null)}
+                  onFieldPlaced={() => {
+                    setPendingFieldType(null);
+                    setMobilePanelView('sidebar');
+                  }}
                   selectedFieldId={selectedFieldId}
                   onFieldSelect={setSelectedFieldId}
+                  readOnly={step !== 4}
                 />
               </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 px-8 text-center animate-pulse">
-                <FileText className="w-24 h-24 opacity-10 mb-6" />
-                <p className="font-black text-slate-400 dark:text-slate-600 text-2xl uppercase tracking-tighter">
-                  Upload a PDF to begin workspace
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center
+                            justify-center gap-4 p-8 text-center">
+              <div className="w-24 h-24 rounded-3xl
+                              bg-white dark:bg-slate-900
+                              border-2 border-dashed
+                              border-slate-200 dark:border-slate-700
+                              flex items-center justify-center">
+                <FileText className="w-10 h-10 text-slate-200
+                                      dark:text-slate-700" />
+              </div>
+              <div>
+                <p className="text-base font-semibold text-slate-400
+                              dark:text-slate-600 mb-1">
+                  No PDF loaded
+                </p>
+                <p className="text-sm text-slate-300 dark:text-slate-700">
+                  Upload a PDF in Step 1 to preview it here
                 </p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </section>
+
       </main>
     </div>
   );

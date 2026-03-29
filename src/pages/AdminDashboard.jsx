@@ -1290,53 +1290,219 @@
 /**
  * AdminDashboard.jsx — NeXsign Enterprise
  * Optimized: 30s polling (was 10s), separate loading per tab, AbortController
- */
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+ */// src/pages/AdminDashboard.jsx
+import React, {
+  useState, useEffect, useCallback, useMemo, useRef,
+} from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Shield, Users, Clock, Search, Trash2, Loader2,
-  Activity, ChevronLeft, ChevronRight, Calendar, Plus, History, FileText,
-} from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import { toast } from 'sonner';
+import {
+  Shield, Users, Clock, Search, Trash2, Loader2,
+  Activity, ChevronLeft, ChevronRight, Calendar, Plus,
+  History, FileText, RefreshCw, AlertTriangle, CheckCircle,
+  XCircle, Database, BarChart3, Eye,
+} from 'lucide-react';
 
+// ─── tiny helpers (no shadcn dep) ────────────────────────────────────────────
+const cn = (...c) => c.filter(Boolean).join(' ');
 
+const Badge = ({ children, className }) => (
+  <span className={cn(
+    'inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider',
+    className,
+  )}>
+    {children}
+  </span>
+);
+
+// ─── SEO ─────────────────────────────────────────────────────────────────────
+const SEO = ({ title, noIndex }) => {
+  useEffect(() => {
+    document.title = title;
+    if (noIndex) {
+      let m = document.querySelector('meta[name="robots"]');
+      if (!m) { m = document.createElement('meta'); m.name = 'robots'; document.head.appendChild(m); }
+      m.content = 'noindex,nofollow';
+    }
+  }, [title, noIndex]);
+  return null;
+};
+
+// ─── Skeleton primitives ──────────────────────────────────────────────────────
+const Pulse = ({ className }) => (
+  <div className={cn('animate-pulse rounded bg-slate-200 dark:bg-slate-700/60', className)} />
+);
+
+const TableRowSkeleton = ({ cols = 4 }) => (
+  <tr>
+    {Array.from({ length: cols }).map((_, i) => (
+      <td key={i} className="py-5 px-4">
+        <Pulse className={cn('h-4', i === 0 ? 'w-40' : 'w-24')} />
+        {i === 0 && <Pulse className="h-3 w-28 mt-1.5" />}
+      </td>
+    ))}
+  </tr>
+);
+
+const CardSkeleton = () => (
+  <div className="animate-pulse p-5 md:p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl">
+    <div className="flex justify-between items-start mb-6 pb-6 border-b dark:border-slate-800">
+      <div className="space-y-2">
+        <Pulse className="h-6 w-48" />
+        <Pulse className="h-4 w-64" />
+      </div>
+      <Pulse className="h-10 w-24 rounded-2xl" />
+    </div>
+    <div className="grid sm:grid-cols-2 gap-4">
+      <Pulse className="h-24 rounded-2xl" />
+      <Pulse className="h-24 rounded-2xl" />
+    </div>
+  </div>
+);
+
+const StatCardSkeleton = () => (
+  <div className="animate-pulse bg-white dark:bg-slate-900 rounded-[1.5rem] p-6 shadow-md border border-slate-100 dark:border-slate-800">
+    <Pulse className="h-10 w-10 rounded-xl mb-4" />
+    <Pulse className="h-8 w-20 mb-2" />
+    <Pulse className="h-4 w-28" />
+  </div>
+);
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ icon: Icon, label, value, color, loading }) => {
+  const colorMap = {
+    sky:     'bg-sky-50 text-sky-600 dark:bg-sky-900/30',
+    emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30',
+    violet:  'bg-violet-50 text-violet-600 dark:bg-violet-900/30',
+  };
+  if (loading) return <StatCardSkeleton />;
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] p-6 shadow-md border border-slate-100 dark:border-slate-800 hover:shadow-lg transition-shadow">
+      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center mb-4', colorMap[color])}>
+        <Icon size={20} />
+      </div>
+      <p className="text-2xl font-black text-slate-900 dark:text-white">{value ?? '—'}</p>
+      <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mt-1">{label}</p>
+    </div>
+  );
+};
+
+// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
+const DeleteModal = ({ open, onConfirm, onCancel, label }) => {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onCancel}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-sm w-full shadow-2xl border border-slate-100 dark:border-slate-800"
+      >
+        <div className="w-14 h-14 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-5">
+          <AlertTriangle size={26} className="text-red-500" />
+        </div>
+        <h3 className="text-lg font-black text-slate-900 dark:text-white text-center mb-2">
+          Confirm Delete
+        </h3>
+        <p className="text-sm text-slate-400 text-center mb-8">
+          {label} This action <span className="font-black text-red-500">cannot be undone</span>.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 h-12 rounded-2xl border border-slate-200 dark:border-slate-700 text-sm font-black text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 h-12 rounded-2xl bg-red-500 hover:bg-red-600 text-sm font-black text-white transition-colors shadow-lg shadow-red-500/20"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
+const EmptyState = ({ icon: Icon, message }) => (
+  <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300">
+    <Icon size={40} strokeWidth={1.5} />
+    <p className="text-xs font-black uppercase tracking-widest">{message}</p>
+  </div>
+);
+
+// ─── Status badge helper ──────────────────────────────────────────────────────
+const statusCfg = {
+  completed: { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
+  pending:   { label: 'Pending',   cls: 'bg-amber-100  text-amber-700  dark:bg-amber-900/40  dark:text-amber-400'  },
+  declined:  { label: 'Declined',  cls: 'bg-red-100    text-red-700    dark:bg-red-900/40    dark:text-red-400'    },
+  draft:     { label: 'Draft',     cls: 'bg-slate-100  text-slate-600  dark:bg-slate-800     dark:text-slate-400'  },
+};
+const StatusBadge = ({ status }) => {
+  const cfg = statusCfg[status] || statusCfg.draft;
+  return <Badge className={cfg.cls}>{cfg.label}</Badge>;
+};
+
+// ─── TABS config ──────────────────────────────────────────────────────────────
+const TABS = [
+  { val: 'users',     label: 'Users'      },
+  { val: 'documents', label: 'Documents'  },
+  { val: 'logs',      label: 'Audit Logs' },
+];
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ══════════════════════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate  = useNavigate();
-  const abortRef  = useRef(null);
+  const timerRef  = useRef(null);
 
   const [tab, setTab]       = useState('users');
   const [search, setSearch] = useState('');
 
+  // data
   const [users,     setUsers]     = useState([]);
   const [documents, setDocuments] = useState([]);
   const [logs,      setLogs]      = useState([]);
 
+  // loading
   const [loading, setLoading] = useState({ users: true, docs: true, logs: true });
-  const [logPage, setLogPage] = useState(1);
+
+  // pagination (logs)
+  const [logPage,    setLogPage]    = useState(1);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
 
+  // delete modal
+  const [deleteTarget, setDeleteTarget] = useState(null); // { type, id, label }
+
+  // refresh countdown
+  const [refreshIn, setRefreshIn] = useState(30);
+
+  // ── date helper ─────────────────────────────────────────────────────────────
   const safeFormat = (d, f = 'hh:mm aa, d MMM yyyy') => {
     if (!d) return 'N/A';
     const dt = new Date(d);
     return isValid(dt) ? format(dt, f) : 'N/A';
   };
 
+  // ── fetchers ─────────────────────────────────────────────────────────────────
   const fetchUsers = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(p => ({ ...p, users: true }));
     try {
       const res  = await api.get('/admin/users');
-      const data = Array.isArray(res.data) ? res.data : (res.data?.users || []);
+      const data = Array.isArray(res.data) ? res.data : (res.data?.users ?? []);
       setUsers(data);
-    } catch { /* silent */ } finally {
+    } catch {
+      /* silent — toast only on manual refresh */
+    } finally {
       setLoading(p => ({ ...p, users: false }));
     }
   }, []);
@@ -1345,8 +1511,8 @@ export default function AdminDashboard() {
     if (showLoading) setLoading(p => ({ ...p, docs: true }));
     try {
       const res  = await api.get('/admin/documents');
-      const data = Array.isArray(res.data) ? res.data : (res.data?.documents || []);
-      setDocuments(data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      const data = Array.isArray(res.data) ? res.data : (res.data?.documents ?? []);
+      setDocuments([...data].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch { /* silent */ } finally {
       setLoading(p => ({ ...p, docs: false }));
     }
@@ -1356,7 +1522,7 @@ export default function AdminDashboard() {
     if (showLoading) setLoading(p => ({ ...p, logs: true }));
     try {
       const res     = await api.get(`/admin/audit-logs?page=${pageNo}&limit=15`);
-      const logData = res.data?.logs || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      const logData = res.data?.logs ?? res.data?.data ?? (Array.isArray(res.data) ? res.data : []);
       setLogs(logData);
       setHasMoreLogs(logData.length >= 15);
       setLogPage(pageNo);
@@ -1365,50 +1531,92 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const refreshAll = useCallback((showLoading = false) => {
+    fetchUsers(showLoading);
+    fetchDocs(showLoading);
+    fetchLogs(1, showLoading);
+    setRefreshIn(30);
+  }, [fetchUsers, fetchDocs, fetchLogs]);
+
+  // ── countdown + auto-refresh ─────────────────────────────────────────────────
   useEffect(() => {
-    if (authLoading) return;
-    if (!isAdmin)    { navigate('/dashboard'); return; }
-    fetchUsers(true); fetchDocs(true); fetchLogs(1, true);
-    const interval = setInterval(() => {
-      fetchUsers(false); fetchDocs(false); fetchLogs(1, false);
-    }, 30000); // 30s — was 10s (too aggressive)
-    return () => { clearInterval(interval); abortRef.current?.abort(); };
-  }, [isAdmin, authLoading, navigate, fetchUsers, fetchDocs, fetchLogs]);
+    if (authLoading || !isAdmin) return;
 
-  const filteredUsers = useMemo(() =>
-    users.filter(u => !search ||
-      u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      u.email?.toLowerCase().includes(search.toLowerCase())
-    ), [users, search]);
+    // initial load
+    fetchUsers(true);
+    fetchDocs(true);
+    fetchLogs(1, true);
 
-  const filteredDocs = useMemo(() =>
-    documents.filter(d => !search || d.title?.toLowerCase().includes(search.toLowerCase())
-    ), [documents, search]);
+    // countdown tick
+    const tick = setInterval(() => {
+      setRefreshIn(n => {
+        if (n <= 1) { refreshAll(false); return 30; }
+        return n - 1;
+      });
+    }, 1000);
 
-  const filteredLogs = useMemo(() =>
-    logs.filter(l => !search ||
-      l.action?.toLowerCase().includes(search.toLowerCase()) ||
-      l.performed_by?.email?.toLowerCase().includes(search.toLowerCase())
-    ), [logs, search]);
+    timerRef.current = tick;
+    return () => clearInterval(tick);
+  }, [authLoading, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Delete this user? This cannot be undone.')) return;
+  // ── redirect if not admin ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!authLoading && !isAdmin) navigate('/dashboard', { replace: true });
+  }, [authLoading, isAdmin, navigate]);
+
+  // ── filtered lists ────────────────────────────────────────────────────────────
+  const q = search.toLowerCase();
+  const filteredUsers = useMemo(() => users.filter(u =>
+    !q || u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q),
+  ), [users, q]);
+
+  const filteredDocs = useMemo(() => documents.filter(d =>
+    !q || d.title?.toLowerCase().includes(q),
+  ), [documents, q]);
+
+  const filteredLogs = useMemo(() => logs.filter(l =>
+    !q ||
+    l.action?.toLowerCase().includes(q) ||
+    l.performed_by?.email?.toLowerCase().includes(q) ||
+    l.performed_by?.name?.toLowerCase().includes(q),
+  ), [logs, q]);
+
+  // ── delete helpers ────────────────────────────────────────────────────────────
+  const confirmDelete = (type, id, label) => setDeleteTarget({ type, id, label });
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const { type, id } = deleteTarget;
+    setDeleteTarget(null);
+
+    // optimistic remove
+    if (type === 'user') {
+      setUsers(prev => prev.filter(u => u._id !== id));
+    } else {
+      setDocuments(prev => prev.filter(d => d._id !== id));
+    }
+
     try {
-      await api.delete(`/admin/users/${userId}`);
-      setUsers(p => p.filter(u => u._id !== userId));
-      toast.success('User deleted');
-    } catch { toast.error('Deletion failed'); }
+      await api.delete(`/admin/${type === 'user' ? 'users' : 'documents'}/${id}`);
+      toast.success(type === 'user' ? 'User deleted' : 'Document removed');
+    } catch (err) {
+      toast.error('Delete failed — restoring…');
+      // rollback
+      if (type === 'user') fetchUsers(false);
+      else fetchDocs(false);
+    }
   };
 
-  const handleDeleteDoc = async (docId) => {
-    if (!window.confirm('Remove this document permanently?')) return;
-    try {
-      await api.delete(`/admin/documents/${docId}`);
-      setDocuments(p => p.filter(d => d._id !== docId));
-      toast.success('Document removed');
-    } catch { toast.error('Delete failed'); }
+  // ── manual refresh ────────────────────────────────────────────────────────────
+  const handleManualRefresh = () => {
+    setLoading({ users: true, docs: true, logs: true });
+    refreshAll(true);
+    toast.success('Data refreshed');
   };
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // AUTH LOADING SCREEN
+  // ══════════════════════════════════════════════════════════════════════════════
   if (authLoading) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-950">
       <Loader2 className="animate-spin text-sky-600 w-10 h-10" />
@@ -1416,246 +1624,424 @@ export default function AdminDashboard() {
     </div>
   );
 
-  const isTabLoading = loading[tab === 'documents' ? 'docs' : tab === 'users' ? 'users' : 'logs'];
+  const anyLoading = loading.users || loading.docs || loading.logs;
+  const tabLoading = tab === 'users' ? loading.users : tab === 'documents' ? loading.docs : loading.logs;
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════════════════════════
   return (
     <>
-      <SEO title="Admin Console — NeXsign" noIndex />
-      <div className="w-full mx-auto px-4 md:px-8 py-8 bg-[#F8FAFC] dark:bg-slate-950 min-h-screen">
+      <SEO title="Admin Console — NexSign" noIndex />
 
-        {/* Header */}
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-5 mb-10">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Shield className="text-sky-600 w-4 h-4" />
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sky-600">Admin Environment</span>
+      <DeleteModal
+        open={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        label={deleteTarget?.label}
+      />
+
+      <div className="w-full min-h-screen bg-[#F8FAFC] dark:bg-slate-950 px-4 md:px-8 py-8">
+        <div className="max-w-[1600px] mx-auto space-y-8">
+
+          {/* ── Header ─────────────────────────────────────────────────────── */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Shield className="text-sky-600 w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sky-600">
+                  Admin Environment
+                </span>
+              </div>
+              <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Management Console
+              </h1>
+              <p className="text-sm text-slate-400 mt-1">
+                Logged in as&nbsp;
+                <span className="font-bold text-slate-600 dark:text-slate-300">{user?.email}</span>
+              </p>
             </div>
-            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Management Console</h1>
-          </div>
-          <div className="flex gap-3">
-            <Link to="/DocumentEditor">
-              <Button className="bg-sky-600 hover:bg-sky-700 text-white rounded-2xl px-6 h-12 font-black shadow-xl gap-2">
-                <Plus className="w-5 h-5" /> New Doc
-              </Button>
-            </Link>
-            <Button
-              onClick={() => { fetchUsers(true); fetchDocs(true); fetchLogs(1, true); }}
-              variant="outline"
-              className="rounded-2xl px-5 h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 gap-2">
-              <Activity size={17} className={`text-emerald-500 ${isTabLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
-        </div>
 
-        <Tabs value={tab} onValueChange={v => { setTab(v); setSearch(''); }} className="max-w-[1600px] mx-auto space-y-6">
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* refresh countdown pill */}
+              <div className="flex items-center gap-1.5 px-4 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <Clock size={13} className="text-sky-400" />
+                Auto-refresh in {refreshIn}s
+              </div>
 
-          <TabsList className="bg-slate-200/40 dark:bg-slate-900/50 p-1.5 rounded-[20px] w-full md:w-fit border">
-            {[
-              { val: 'users',     label: 'Users'     },
-              { val: 'documents', label: 'Documents' },
-              { val: 'logs',      label: 'Audit Logs'},
-            ].map(t => (
-              <TabsTrigger key={t.val} value={t.val}
-                className="px-7 md:px-10 py-3 text-[10px] font-black uppercase tracking-widest data-[state=active]:text-sky-600 rounded-[16px]">
+              <button
+                onClick={handleManualRefresh}
+                className="flex items-center gap-2 px-5 h-10 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-black text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
+              >
+                <RefreshCw size={15} className={cn('text-emerald-500', anyLoading && 'animate-spin')} />
+                Refresh
+              </button>
+
+              <Link to="/document-editor">
+                <button className="flex items-center gap-2 px-6 h-10 rounded-2xl bg-sky-600 hover:bg-sky-700 text-sm font-black text-white transition-colors shadow-lg shadow-sky-500/25">
+                  <Plus size={16} /> New Doc
+                </button>
+              </Link>
+            </div>
+          </div>
+
+          {/* ── Stats row ──────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard icon={Users}    label="Total Users"     value={users.length}     color="sky"     loading={loading.users} />
+            <StatCard icon={FileText} label="Total Documents" value={documents.length} color="emerald" loading={loading.docs}  />
+            <StatCard icon={History}  label="Audit Events"    value={logs.length}      color="violet"  loading={loading.logs}  />
+          </div>
+
+          {/* ── Tabs ───────────────────────────────────────────────────────── */}
+          <div className="flex gap-1 bg-slate-100 dark:bg-slate-900/60 p-1.5 rounded-[1.5rem] w-full md:w-fit border border-slate-200 dark:border-slate-800">
+            {TABS.map(t => (
+              <button
+                key={t.val}
+                onClick={() => { setTab(t.val); setSearch(''); }}
+                className={cn(
+                  'px-7 md:px-10 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-[1.2rem] transition-all',
+                  tab === t.val
+                    ? 'bg-white dark:bg-slate-800 text-sky-600 shadow-md'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300',
+                )}
+              >
                 {t.label}
-              </TabsTrigger>
+              </button>
             ))}
-          </TabsList>
-
-          {/* Search */}
-          <div className="bg-white dark:bg-slate-900 p-3 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-              <Input
-                placeholder={`Search ${tab}…`}
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-12 border-none bg-transparent h-12 text-base focus-visible:ring-0 font-medium"
-              />
-            </div>
-            {isTabLoading && <Loader2 className="animate-spin text-sky-500 mr-3 w-4 h-4" />}
           </div>
 
-          {/* Users tab */}
+          {/* ── Search bar ─────────────────────────────────────────────────── */}
+          <div className="flex items-center gap-3 bg-white dark:bg-slate-900 px-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm h-14">
+            <Search size={16} className="text-slate-300 flex-shrink-0" />
+            <input
+              type="text"
+              placeholder={`Search ${tab}…`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 bg-transparent h-full text-sm font-medium text-slate-700 dark:text-slate-200 placeholder:text-slate-300 outline-none"
+            />
+            {tabLoading && <Loader2 size={16} className="animate-spin text-sky-400 flex-shrink-0" />}
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="text-xs font-black text-slate-300 hover:text-slate-500 transition-colors uppercase tracking-wider flex-shrink-0"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              TAB: USERS
+          ══════════════════════════════════════════════════════════════════ */}
           {tab === 'users' && (
-            <Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-6 md:p-8">
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden">
+
               {/* Desktop table */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b-2 dark:border-slate-800">
-                      <th className="pb-5 px-4">User</th>
-                      <th className="pb-5 px-4">Role</th>
-                      <th className="pb-5 px-4">Joined</th>
-                      <th className="pb-5 px-4 text-right">Action</th>
+                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-slate-100 dark:border-slate-800">
+                      {['User', 'Role', 'Joined', 'Action'].map(h => (
+                        <th key={h} className={cn('py-5 px-6', h === 'Action' && 'text-right')}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y dark:divide-slate-800">
-                    {filteredUsers.map(u => (
-                      <tr key={u._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all">
-                        <td className="py-5 px-4">
-                          <div className="font-bold text-slate-900 dark:text-white">{u.full_name}</div>
-                          <div className="text-xs text-slate-400">{u.email}</div>
-                        </td>
-                        <td className="py-5 px-4">
-                          <Badge variant="outline" className="text-[9px] font-black px-3 py-1 border-slate-200 text-sky-600">{u.role}</Badge>
-                        </td>
-                        <td className="py-5 px-4 text-[11px] font-black text-slate-500">{safeFormat(u.createdAt, 'd MMM, yyyy')}</td>
-                        <td className="py-5 px-4 text-right">
-                          {u.role !== 'super_admin' && (
-                            <Button onClick={() => handleDeleteUser(u._id)}
-                              className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl h-10 w-10 p-0 bg-transparent">
-                              <Trash2 size={18} />
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
+                    {loading.users
+                      ? Array.from({ length: 6 }).map((_, i) => <TableRowSkeleton key={i} cols={4} />)
+                      : filteredUsers.map(u => (
+                          <tr key={u._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors group">
+                            <td className="py-5 px-6">
+                              <div className="flex items-center gap-3">
+                                {/* avatar */}
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 flex items-center justify-center text-white text-sm font-black flex-shrink-0">
+                                  {u.full_name?.[0]?.toUpperCase() ?? 'U'}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-slate-900 dark:text-white text-sm leading-tight">
+                                    {u.full_name}
+                                  </p>
+                                  <p className="text-[11px] text-slate-400 leading-tight">{u.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-5 px-6">
+                              <Badge className={cn(
+                                'border',
+                                u.role === 'super_admin'
+                                  ? 'bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-900/30 dark:border-violet-800'
+                                  : u.role === 'admin'
+                                    ? 'bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-900/30 dark:border-sky-800'
+                                    : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:border-slate-700',
+                              )}>
+                                {u.role}
+                              </Badge>
+                            </td>
+                            <td className="py-5 px-6 text-[11px] font-bold text-slate-500">
+                              {safeFormat(u.createdAt, 'd MMM, yyyy')}
+                            </td>
+                            <td className="py-5 px-6 text-right">
+                              {u.role !== 'super_admin' && (
+                                <button
+                                  onClick={() => confirmDelete('user', u._id, `Delete "${u.full_name}"?`)}
+                                  className="h-9 w-9 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors inline-flex items-center justify-center"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
                   </tbody>
                 </table>
               </div>
-              {/* Mobile cards */}
-              <div className="md:hidden space-y-3">
-                {filteredUsers.map(u => (
-                  <div key={u._id} className="p-4 border dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950/40">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <p className="font-bold text-slate-900 dark:text-white text-sm">{u.full_name}</p>
-                        <p className="text-xs text-slate-400">{u.email}</p>
-                      </div>
-                      <Badge className="text-[9px] font-black">{u.role}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-500">{safeFormat(u.createdAt, 'd MMM, yyyy')}</span>
-                      {u.role !== 'super_admin' && (
-                        <Button onClick={() => handleDeleteUser(u._id)} variant="ghost" className="text-red-400 p-0 h-8 w-8">
-                          <Trash2 size={15} />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {filteredUsers.length === 0 && !loading.users && (
-                <p className="text-center py-12 text-slate-400 font-bold uppercase text-xs">No users found</p>
-              )}
-            </Card>
-          )}
 
-          {/* Documents tab */}
-          {tab === 'documents' && (
-            <div className="space-y-5">
-              {filteredDocs.length === 0 && !loading.docs ? (
-                <Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl p-10 text-center text-slate-400 font-bold uppercase text-xs">
-                  No Documents Found
-                </Card>
-              ) : filteredDocs.map(d => (
-                <Card key={d._id} className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-5 md:p-8">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b dark:border-slate-800 pb-6">
-                    <div>
-                      <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white mb-1">{d.title}</h2>
-                      <div className="flex flex-wrap gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        <span className="flex items-center gap-1.5"><Users size={11} className="text-sky-500" /> {d.owner?.full_name || 'System'}</span>
-                        <span className="flex items-center gap-1.5"><Calendar size={11} className="text-sky-500" /> {safeFormat(d.createdAt)}</span>
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                {loading.users
+                  ? Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="p-4 animate-pulse flex gap-3">
+                        <Pulse className="w-10 h-10 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-2 py-1">
+                          <Pulse className="h-4 w-32" />
+                          <Pulse className="h-3 w-44" />
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      {d.status === 'completed' && (
-                        <Button onClick={() => window.open(d.fileUrl, '_blank')}
-                          className="flex-1 sm:flex-none bg-white dark:bg-slate-800 text-sky-600 border border-sky-100 h-10 px-5 rounded-2xl font-black text-sm gap-1.5">
-                          <FileText size={14} /> View PDF
-                        </Button>
-                      )}
-                      <Badge className={`px-4 h-10 rounded-2xl justify-center text-[10px] font-black uppercase flex-1 sm:flex-none ${
-                        d.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-sky-500 text-white'
-                      }`}>
-                        {d.status}
-                      </Badge>
-                      <Button onClick={() => handleDeleteDoc(d._id)} variant="ghost"
-                        className="h-10 w-10 rounded-2xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
-                        <Trash2 size={18} />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {d.parties?.map((p, i) => (
-                      <div key={i} className="p-4 border border-slate-50 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950/40">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-black text-slate-900 dark:text-slate-100 text-sm">{p.name}</span>
-                          <Badge variant="outline" className={`text-[9px] font-black px-2.5 py-0.5 ${p.status === 'signed' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                            {p.status}
-                          </Badge>
+                    ))
+                  : filteredUsers.map(u => (
+                      <div key={u._id} className="p-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 flex items-center justify-center text-white text-sm font-black flex-shrink-0">
+                              {u.full_name?.[0]?.toUpperCase() ?? 'U'}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-sm text-slate-900 dark:text-white truncate">{u.full_name}</p>
+                              <p className="text-[11px] text-slate-400 truncate">{u.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Badge className="bg-slate-100 text-slate-500 dark:bg-slate-800">{u.role}</Badge>
+                            {u.role !== 'super_admin' && (
+                              <button
+                                onClick={() => confirmDelete('user', u._id, `Delete "${u.full_name}"?`)}
+                                className="h-8 w-8 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors inline-flex items-center justify-center"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 font-bold uppercase">
-                          <div><span className="block">IP</span><span className="text-slate-700 dark:text-slate-300 truncate block">{p.ipAddress || '—'}</span></div>
-                          <div><span className="block">Location</span><span className="text-slate-700 dark:text-slate-300 truncate block">{p.location || '—'}</span></div>
-                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 mt-2 ml-12">
+                          Joined {safeFormat(u.createdAt, 'd MMM, yyyy')}
+                        </p>
                       </div>
                     ))}
-                  </div>
-                </Card>
-              ))}
+              </div>
+
+              {!loading.users && filteredUsers.length === 0 && (
+                <EmptyState icon={Users} message="No users found" />
+              )}
             </div>
           )}
 
-          {/* Audit Logs tab */}
+          {/* ══════════════════════════════════════════════════════════════════
+              TAB: DOCUMENTS
+          ══════════════════════════════════════════════════════════════════ */}
+          {tab === 'documents' && (
+            <div className="space-y-5">
+              {loading.docs
+                ? Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)
+                : filteredDocs.length === 0
+                  ? (
+                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-xl">
+                      <EmptyState icon={FileText} message="No documents found" />
+                    </div>
+                  )
+                  : filteredDocs.map(d => (
+                      <div
+                        key={d._id}
+                        className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden p-5 md:p-8 hover:shadow-2xl transition-shadow"
+                      >
+                        {/* doc header */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-6 border-b border-slate-100 dark:border-slate-800">
+                          <div className="min-w-0 flex-1">
+                            <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white mb-1.5 truncate">
+                              {d.title}
+                            </h2>
+                            <div className="flex flex-wrap gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                              <span className="flex items-center gap-1.5">
+                                <Users size={11} className="text-sky-500" />
+                                {d.owner?.full_name || d.owner?.name || 'System'}
+                              </span>
+                              <span className="flex items-center gap-1.5">
+                                <Calendar size={11} className="text-sky-500" />
+                                {safeFormat(d.createdAt)}
+                              </span>
+                              <span className="flex items-center gap-1.5">
+                                <Users size={11} className="text-violet-400" />
+                                {d.parties?.length ?? 0} parties
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
+                            {d.fileUrl && (
+                              <a
+                                href={d.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 h-10 px-4 rounded-2xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 text-sky-600 text-xs font-black hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors"
+                              >
+                                <Eye size={13} /> View PDF
+                              </a>
+                            )}
+                            <StatusBadge status={d.status} />
+                            <button
+                              onClick={() => confirmDelete('doc', d._id, `Remove "${d.title}"?`)}
+                              className="h-10 w-10 rounded-2xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors inline-flex items-center justify-center flex-shrink-0"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* parties grid */}
+                        {d.parties?.length > 0 && (
+                          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                            {d.parties.map((p, i) => (
+                              <div
+                                key={i}
+                                className="p-4 bg-slate-50 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800"
+                              >
+                                <div className="flex justify-between items-center mb-3">
+                                  <span className="font-black text-slate-900 dark:text-slate-100 text-sm truncate flex-1 mr-2">
+                                    {p.name}
+                                  </span>
+                                  <Badge className={cn(
+                                    p.status === 'signed'
+                                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                      : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+                                  )}>
+                                    {p.status}
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 font-bold uppercase">
+                                  <div>
+                                    <span className="block text-slate-300 mb-0.5">IP</span>
+                                    <span className="text-slate-600 dark:text-slate-300 truncate block">
+                                      {p.ipAddress || '—'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-300 mb-0.5">Location</span>
+                                    <span className="text-slate-600 dark:text-slate-300 truncate block">
+                                      {p.location || '—'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════════
+              TAB: AUDIT LOGS
+          ══════════════════════════════════════════════════════════════════ */}
           {tab === 'logs' && (
-            <Card className="rounded-[2rem] border-none bg-white dark:bg-slate-900 shadow-xl overflow-hidden p-5 md:p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <History className="text-sky-500" size={22} />
-                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Audit Trail</h3>
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden">
+
+              <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                <History className="text-sky-500" size={20} />
+                <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                  Audit Trail
+                </h3>
+                <Badge className="ml-auto bg-slate-100 text-slate-500 dark:bg-slate-800">
+                  Page {logPage}
+                </Badge>
               </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[560px]">
                   <thead>
-                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b-2 dark:border-slate-800">
-                      <th className="pb-5 px-4">Performed By</th>
-                      <th className="pb-5 px-4">Action</th>
-                      <th className="pb-5 px-4">Timestamp</th>
-                      <th className="pb-5 px-4 text-right">Status</th>
+                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                      {['Performed By', 'Action', 'Timestamp', 'Status'].map(h => (
+                        <th key={h} className={cn('py-4 px-6', h === 'Status' && 'text-right')}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y dark:divide-slate-800">
-                    {filteredLogs.map((log, i) => (
-                      <tr key={log._id || i} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all">
-                        <td className="py-5 px-4">
-                          <div className="font-bold text-slate-900 dark:text-white text-sm">{log.performed_by?.name || 'System'}</div>
-                          <div className="text-[10px] text-slate-400">{log.performed_by?.email || 'automated@system.com'}</div>
-                        </td>
-                        <td className="py-5 px-4">
-                          <Badge className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-none uppercase px-2.5">
-                            {log.action}
-                          </Badge>
-                        </td>
-                        <td className="py-5 px-4 text-[11px] font-black text-slate-500">{safeFormat(log.timestamp || log.createdAt)}</td>
-                        <td className="py-5 px-4 text-right">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 inline-block shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                        </td>
-                      </tr>
-                    ))}
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
+                    {loading.logs
+                      ? Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} cols={4} />)
+                      : filteredLogs.map((log, i) => (
+                          <tr
+                            key={log._id || i}
+                            className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors"
+                          >
+                            <td className="py-5 px-6">
+                              <p className="font-bold text-slate-900 dark:text-white text-sm leading-tight">
+                                {log.performed_by?.name || log.signerName || 'System'}
+                              </p>
+                              <p className="text-[10px] text-slate-400 leading-tight mt-0.5">
+                                {log.performed_by?.email || 'automated@system'}
+                              </p>
+                            </td>
+                            <td className="py-5 px-6">
+                              <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-none">
+                                {log.action?.replace(/_/g, ' ')}
+                              </Badge>
+                            </td>
+                            <td className="py-5 px-6 text-[11px] font-bold text-slate-500">
+                              {safeFormat(log.timestamp || log.createdAt)}
+                            </td>
+                            <td className="py-5 px-6 text-right">
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
+                                OK
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
                   </tbody>
                 </table>
               </div>
+
+              {!loading.logs && filteredLogs.length === 0 && (
+                <EmptyState icon={History} message="No audit events found" />
+              )}
+
               {/* Pagination */}
-              <div className="mt-8 pt-6 border-t dark:border-slate-800 flex justify-between items-center">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Page {logPage}</span>
-                <div className="flex gap-3">
-                  <Button onClick={() => fetchLogs(logPage - 1, true)} disabled={logPage === 1}
-                    variant="outline" className="rounded-xl h-10 w-10 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0">
-                    <ChevronLeft size={18} />
-                  </Button>
-                  <Button onClick={() => fetchLogs(logPage + 1, true)} disabled={!hasMoreLogs}
-                    variant="outline" className="rounded-xl h-10 w-10 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0">
-                    <ChevronRight size={18} />
-                  </Button>
+              <div className="px-6 md:px-8 py-5 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Showing {filteredLogs.length} events
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => fetchLogs(logPage - 1, true)}
+                    disabled={logPage === 1}
+                    className="h-10 w-10 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors inline-flex items-center justify-center"
+                  >
+                    <ChevronLeft size={16} className="text-slate-500" />
+                  </button>
+                  <button
+                    onClick={() => fetchLogs(logPage + 1, true)}
+                    disabled={!hasMoreLogs}
+                    className="h-10 w-10 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors inline-flex items-center justify-center"
+                  >
+                    <ChevronRight size={16} className="text-slate-500" />
+                  </button>
                 </div>
               </div>
-            </Card>
+            </div>
           )}
 
-        </Tabs>
-      </div>
+        </div>{/* /max-w wrapper */}
+      </div>{/* /page */}
     </>
   );
 }

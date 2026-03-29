@@ -1,57 +1,170 @@
 // src/components/dashboard/DocumentCard.jsx
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
-  FileText, ArrowRight, Clock,
-  CheckCircle2, AlertCircle, Pencil, Layout,
+  FileText, ArrowRight, Clock, CheckCircle2,
+  AlertCircle, Pencil, Layout, Download, Eye,
+  XCircle, Users,
 } from 'lucide-react';
 
-const statusConfig = {
+// ─── cn helper ───────────────────────────────────────────────────
+const cn = (...c) => c.filter(Boolean).join(' ');
+
+// ─── Status config ────────────────────────────────────────────────
+const STATUS = {
   draft: {
     label: 'Draft',
-    color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
     icon: Pencil,
+    card:  'border-slate-200 dark:border-slate-800',
+    badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    icon_bg: 'bg-slate-100 dark:bg-slate-800',
+    icon_color: 'text-slate-500',
+    bar: 'from-slate-300 to-slate-400',
   },
   pending: {
     label: 'Pending',
-    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
     icon: Clock,
+    card:  'border-amber-200/60 dark:border-amber-900/40',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    icon_bg: 'bg-amber-50 dark:bg-amber-900/20',
+    icon_color: 'text-amber-500',
+    bar: 'from-amber-400 to-amber-500',
   },
   in_progress: {
     label: 'In Progress',
-    color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
     icon: Clock,
+    card:  'border-sky-200/60 dark:border-sky-900/40',
+    badge: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+    icon_bg: 'bg-sky-50 dark:bg-sky-900/20',
+    icon_color: 'text-sky-500',
+    bar: 'from-sky-400 to-sky-500',
   },
   completed: {
     label: 'Completed',
-    color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
     icon: CheckCircle2,
+    card:  'border-emerald-200/60 dark:border-emerald-900/40',
+    badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    icon_bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+    icon_color: 'text-emerald-500',
+    bar: 'from-emerald-400 to-emerald-500',
+  },
+  declined: {
+    label: 'Declined',
+    icon: XCircle,
+    card:  'border-red-200/60 dark:border-red-900/40',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    icon_bg: 'bg-red-50 dark:bg-red-900/20',
+    icon_color: 'text-red-500',
+    bar: 'from-red-400 to-red-500',
   },
   cancelled: {
     label: 'Cancelled',
-    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
     icon: AlertCircle,
+    card:  'border-red-200/60 dark:border-red-900/40',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    icon_bg: 'bg-red-50 dark:bg-red-900/20',
+    icon_color: 'text-red-500',
+    bar: 'from-red-400 to-red-500',
   },
   template: {
     label: 'Template',
-    color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
     icon: Layout,
+    card:  'border-violet-200/60 dark:border-violet-900/40',
+    badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+    icon_bg: 'bg-violet-50 dark:bg-violet-900/20',
+    icon_color: 'text-violet-500',
+    bar: 'from-violet-400 to-violet-500',
   },
 };
 
-const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
+// ─── Party colors ─────────────────────────────────────────────────
+const PARTY_COLORS = [
+  '#0ea5e9', '#8b5cf6', '#f59e0b',
+  '#10b981', '#ef4444', '#ec4899',
+];
 
+// ─── Tooltip wrapper ──────────────────────────────────────────────
+const Tooltip = ({ label, children }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      {children}
+      {show && label && (
+        <div className="absolute -top-9 left-1/2 -translate-x-1/2 px-2.5 py-1 bg-slate-900 dark:bg-slate-700 text-white text-[10px] font-bold rounded-lg whitespace-nowrap pointer-events-none z-20 shadow-xl">
+          {label}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900 dark:border-t-slate-700" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Avatar stack ─────────────────────────────────────────────────
+const AvatarStack = ({ parties }) => (
+  <div className="flex items-center gap-1.5">
+    <div className="flex -space-x-2.5">
+      {parties.slice(0, 4).map((p, i) => (
+        <Tooltip key={i} label={p.name || `Party ${i + 1}`}>
+          <div
+            className={cn(
+              'w-8 h-8 rounded-full border-2 border-white dark:border-slate-900',
+              'flex items-center justify-center text-[10px] font-black text-white',
+              'shadow-sm ring-1 ring-black/5',
+              'transition-transform duration-150 hover:scale-110 hover:z-10 cursor-default',
+              p.status === 'signed' && 'ring-2 ring-emerald-400 ring-offset-1',
+            )}
+            style={{ backgroundColor: PARTY_COLORS[i % PARTY_COLORS.length] }}
+          >
+            {p.name?.charAt(0).toUpperCase() || 'P'}
+          </div>
+        </Tooltip>
+      ))}
+      {parties.length > 4 && (
+        <div className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black text-slate-500 dark:text-slate-400 shadow-sm">
+          +{parties.length - 4}
+        </div>
+      )}
+    </div>
+    <span className="text-[10px] font-bold text-slate-400 ml-1">
+      {parties.length} {parties.length === 1 ? 'party' : 'parties'}
+    </span>
+  </div>
+);
+
+// ─── Action buttons ───────────────────────────────────────────────
+const ActionBtn = ({ onClick, variant = 'default', children, className }) => {
+  const base = 'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-150 active:scale-[0.97]';
+  const variants = {
+    default:   'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
+    primary:   'bg-sky-500 hover:bg-sky-600 text-white shadow-md shadow-sky-500/20',
+    ghost:     'bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-800',
+    success:   'bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800',
+  };
+  return (
+    <button onClick={onClick} className={cn(base, variants[variant], className)}>
+      {children}
+    </button>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ════════════════════════════════════════════════════════════════
 const DocumentCard = React.memo(({ doc }) => {
   const navigate = useNavigate();
-  const parties  = doc.parties || [];
+  const parties  = doc?.parties || [];
 
-  const config = useMemo(() => {
-    if (doc.isTemplate) return statusConfig.template;
-    return statusConfig[doc.status] || statusConfig.draft;
+  // ── Derived state ──────────────────────────────────────────────
+  const cfg = useMemo(() => {
+    if (doc.isTemplate) return STATUS.template;
+    return STATUS[doc.status] || STATUS.draft;
   }, [doc.status, doc.isTemplate]);
+
+  const StatusIcon = cfg.icon;
 
   const progress = useMemo(() => {
     if (!parties.length) return 0;
@@ -59,163 +172,188 @@ const DocumentCard = React.memo(({ doc }) => {
     return Math.round((signed / parties.length) * 100);
   }, [parties]);
 
+  const signedCount = useMemo(
+    () => parties.filter(p => p.status === 'signed').length,
+    [parties],
+  );
+
   const currentSigner = useMemo(() => {
     if (doc.status !== 'in_progress' || doc.isTemplate) return null;
     return parties.find(p => p.status !== 'signed') || null;
   }, [parties, doc.status, doc.isTemplate]);
 
   const formattedDate = useMemo(() => {
-    const dateStr = doc.createdAt || doc.updatedAt;
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return !isNaN(date) 
-      ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-      : '';
+    const d = new Date(doc.createdAt || doc.updatedAt);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    });
   }, [doc.createdAt, doc.updatedAt]);
 
-  const handleAction = useCallback((e) => {
-    e.stopPropagation();
-    if (doc.isTemplate) {
-      navigate(`/templates/${doc._id}`);
-    } else if (doc.status === 'draft') {
-      navigate(`/DocumentEditor?id=${doc._id}`);
-    } else {
-      navigate(`/audit/${doc._id}`);
-    }
+  // ── Handlers ───────────────────────────────────────────────────
+  const handleCardClick = useCallback(() => {
+    if (doc.isTemplate) return navigate(`/templates/${doc._id}`);
+    if (doc.status === 'draft') return navigate(`/document-editor?id=${doc._id}`);
+    navigate(`/documents/${doc._id}`);
   }, [doc, navigate]);
 
-  const handleView = useCallback((e) => {
-    e.stopPropagation();
-    if (doc.signedFileUrl) {
-      window.open(doc.signedFileUrl, '_blank');
-    }
-  }, [doc.signedFileUrl]);
+  const stop = (fn) => (e) => { e.stopPropagation(); fn(e); };
 
-  const handleDownload = useCallback((e) => {
-    e.stopPropagation();
-    if (doc.signedFileUrl) {
-      const link = document.createElement('a');
-      link.href = doc.signedFileUrl;
-      link.download = `${doc.title || 'signed_document'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  }, [doc.signedFileUrl, doc.title]);
+  const handleView = stop(() => {
+    if (doc.signedFileUrl) window.open(doc.signedFileUrl, '_blank');
+  });
 
+  const handleDownload = stop(() => {
+    if (!doc.signedFileUrl) return;
+    const a = document.createElement('a');
+    a.href     = doc.signedFileUrl;
+    a.download = `${doc.title || 'document'}.pdf`;
+    a.click();
+  });
+
+  const handleAction = stop(handleCardClick);
+
+  // ── Render ─────────────────────────────────────────────────────
   return (
-    <Card 
-      onClick={handleAction}
-      className="group relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm cursor-pointer rounded-[2.5rem] p-6 md:p-8"
+    <div
+      onClick={handleCardClick}
+      className={cn(
+        'group relative flex flex-col bg-white dark:bg-slate-900',
+        'rounded-3xl border-2 cursor-pointer',
+        'transition-all duration-250',
+        'hover:shadow-xl hover:shadow-slate-200/60 dark:hover:shadow-slate-900/60',
+        'hover:-translate-y-0.5',
+        cfg.card,
+      )}
     >
-      <div className="flex flex-col h-full">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl transition-colors duration-300 ${config.color.split(' ')[0]} bg-opacity-20 group-hover:bg-opacity-30`}>
-              <FileText className={`w-6 h-6 ${config.color.split(' ')[1]}`} />
+      {/* Completed top accent line */}
+      {doc.status === 'completed' && (
+        <div className="absolute top-0 left-6 right-6 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full" />
+      )}
+
+      <div className="p-5 sm:p-6 flex flex-col gap-5 h-full">
+
+        {/* ── Header ───────────────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-3">
+          {/* Icon + title */}
+          <div className="flex items-start gap-3.5 min-w-0 flex-1">
+            <div className={cn(
+              'w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 mt-0.5',
+              cfg.icon_bg,
+            )}>
+              <StatusIcon size={18} className={cfg.icon_color} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white truncate group-hover:text-[#28ABDF] transition-colors uppercase tracking-tight">
-                {doc.title || 'Untitled'}
+              <h3 className="text-sm font-black text-slate-900 dark:text-white truncate group-hover:text-sky-500 transition-colors duration-200 leading-snug">
+                {doc.title || 'Untitled Document'}
               </h3>
-              <div className="flex items-center gap-2 mt-1">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  {formattedDate}
-                </p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <Clock size={11} className="text-slate-400 flex-shrink-0" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {formattedDate || 'No date'}
+                </span>
               </div>
             </div>
           </div>
-          <Badge className={`rounded-xl px-4 py-1.5 text-[10px] font-black uppercase tracking-widest ${config.color} border-none`}>
-            {config.label}
-          </Badge>
+
+          {/* Status badge */}
+          <span className={cn(
+            'flex-shrink-0 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider',
+            cfg.badge,
+          )}>
+            {cfg.label}
+          </span>
         </div>
 
-        <div className="flex-1 space-y-6">
-          {/* Progress Bar */}
-          {!doc.isTemplate && parties.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                <span className="text-slate-400">Signing Progress</span>
-                <span className="text-[#28ABDF]">{progress}%</span>
-              </div>
-              <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
-                <div 
-                  className="h-full bg-[#28ABDF] rounded-full transition-all duration-700 ease-in-out shadow-[0_0_15px_rgba(40,171,223,0.3)]"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+        {/* ── Progress bar ─────────────────────────────────────── */}
+        {!doc.isTemplate && parties.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Signing Progress
+              </span>
+              <span className="text-[10px] font-black text-slate-600 dark:text-slate-300">
+                {signedCount}/{parties.length} signed · {progress}%
+              </span>
             </div>
-          )}
-
-          {/* Parties Avatars */}
-          <div className="flex items-center justify-between pt-4 border-t dark:border-slate-800">
-            <div className="flex -space-x-3">
-              {parties.slice(0, 4).map((p, i) => (
-                <div 
-                  key={i}
-                  className="w-10 h-10 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center text-[11px] font-black text-white shadow-md ring-1 ring-slate-100 dark:ring-slate-800 transition-transform hover:scale-110 hover:z-10"
-                  style={{ backgroundColor: PARTY_COLORS[i % PARTY_COLORS.length] }}
-                  title={p.name}
-                >
-                  {p.name?.charAt(0).toUpperCase() || 'P'}
-                </div>
-              ))}
-              {parties.length > 4 && (
-                <div className="w-10 h-10 rounded-full border-4 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[11px] font-black text-slate-500 shadow-md ring-1 ring-slate-100 dark:ring-slate-800">
-                  +{parties.length - 4}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {doc.status === 'completed' && doc.signedFileUrl ? (
-                <>
-                  <Button 
-                    size="sm" 
-                    onClick={handleView}
-                    className="bg-sky-50 hover:bg-sky-100 text-[#28ABDF] rounded-xl px-4 h-10 font-black transition-all border-none"
-                  >
-                    VIEW
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    onClick={handleDownload}
-                    className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-4 h-10 font-black transition-all shadow-sm"
-                  >
-                    DOWNLOAD
-                  </Button>
-                </>
-              ) : (
-                <Button 
-                  size="sm" 
-                  onClick={handleAction}
-                  className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-100 dark:border-slate-700 hover:border-[#28ABDF] hover:text-[#28ABDF] rounded-2xl px-6 h-11 font-black transition-all shadow-sm"
-                >
-                  <span className="text-[10px] font-black uppercase tracking-widest mr-2">
-                    {doc.isTemplate ? 'USE TEMPLATE' : (doc.status === 'draft' ? 'EDIT' : 'MANAGE')}
-                  </span>
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              )}
+            <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out',
+                  cfg.bar,
+                )}
+                style={{ width: `${progress}%` }}
+              />
             </div>
           </div>
+        )}
 
-          {/* Next Action Indicator */}
-          {currentSigner && (
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/10 border border-sky-100 dark:border-sky-800/30">
-              <div className="w-2 h-2 rounded-full bg-[#28ABDF] animate-pulse shadow-[0_0_8px_rgba(40,171,223,0.5)]" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-sky-700 dark:text-sky-400 truncate">
-                Waiting for: <span className="text-slate-900 dark:text-white">{currentSigner.name}</span>
-              </p>
-            </div>
-          )}
+        {/* ── Template info ─────────────────────────────────────── */}
+        {doc.isTemplate && doc.recipientCount != null && (
+          <div className="flex items-center gap-2 py-2.5 px-3.5 rounded-2xl bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30">
+            <Users size={13} className="text-violet-500 flex-shrink-0" />
+            <span className="text-[11px] font-black text-violet-700 dark:text-violet-400 uppercase tracking-wide">
+              {doc.recipientCount} recipients configured
+            </span>
+          </div>
+        )}
+
+        {/* ── Footer ───────────────────────────────────────────── */}
+        <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+
+          {/* Party avatars */}
+          {parties.length > 0
+            ? <AvatarStack parties={parties} />
+            : (
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                <FileText size={13} />
+                {doc.isTemplate ? 'Master template' : 'No parties yet'}
+              </div>
+            )
+          }
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {doc.status === 'completed' && doc.signedFileUrl ? (
+              <>
+                <ActionBtn onClick={handleView} variant="ghost">
+                  <Eye size={13} /> View
+                </ActionBtn>
+                <ActionBtn onClick={handleDownload} variant="primary">
+                  <Download size={13} /> PDF
+                </ActionBtn>
+              </>
+            ) : (
+              <ActionBtn onClick={handleAction} variant="default">
+                {doc.isTemplate
+                  ? 'Use'
+                  : doc.status === 'draft'
+                    ? 'Edit'
+                    : 'Manage'
+                }
+                <ArrowRight size={13} />
+              </ActionBtn>
+            )}
+          </div>
         </div>
+
+        {/* ── Awaiting signer chip ──────────────────────────────── */}
+        {currentSigner && (
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-sky-50 dark:bg-sky-900/15 border border-sky-100 dark:border-sky-800/40">
+            <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse flex-shrink-0 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />
+            <p className="text-[10px] font-black uppercase tracking-wider text-sky-600 dark:text-sky-400 truncate">
+              Awaiting{' '}
+              <span className="text-slate-900 dark:text-white font-black">
+                {currentSigner.name}
+              </span>
+            </p>
+          </div>
+        )}
+
       </div>
-    </Card>
+    </div>
   );
 });
 
 DocumentCard.displayName = 'DocumentCard';
-
 export default DocumentCard;

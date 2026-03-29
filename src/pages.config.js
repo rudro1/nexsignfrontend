@@ -1,132 +1,52 @@
-/**
- * pages.config.js - Page routing configuration
- * 
- * This file is AUTO-GENERATED. Do not add imports or modify PAGES manually.
- * Pages are auto-registered when you create files in the ./pages/ folder.
- * 
- * THE ONLY EDITABLE VALUE: mainPage
- * This controls which page is the landing page (shown when users visit the app).
- * 
- * Example file structure:
- * 
- *   import HomePage from './pages/HomePage';
- *   import Dashboard from './pages/Dashboard';
- *   import Settings from './pages/Settings';
- *   
- *   export const PAGES = {
- *       "HomePage": HomePage,
- *       "Dashboard": Dashboard,
- *       "Settings": Settings,
- *   }
- *   
- *   export const pagesConfig = {
- *       mainPage: "HomePage",
- *       Pages: PAGES,
- *   };
- * 
- * Example with Layout (wraps all pages):
- *
- *   import Home from './pages/Home';
- *   import Settings from './pages/Settings';
- *   import __Layout from './Layout.jsx';
- *
- *   export const PAGES = {
- *       "Home": Home,
- *       "Settings": Settings,
- *   }
- *
- *   export const pagesConfig = {
- *       mainPage: "Home",
- *       Pages: PAGES,
- *       Layout: __Layout,
- *   };
- *
- * To change the main page from HomePage to Dashboard, use find_replace:
- *   Old: mainPage: "HomePage",
- *   New: mainPage: "Dashboard",
- *
- * The mainPage value must match a key in the PAGES object exactly.
- */
-// import { Landing } from './pages/Landing';
-// import Dashboard from './pages/Dashboard';
-// import DocumentEditor from './pages/DocumentEditor';
-// import SignerView from './pages/SignerView';
-// import AdminDashboard from './pages/AdminDashboard';
-// import Login from './pages/Login';
-// import Register from './pages/Register';
-// import __Layout from './Layout.jsx';
+
+// import Landing        from '@/pages/Landing';
+// import Dashboard      from '@/pages/Dashboard';
+// import DocumentEditor from '@/pages/DocumentEditor';
+// import SignerView     from '@/pages/SignerView';
+// import AdminDashboard from '@/pages/AdminDashboard';
+// import Templates      from '@/pages/Templates';
+// import Audit          from '@/pages/Audit';
+// import Auth           from '@/pages/Auth';
+// import NewTemplate    from '@/pages/NewTemplate';
+// import Layout         from './Layout.jsx';
 
 // export const PAGES = {
-//     "landing": Landing,
-//     "dashboard": Dashboard,
-//     "DocumentEditor": DocumentEditor,
-//     "sign": SignerView,
-//     "admin": AdminDashboard,
-//     "login": Login,
-//     "register": Register,  // ✅ এটি যোগ করুন
+//   landing:        Landing,
+//   dashboard:      Dashboard,
+//   DocumentEditor: DocumentEditor,
+//   templates:      Templates,
+//   'new-template': NewTemplate,
+//   audit:          Audit,
+//   sign:           SignerView,
+//   admin:          AdminDashboard,
+//   login:          Auth,
+//   register:       Auth,
 // };
 
 // export const pagesConfig = {
-//     mainPage: "landing",
-//     Pages: PAGES,
-//     Layout: __Layout,
+//   mainPage: 'landing',
+//   Pages:    PAGES,
+//   Layout:   Layout,
 // };
+// src/pages.config.js
+// NOTE: App.jsx uses lazy() routes directly.
+// This file only exists for any legacy/external consumers.
 
-// import { Landing } from './pages/Landing';
-// import Dashboard from './pages/Dashboard';
-// import DocumentEditor from './pages/DocumentEditor';
-// import SignerView from './pages/SignerView';
-// import AdminDashboard from './pages/AdminDashboard';
-// import Templates from './pages/Templates';
-// import Audit from './pages/Audit';
-// import Login from './pages/Login';
-// import Register from './pages/Register';
-// import __Layout from './Layout.jsx';
-
-// export const PAGES = {
-//     "landing": Landing,
-//     "dashboard": Dashboard,
-//     "DocumentEditor": DocumentEditor,
-//     "templates": Templates,
-//     "audit": Audit,
-//     "sign": SignerView,
-//     "admin": AdminDashboard, // ✅ এই কি-টি 'admin' হিসেবেই থাকবে
-//     "login": Login,
-//     "register": Register,
-// };
-
-// export const pagesConfig = {
-//     mainPage: "landing",
-//     Pages: PAGES,
-//     Layout: __Layout,
-// };
-// ✅ সব default import — named import নেই
-import Landing        from '@/pages/Landing';
-import Dashboard      from '@/pages/Dashboard';
-import DocumentEditor from '@/pages/DocumentEditor';
-import SignerView     from '@/pages/SignerView';
-import AdminDashboard from '@/pages/AdminDashboard';
-import Templates      from '@/pages/Templates';
-import Audit          from '@/pages/Audit';
-import Auth           from '@/pages/Auth';
-import NewTemplate    from '@/pages/NewTemplate';
-import Layout         from './Layout.jsx';
-
-export const PAGES = {
-  landing:        Landing,
-  dashboard:      Dashboard,
-  DocumentEditor: DocumentEditor,
-  templates:      Templates,
-  'new-template': NewTemplate,
-  audit:          Audit,
-  sign:           SignerView,
-  admin:          AdminDashboard,
-  login:          Auth,
-  register:       Auth,
+export const ROUTE_MAP = {
+  landing:          '/',
+  pricing:          '/pricing',
+  login:            '/login',
+  register:         '/register',
+  dashboard:        '/dashboard',
+  documentEditor:   '/document-editor',
+  templates:        '/templates',
+  newTemplate:      '/templates/new',
+  templateDetail:   '/templates/:id',
+  documentDetail:   '/documents/:id',
+  audit:            '/audit/:id',
+  sign:             '/sign/:token',
+  templateSign:     '/template-sign/:token',
+  admin:            '/admin',
 };
 
-export const pagesConfig = {
-  mainPage: 'landing',
-  Pages:    PAGES,
-  Layout:   Layout,
-};
+export default ROUTE_MAP;
