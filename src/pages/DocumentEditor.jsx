@@ -231,7 +231,7 @@ export default function DocumentEditor() {
 
   // ── Load existing doc ─────────────────────────────────────────
   useEffect(() => {
-    if (!docId) return;
+    if (!docId || docId === 'new') return;
     setDocLoading(true);
     api.get(`/documents/${docId}`)
       .then(res => {
