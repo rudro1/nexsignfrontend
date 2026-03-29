@@ -1,5 +1,4 @@
 // src/pages/DocumentEditor.jsx
-
 import React, {
   useState, useEffect, useCallback,
   useMemo, useRef,
@@ -20,16 +19,13 @@ import {
   Loader2, Mail, Trash2, ImagePlus,
   ChevronRight, CheckCircle2, Users,
   PenTool, AlertCircle, Building2,
-  Type, Pen, Hash, Calendar,
-  Eye, EyeOff, RotateCcw,
+  Eye, RotateCcw,
 } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer    from '@/components/editor/PdfViewer';
 
-// ─────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────
 const FONT_FAMILIES = [
   { label: 'Helvetica',       value: 'Helvetica'       },
   { label: 'Times New Roman', value: 'Times New Roman' },
@@ -38,11 +34,11 @@ const FONT_FAMILIES = [
 const FONT_SIZES = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
 
 const STEPS = [
-  { id: 1, label: 'Upload',   desc: 'PDF & Branding',   icon: Upload       },
-  { id: 2, label: 'Signers',  desc: 'Signing Parties',  icon: Users        },
-  { id: 3, label: 'CC',       desc: 'Carbon Copy',      icon: Mail         },
-  { id: 4, label: 'Fields',   desc: 'Place Fields',     icon: PenTool      },
-  { id: 5, label: 'Review',   desc: 'Finalize & Send',  icon: CheckCircle2 },
+  { id: 1, label: 'Upload',  desc: 'PDF & Branding',  icon: Upload       },
+  { id: 2, label: 'Signers', desc: 'Signing Parties', icon: Users        },
+  { id: 3, label: 'CC',      desc: 'Carbon Copy',     icon: Mail         },
+  { id: 4, label: 'Fields',  desc: 'Place Fields',    icon: PenTool      },
+  { id: 5, label: 'Review',  desc: 'Finalize & Send', icon: CheckCircle2 },
 ];
 
 const isValidEmail = (v) =>
@@ -52,18 +48,15 @@ function revokeBlob(url) {
   if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Step Progress (desktop top bar)
-// ─────────────────────────────────────────────────────────────────
+// ─── StepProgress ─────────────────────────────────────────────────
 function StepProgress({ current, onStepClick, maxReached }) {
   return (
     <div className="hidden lg:flex items-center gap-0">
       {STEPS.map((s, idx) => {
-        const done    = current > s.id;
-        const active  = current === s.id;
-        const canGo   = s.id <= maxReached;
-        const Icon    = s.icon;
-
+        const done   = current > s.id;
+        const active = current === s.id;
+        const canGo  = s.id <= maxReached;
+        const Icon   = s.icon;
         return (
           <React.Fragment key={s.id}>
             <button
@@ -72,7 +65,10 @@ function StepProgress({ current, onStepClick, maxReached }) {
               onClick={() => canGo && onStepClick(s.id)}
               className={`flex flex-col items-center gap-1.5
                           transition-all duration-200
-                          ${canGo ? 'cursor-pointer' : 'cursor-default opacity-40'}`}
+                          ${canGo
+                            ? 'cursor-pointer'
+                            : 'cursor-default opacity-40'
+                          }`}
             >
               <div className={`w-8 h-8 rounded-xl flex items-center
                               justify-center transition-all duration-200
@@ -88,17 +84,20 @@ function StepProgress({ current, onStepClick, maxReached }) {
                 }
               </div>
               <span className={`text-[9px] font-semibold tracking-wide
-                transition-colors whitespace-nowrap
-                ${active  ? 'text-[#28ABDF]'
-                : done    ? 'text-emerald-500'
-                           : 'text-slate-400'
+                               whitespace-nowrap transition-colors
+                ${active
+                  ? 'text-[#28ABDF]'
+                  : done
+                    ? 'text-emerald-500'
+                    : 'text-slate-400'
                 }`}>
                 {s.label}
               </span>
             </button>
 
             {idx < STEPS.length - 1 && (
-              <div className={`w-10 h-px mx-1 mb-5 rounded-full transition-all duration-500
+              <div className={`w-10 h-px mx-1 mb-5 rounded-full
+                              transition-all duration-500
                 ${current > s.id
                   ? 'bg-emerald-400'
                   : 'bg-slate-200 dark:bg-slate-700'
@@ -112,9 +111,7 @@ function StepProgress({ current, onStepClick, maxReached }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Section Header helper
-// ─────────────────────────────────────────────────────────────────
+// ─── SectionHeader ────────────────────────────────────────────────
 function SectionHeader({ icon: Icon, iconBg, iconColor, title, subtitle }) {
   return (
     <div className="flex items-start gap-3">
@@ -135,14 +132,12 @@ function SectionHeader({ icon: Icon, iconBg, iconColor, title, subtitle }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Review Row
-// ─────────────────────────────────────────────────────────────────
+// ─── ReviewRow ────────────────────────────────────────────────────
 function ReviewRow({ label, value, valueClass = '' }) {
   return (
-    <div className="flex items-center justify-between
-                    py-3 border-b border-slate-50
-                    dark:border-slate-700/60 last:border-0">
+    <div className="flex items-center justify-between py-3
+                    border-b border-slate-50 dark:border-slate-700/60
+                    last:border-0">
       <span className="text-xs text-slate-400 font-medium">{label}</span>
       <span className={`text-xs font-semibold text-slate-800
                         dark:text-white text-right max-w-[60%]
@@ -153,67 +148,102 @@ function ReviewRow({ label, value, valueClass = '' }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────
-export default function DocumentEditor() {
-  const navigate  = useNavigate();
-  const location  = useLocation();
-  const { id: pathId } = useParams();
-  const { user }  = useAuth();
+// ─── Skeleton Loader ──────────────────────────────────────────────
+function DocLoadingSkeleton() {
+  return (
+    <div className="h-screen flex bg-slate-50 dark:bg-slate-950
+                    overflow-hidden">
+      {/* Sidebar skeleton */}
+      <div className="w-[360px] border-r border-slate-200
+                      dark:border-slate-800 bg-white
+                      dark:bg-slate-900 p-6 space-y-4 shrink-0">
+        <div className="h-8 w-40 bg-slate-200 dark:bg-slate-700
+                        rounded-xl animate-pulse" />
+        <div className="h-44 w-full bg-slate-100 dark:bg-slate-800
+                        rounded-2xl animate-pulse" />
+        <div className="h-10 w-full bg-slate-100 dark:bg-slate-800
+                        rounded-xl animate-pulse" />
+        <div className="h-10 w-full bg-slate-100 dark:bg-slate-800
+                        rounded-xl animate-pulse" />
+        <div className="h-10 w-2/3 bg-slate-100 dark:bg-slate-800
+                        rounded-xl animate-pulse" />
+      </div>
+      {/* PDF area skeleton */}
+      <div className="flex-1 p-8 flex justify-center">
+        <div className="w-full max-w-2xl h-[800px] bg-slate-200
+                        dark:bg-slate-800 rounded-2xl animate-pulse
+                        flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  // ── Resolve doc ID ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════
+export default function DocumentEditor() {
+  const navigate       = useNavigate();
+  const location       = useLocation();
+  const { id: pathId } = useParams();
+  const { user }       = useAuth();
+
+  // ── Resolve doc ID ─────────────────────────────────────────
   const docId = useMemo(() => {
     if (pathId && pathId !== 'new') return pathId;
     const q = new URLSearchParams(location.search).get('id');
     return q === 'new' ? null : q;
   }, [pathId, location.search]);
 
-  // ── Wizard ────────────────────────────────────────────────────
+  // ── Wizard ─────────────────────────────────────────────────
   const [step,       setStep]       = useState(1);
   const [maxReached, setMaxReached] = useState(1);
 
-  // ── Core ──────────────────────────────────────────────────────
-  const [rawFile,    setRawFile]    = useState(null);
-  const [title,      setTitle]      = useState('');
-  const [fileUrl,    setFileUrl]    = useState('');
-  const [fileReady,  setFileReady]  = useState(false);
-  const [parties,    setParties]    = useState([{
-    name: user?.full_name || '', email: user?.email || '',
+  // ── Core ───────────────────────────────────────────────────
+  const [rawFile,   setRawFile]   = useState(null);
+  const [title,     setTitle]     = useState('');
+  const [fileUrl,   setFileUrl]   = useState('');
+  const [fileReady, setFileReady] = useState(false);
+  const [parties,   setParties]   = useState([{
+    name:  user?.full_name || '',
+    email: user?.email     || '',
     order: 0, status: 'pending', color: '#0ea5e9',
   }]);
-  const [fields,     setFields]     = useState([]);
-  const [ccList,     setCcList]     = useState([]);
-  const [companyLogo,         setCompanyLogo]         = useState('');
-  const [companyLogoFile,     setCompanyLogoFile]     = useState(null);
-  const [companyLogoPreview,  setCompanyLogoPreview]  = useState('');
-  const [companyName,         setCompanyName]         = useState('');
+  const [fields,  setFields]  = useState([]);
+  const [ccList,  setCcList]  = useState([]);
 
-  // ── CC inputs ─────────────────────────────────────────────────
+  // ── Branding ───────────────────────────────────────────────
+  const [companyLogo,        setCompanyLogo]        = useState('');
+  const [companyLogoFile,    setCompanyLogoFile]    = useState(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState('');
+  const [companyName,        setCompanyName]        = useState('');
+
+  // ── CC form ────────────────────────────────────────────────
   const [ccForm, setCcForm] = useState({
     name: '', email: '', designation: '',
   });
 
-  // ── Editor ────────────────────────────────────────────────────
-  const [currentPage,        setCurrentPage]        = useState(1);
-  const [totalPages,         setTotalPages]          = useState(1);
-  const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
-  const [pendingFieldType,   setPendingFieldType]   = useState(null);
-  const [processing,         setProcessing]         = useState(false);
-  const [selectedFieldId,    setSelectedFieldId]    = useState(null);
-  const [docLoading,         setDocLoading]         = useState(false);
+  // ── Editor ─────────────────────────────────────────────────
+  const [currentPage,        setCurrentPage]       = useState(1);
+  const [totalPages,         setTotalPages]         = useState(1);
+  const [selectedPartyIndex, setSelectedPartyIndex]= useState(0);
+  const [pendingFieldType,   setPendingFieldType]  = useState(null);
+  const [processing,         setProcessing]        = useState(false);
+  const [selectedFieldId,    setSelectedFieldId]   = useState(null);
+  const [docLoading,         setDocLoading]        = useState(false);
 
-  // Mobile: show sidebar or viewer
-  const [mobilePanelView, setMobilePanelView] = useState('sidebar'); // 'sidebar' | 'viewer'
+  // Mobile panel toggle
+  const [mobilePanelView, setMobilePanelView] = useState('sidebar');
 
-  const fileUrlRef       = useRef(fileUrl);
-  const logoPreviewRef   = useRef(companyLogoPreview);
-  const mountedRef       = useRef(true);
+  // ── Refs ───────────────────────────────────────────────────
+  const fileUrlRef     = useRef(fileUrl);
+  const logoPreviewRef = useRef(companyLogoPreview);
+  const mountedRef     = useRef(true);
 
-  useEffect(() => { fileUrlRef.current = fileUrl; },     [fileUrl]);
-  useEffect(() => { logoPreviewRef.current = companyLogoPreview; }, [companyLogoPreview]);
+  useEffect(() => { fileUrlRef.current     = fileUrl;           }, [fileUrl]);
+  useEffect(() => { logoPreviewRef.current = companyLogoPreview;}, [companyLogoPreview]);
 
-  // ── Cleanup blobs on unmount ──────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -223,13 +253,13 @@ export default function DocumentEditor() {
     };
   }, []);
 
-  // ── Selected field ────────────────────────────────────────────
+  // ── Selected field ─────────────────────────────────────────
   const selectedField = useMemo(
     () => fields.find(f => f.id === selectedFieldId),
-    [fields, selectedFieldId]
+    [fields, selectedFieldId],
   );
 
-  // ── Load existing doc ─────────────────────────────────────────
+  // ── Load existing doc ──────────────────────────────────────
   useEffect(() => {
     if (!docId) return;
     setDocLoading(true);
@@ -240,25 +270,33 @@ export default function DocumentEditor() {
         setTitle(d.title || '');
         setFileUrl(d.fileUrl || '');
         setFileReady(!!d.fileUrl);
-        setParties(d.parties?.length
-          ? d.parties
-          : [{ name: user?.full_name || '', email: user?.email || '',
-               order: 0, status: 'pending', color: '#0ea5e9' }]
+        setParties(
+          d.parties?.length
+            ? d.parties
+            : [{
+                name:  user?.full_name || '',
+                email: user?.email     || '',
+                order: 0, status: 'pending', color: '#0ea5e9',
+              }],
         );
         setCcList(d.ccList || []);
         setCompanyLogo(d.companyLogo || '');
         setCompanyLogoPreview(d.companyLogo || '');
         setCompanyName(d.companyName || '');
-        setFields((d.fields || []).map(f =>
-          typeof f === 'string' ? JSON.parse(f) : f
-        ));
+        setFields(
+          (d.fields || []).map(f =>
+            typeof f === 'string' ? JSON.parse(f) : f,
+          ),
+        );
         setMaxReached(d.fileUrl ? 4 : 1);
       })
       .catch(() => toast.error('Failed to load document.'))
-      .finally(() => { if (mountedRef.current) setDocLoading(false); });
-  }, [docId]); // eslint-disable-line react-hooks/exhaustive-deps
+      .finally(() => {
+        if (mountedRef.current) setDocLoading(false);
+      });
+  }, [docId]); // eslint-disable-line
 
-  // ── File select ───────────────────────────────────────────────
+  // ── File select ────────────────────────────────────────────
   const handleFileSelect = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -290,7 +328,7 @@ export default function DocumentEditor() {
     e.target.value = '';
   }, []);
 
-  // ── CC ────────────────────────────────────────────────────────
+  // ── CC ─────────────────────────────────────────────────────
   const addCc = useCallback(() => {
     const email = ccForm.email.trim().toLowerCase();
     if (!isValidEmail(email)) {
@@ -313,11 +351,13 @@ export default function DocumentEditor() {
     setCcList(prev => prev.filter((_, i) => i !== idx));
   }, []);
 
-  // ── Typography ────────────────────────────────────────────────
+  // ── Field typography ───────────────────────────────────────
   const updateFieldTypography = useCallback((key, value) => {
     if (!selectedFieldId) return;
     setFields(prev =>
-      prev.map(f => f.id === selectedFieldId ? { ...f, [key]: value } : f)
+      prev.map(f =>
+        f.id === selectedFieldId ? { ...f, [key]: value } : f,
+      ),
     );
   }, [selectedFieldId]);
 
@@ -326,7 +366,7 @@ export default function DocumentEditor() {
     if (selectedFieldId === id) setSelectedFieldId(null);
   }, [selectedFieldId]);
 
-  // ── Step navigation ───────────────────────────────────────────
+  // ── Step navigation ────────────────────────────────────────
   const goToStep = useCallback((target) => {
     setStep(target);
     setMaxReached(prev => Math.max(prev, target));
@@ -334,8 +374,8 @@ export default function DocumentEditor() {
 
   const nextStep = useCallback(() => {
     if (step === 1) {
-      if (!fileUrl)       return toast.error('Please upload a PDF first.');
-      if (!title.trim())  return toast.error('Please enter a document title.');
+      if (!fileUrl)      return toast.error('Please upload a PDF first.');
+      if (!title.trim()) return toast.error('Please enter a document title.');
     }
     if (step === 2) {
       if (!parties.length)
@@ -356,80 +396,103 @@ export default function DocumentEditor() {
     if (step > 1) setStep(s => s - 1);
   }, [step]);
 
-  // ── Send ──────────────────────────────────────────────────────
+  // ── Validate ───────────────────────────────────────────────
   const validate = useCallback(() => {
-    if (!fileUrl)          { toast.error('No PDF uploaded.');              return false; }
-    if (!title.trim())     { toast.error('Document title is required.');   return false; }
-    if (!parties.length)   { toast.error('Add at least one signer.');      return false; }
+    if (!fileUrl)        { toast.error('No PDF uploaded.');            return false; }
+    if (!title.trim())   { toast.error('Document title is required.'); return false; }
+    if (!parties.length) { toast.error('Add at least one signer.');    return false; }
     if (parties.some(p => !p.name?.trim() || !p.email?.trim())) {
-      toast.error('All signers need a name and email.'); return false;
+      toast.error('All signers need a name and email.');
+      return false;
     }
-    if (!fields.length)    { toast.error('Place at least one field.');     return false; }
+    if (!fields.length)  { toast.error('Place at least one field.');   return false; }
     return true;
   }, [fileUrl, title, parties, fields]);
 
+  // ── SEND ───────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
     if (!validate()) return;
     setProcessing(true);
+
     try {
-      const formData = new FormData();
-      if (rawFile)          formData.append('file',         rawFile);
-      formData.append('title',        title.trim());
-      formData.append('parties',      JSON.stringify(parties));
-      formData.append('ccRecipients', JSON.stringify(ccList));
-      formData.append('fields',       JSON.stringify(fields));
-      formData.append('totalPages',   String(totalPages));
-      formData.append('companyName',  companyName.trim());
-      if (docId)            formData.append('docId',        docId);
+      // ── Step 1: Logo upload (যদি নতুন file থাকে) ─────────
+      let finalLogoUrl = companyLogo;
 
       if (companyLogoFile) {
-        const lf = new FormData();
-        lf.append('logo', companyLogoFile);
-        const lr = await api.post('/documents/upload-logo', lf);
-        if (lr.data?.logoUrl) formData.append('companyLogo', lr.data.logoUrl);
-      } else if (companyLogo) {
-        formData.append('companyLogo', companyLogo);
+        try {
+          const lf = new FormData();
+          lf.append('logo', companyLogoFile);
+          const lr = await api.post('/documents/upload-logo', lf);
+          if (lr.data?.logoUrl) {
+            finalLogoUrl = lr.data.logoUrl;
+          }
+        } catch (logoErr) {
+          // Logo upload fail হলেও document send চলবে
+          console.error('[logo upload]', logoErr);
+          toast.warning('Logo upload failed, continuing without logo.');
+          finalLogoUrl = '';
+        }
       }
 
+      // ── Step 2: Build FormData ────────────────────────────
+      const formData = new FormData();
+
+      // PDF file (নতুন upload হলে)
+      if (rawFile) {
+        formData.append('file', rawFile);
+      }
+
+      // Document data
+      formData.append('title',       title.trim());
+      formData.append('parties',     JSON.stringify(parties));
+      formData.append('fields',      JSON.stringify(fields));
+      formData.append('ccList',      JSON.stringify(ccList));   // ← FIXED: 'ccList'
+      formData.append('totalPages',  String(totalPages));
+      formData.append('companyName', companyName.trim());
+      formData.append('companyLogo', finalLogoUrl || '');
+
+      // Existing doc ID
+      if (docId && docId !== 'undefined' && docId !== 'null') {
+        formData.append('docId', docId);
+      }
+
+      // ── Step 3: Send ──────────────────────────────────────
       await api.post('/documents/upload-and-send', formData);
+
       toast.success('Document sent for signing! ✉️');
       navigate('/dashboard');
+
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send document.');
+      const msg = err?.response?.data?.message
+        || err?.message
+        || 'Failed to send document.';
+      toast.error(msg);
     } finally {
       if (mountedRef.current) setProcessing(false);
     }
   }, [
-    validate, rawFile, title, parties, ccList,
-    fields, totalPages, companyName, docId,
-    companyLogoFile, companyLogo, navigate,
+    validate,
+    rawFile, title, parties, ccList,
+    fields, totalPages, companyName,
+    docId, companyLogoFile, companyLogo,
+    navigate,
   ]);
 
-  // ── Loading screen ────────────────────────────────────────────
-  if (docLoading) {
-    return (
-      <div className="h-screen flex flex-col items-center
-                      justify-center bg-slate-50 dark:bg-slate-950 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-[#28ABDF]" />
-        <p className="text-sm text-slate-500 font-medium">
-          Loading document…
-        </p>
-      </div>
-    );
-  }
+  // ── Loading screen ─────────────────────────────────────────
+  if (docLoading) return <DocLoadingSkeleton />;
 
   const currentStepMeta = STEPS[step - 1];
 
-  // ─────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
   // RENDER
-  // ─────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
   return (
     <div className="flex flex-col h-screen bg-slate-50
                     dark:bg-slate-950 overflow-hidden">
 
-      {/* ══════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════
           HEADER
-      ══════════════════════════════════════════════════════════ */}
+      ════════════════════════════════════════════════════ */}
       <header className="h-16 bg-white dark:bg-slate-900
                          border-b border-slate-200 dark:border-slate-800
                          px-4 sm:px-6 flex items-center justify-between
@@ -457,10 +520,10 @@ export default function DocumentEditor() {
               placeholder="Untitled Document"
               className="w-full bg-transparent border-none outline-none
                          text-sm font-semibold text-slate-900
-                         dark:text-white truncate placeholder:text-slate-300
+                         dark:text-white truncate
+                         placeholder:text-slate-300
                          dark:placeholder:text-slate-600"
             />
-            {/* Mobile step indicator */}
             <p className="text-[10px] text-slate-400 lg:hidden">
               Step {step} of 5 · {currentStepMeta.desc}
             </p>
@@ -476,18 +539,21 @@ export default function DocumentEditor() {
 
         {/* Right: actions */}
         <div className="flex items-center gap-2 shrink-0">
+
           {/* Mobile: toggle sidebar/viewer (only step 4) */}
           {step === 4 && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setMobilePanelView(
-                v => v === 'sidebar' ? 'viewer' : 'sidebar'
-              )}
+              onClick={() =>
+                setMobilePanelView(v =>
+                  v === 'sidebar' ? 'viewer' : 'sidebar'
+                )
+              }
               className="lg:hidden h-9 px-3 rounded-xl
                          border-slate-200 dark:border-slate-700
-                         text-slate-600 dark:text-slate-300 gap-1.5
-                         text-xs font-medium"
+                         text-slate-600 dark:text-slate-300
+                         gap-1.5 text-xs font-medium"
             >
               {mobilePanelView === 'sidebar'
                 ? <><Eye className="w-3.5 h-3.5" /> Preview</>
@@ -537,7 +603,8 @@ export default function DocumentEditor() {
                          hover:shadow-sky-400/40
                          transition-all hover:-translate-y-0.5
                          active:translate-y-0
-                         disabled:opacity-60 disabled:cursor-not-allowed
+                         disabled:opacity-60
+                         disabled:cursor-not-allowed
                          disabled:hover:translate-y-0"
             >
               {processing
@@ -550,12 +617,12 @@ export default function DocumentEditor() {
         </div>
       </header>
 
-      {/* ══════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════
           BODY
-      ══════════════════════════════════════════════════════════ */}
+      ════════════════════════════════════════════════════ */}
       <main className="flex-1 flex overflow-hidden">
 
-        {/* ── SIDEBAR ───────────────────────────────────────────── */}
+        {/* ── SIDEBAR ────────────────────────────────────── */}
         <aside className={`
           w-full lg:w-[360px] xl:w-[400px]
           border-r border-slate-200 dark:border-slate-800
@@ -567,7 +634,7 @@ export default function DocumentEditor() {
           }
         `}>
 
-          {/* ── Step pill (mobile) ── */}
+          {/* Mobile step pill */}
           <div className="lg:hidden flex items-center gap-2
                           px-4 pt-4 pb-0">
             <div className="flex items-center gap-1.5 px-3 py-1.5
@@ -578,9 +645,9 @@ export default function DocumentEditor() {
             </div>
           </div>
 
-          {/* ╔══════════════════════════════════════════════════════╗
+          {/* ╔══════════════════════════════════════════════╗
               STEP 1 — Upload & Branding
-          ╚══════════════════════════════════════════════════════╝ */}
+          ╚══════════════════════════════════════════════╝ */}
           {step === 1 && (
             <div className="p-5 sm:p-6 space-y-8">
 
@@ -595,15 +662,15 @@ export default function DocumentEditor() {
                 />
 
                 {!fileReady ? (
-                  <label className="
-                    flex flex-col items-center justify-center
-                    w-full h-44 rounded-2xl border-2 border-dashed
-                    border-slate-200 dark:border-slate-700
-                    cursor-pointer group
-                    hover:border-[#28ABDF] hover:bg-sky-50/40
-                    dark:hover:bg-sky-900/10
-                    transition-all duration-200
-                  ">
+                  <label className="flex flex-col items-center
+                                    justify-center w-full h-44
+                                    rounded-2xl border-2 border-dashed
+                                    border-slate-200 dark:border-slate-700
+                                    cursor-pointer group
+                                    hover:border-[#28ABDF]
+                                    hover:bg-sky-50/40
+                                    dark:hover:bg-sky-900/10
+                                    transition-all duration-200">
                     <div className="w-12 h-12 rounded-2xl
                                     bg-slate-100 dark:bg-slate-800
                                     flex items-center justify-center
@@ -690,7 +757,6 @@ export default function DocumentEditor() {
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-slate-100
                               dark:border-slate-800" />
 
@@ -727,15 +793,14 @@ export default function DocumentEditor() {
                       Company Logo
                     </Label>
                     <div className="flex items-center gap-4">
-                      <label className="
-                        relative h-16 w-16 rounded-xl cursor-pointer
-                        border-2 border-dashed
-                        border-slate-200 dark:border-slate-700
-                        flex items-center justify-center shrink-0
-                        overflow-hidden
-                        bg-slate-50 dark:bg-slate-800
-                        hover:border-[#28ABDF] transition-colors group
-                      ">
+                      <label className="relative h-16 w-16 rounded-xl
+                                        cursor-pointer border-2 border-dashed
+                                        border-slate-200 dark:border-slate-700
+                                        flex items-center justify-center
+                                        shrink-0 overflow-hidden
+                                        bg-slate-50 dark:bg-slate-800
+                                        hover:border-[#28ABDF]
+                                        transition-colors group">
                         {companyLogoPreview ? (
                           <img
                             src={companyLogoPreview}
@@ -770,6 +835,7 @@ export default function DocumentEditor() {
                               revokeBlob(companyLogoPreview);
                               setCompanyLogoPreview('');
                               setCompanyLogoFile(null);
+                              setCompanyLogo('');
                             }}
                             className="text-xs text-red-400
                                        hover:text-red-500 font-medium"
@@ -785,9 +851,9 @@ export default function DocumentEditor() {
             </div>
           )}
 
-          {/* ╔══════════════════════════════════════════════════════╗
+          {/* ╔══════════════════════════════════════════════╗
               STEP 2 — Signing Parties
-          ╚══════════════════════════════════════════════════════╝ */}
+          ╚══════════════════════════════════════════════╝ */}
           {step === 2 && (
             <div className="p-5 sm:p-6 space-y-5">
               <SectionHeader
@@ -797,13 +863,16 @@ export default function DocumentEditor() {
                 title="Signing Parties"
                 subtitle="Define who signs and in what order"
               />
-              <PartyManager parties={parties} onChange={setParties} />
+              <PartyManager
+                parties={parties}
+                onChange={setParties}
+              />
             </div>
           )}
 
-          {/* ╔══════════════════════════════════════════════════════╗
+          {/* ╔══════════════════════════════════════════════╗
               STEP 3 — CC Recipients
-          ╚══════════════════════════════════════════════════════╝ */}
+          ╚══════════════════════════════════════════════╝ */}
           {step === 3 && (
             <div className="p-5 sm:p-6 space-y-5">
               <SectionHeader
@@ -827,9 +896,9 @@ export default function DocumentEditor() {
                     </Label>
                     <Input
                       value={ccForm.name}
-                      onChange={e => setCcForm(p => ({
-                        ...p, name: e.target.value,
-                      }))}
+                      onChange={e =>
+                        setCcForm(p => ({ ...p, name: e.target.value }))
+                      }
                       placeholder="Jane Smith"
                       className="h-9 rounded-xl text-sm
                                  border-slate-200 dark:border-slate-700
@@ -844,9 +913,11 @@ export default function DocumentEditor() {
                     </Label>
                     <Input
                       value={ccForm.designation}
-                      onChange={e => setCcForm(p => ({
-                        ...p, designation: e.target.value,
-                      }))}
+                      onChange={e =>
+                        setCcForm(p => ({
+                          ...p, designation: e.target.value,
+                        }))
+                      }
                       placeholder="Manager"
                       className="h-9 rounded-xl text-sm
                                  border-slate-200 dark:border-slate-700
@@ -863,9 +934,9 @@ export default function DocumentEditor() {
                   <Input
                     value={ccForm.email}
                     type="email"
-                    onChange={e => setCcForm(p => ({
-                      ...p, email: e.target.value,
-                    }))}
+                    onChange={e =>
+                      setCcForm(p => ({ ...p, email: e.target.value }))
+                    }
                     onKeyDown={e => e.key === 'Enter' && addCc()}
                     placeholder="jane@company.com"
                     className="h-9 rounded-xl text-sm
@@ -881,37 +952,37 @@ export default function DocumentEditor() {
                   variant="outline"
                   className="w-full h-9 rounded-xl text-sm font-medium
                              border-slate-200 dark:border-slate-700
-                             hover:border-[#28ABDF] hover:text-[#28ABDF]
-                             transition-colors gap-1.5"
+                             hover:border-[#28ABDF]
+                             hover:text-[#28ABDF] transition-colors
+                             gap-1.5"
                 >
                   + Add CC Recipient
                 </Button>
               </div>
 
               {/* CC list */}
-              {ccList.length > 0 && (
+              {ccList.length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-slate-400
-                                px-0.5">
-                    {ccList.length} recipient{ccList.length !== 1 ? 's' : ''} added
+                  <p className="text-xs font-medium text-slate-400 px-0.5">
+                    {ccList.length} recipient
+                    {ccList.length !== 1 ? 's' : ''} added
                   </p>
                   {ccList.map((cc, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-3 p-3
-                                 rounded-xl bg-white dark:bg-slate-800
+                      className="flex items-center gap-3 p-3 rounded-xl
+                                 bg-white dark:bg-slate-800
                                  border border-slate-100
                                  dark:border-slate-700"
                     >
-                      <div className="w-8 h-8 rounded-lg
-                                      bg-[#28ABDF]/10 flex items-center
-                                      justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-[#28ABDF]/10
+                                      flex items-center justify-center
+                                      shrink-0">
                         <Mail className="w-3.5 h-3.5 text-[#28ABDF]" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold
-                                      text-slate-800 dark:text-white
-                                      truncate">
+                        <p className="text-xs font-semibold text-slate-800
+                                      dark:text-white truncate">
                           {cc.name || 'No name'}
                           {cc.designation && (
                             <span className="text-slate-400
@@ -920,8 +991,7 @@ export default function DocumentEditor() {
                             </span>
                           )}
                         </p>
-                        <p className="text-[11px] text-slate-400
-                                      truncate">
+                        <p className="text-[11px] text-slate-400 truncate">
                           {cc.email}
                         </p>
                       </div>
@@ -930,32 +1000,28 @@ export default function DocumentEditor() {
                         onClick={() => removeCc(i)}
                         className="p-1 rounded-lg text-slate-300
                                    hover:text-red-500
-                                   hover:bg-red-50 dark:hover:bg-red-900/20
+                                   hover:bg-red-50
+                                   dark:hover:bg-red-900/20
                                    transition-colors"
-                        aria-label="Remove"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
                 </div>
-              )}
-
-              {ccList.length === 0 && (
+              ) : (
                 <div className="text-center py-8 text-slate-400">
                   <Mail className="w-8 h-8 mx-auto mb-2 opacity-30" />
                   <p className="text-xs">No CC recipients yet</p>
-                  <p className="text-xs opacity-70">
-                    CC is optional
-                  </p>
+                  <p className="text-xs opacity-70">CC is optional</p>
                 </div>
               )}
             </div>
           )}
 
-          {/* ╔══════════════════════════════════════════════════════╗
+          {/* ╔══════════════════════════════════════════════╗
               STEP 4 — Field Placement
-          ╚══════════════════════════════════════════════════════╝ */}
+          ╚══════════════════════════════════════════════╝ */}
           {step === 4 && (
             <div className="p-5 sm:p-6 space-y-5">
               <SectionHeader
@@ -972,7 +1038,6 @@ export default function DocumentEditor() {
                 onPartySelect={setSelectedPartyIndex}
                 onAddField={type => {
                   setPendingFieldType(type);
-                  // Auto-switch to viewer on mobile
                   setMobilePanelView('viewer');
                 }}
               />
@@ -980,8 +1045,7 @@ export default function DocumentEditor() {
               {/* Pending field indicator */}
               {pendingFieldType && (
                 <div className="flex items-center justify-between
-                                p-3 rounded-xl
-                                bg-[#28ABDF]/10
+                                p-3 rounded-xl bg-[#28ABDF]/10
                                 border border-[#28ABDF]/30">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full
@@ -1005,9 +1069,8 @@ export default function DocumentEditor() {
 
               {/* Selected field config */}
               {selectedField && (
-                <div className="space-y-3 pt-4
-                                border-t border-slate-100
-                                dark:border-slate-800">
+                <div className="space-y-3 pt-4 border-t
+                                border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-slate-600
                                   dark:text-slate-300 capitalize">
@@ -1016,8 +1079,9 @@ export default function DocumentEditor() {
                     <button
                       type="button"
                       onClick={() => removeField(selectedField.id)}
-                      className="text-xs text-red-400 hover:text-red-500
-                                 font-medium flex items-center gap-1"
+                      className="text-xs text-red-400
+                                 hover:text-red-500 font-medium
+                                 flex items-center gap-1"
                     >
                       <Trash2 className="w-3 h-3" />
                       Remove
@@ -1027,8 +1091,7 @@ export default function DocumentEditor() {
                   {selectedField.type === 'text' && (
                     <div className="space-y-2.5">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-slate-400
-                                          font-medium">
+                        <Label className="text-xs text-slate-400 font-medium">
                           Font Family
                         </Label>
                         <Select
@@ -1053,8 +1116,7 @@ export default function DocumentEditor() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-slate-400
-                                          font-medium">
+                        <Label className="text-xs text-slate-400 font-medium">
                           Font Size
                         </Label>
                         <Select
@@ -1087,10 +1149,11 @@ export default function DocumentEditor() {
                 <div className="pt-4 border-t border-slate-100
                                 dark:border-slate-800">
                   <p className="text-xs font-medium text-slate-400 mb-2">
-                    {fields.length} field{fields.length !== 1 ? 's' : ''} placed
+                    {fields.length} field
+                    {fields.length !== 1 ? 's' : ''} placed
                   </p>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {fields.map((f, i) => {
+                    {fields.map(f => {
                       const party = parties[f.partyIndex] || parties[0];
                       return (
                         <div
@@ -1123,9 +1186,9 @@ export default function DocumentEditor() {
             </div>
           )}
 
-          {/* ╔══════════════════════════════════════════════════════╗
+          {/* ╔══════════════════════════════════════════════╗
               STEP 5 — Final Review
-          ╚══════════════════════════════════════════════════════╝ */}
+          ╚══════════════════════════════════════════════╝ */}
           {step === 5 && (
             <div className="p-5 sm:p-6 space-y-5">
               <SectionHeader
@@ -1144,13 +1207,12 @@ export default function DocumentEditor() {
                                 dark:border-slate-700 bg-slate-50/50
                                 dark:bg-slate-800/50">
                   <p className="text-xs font-semibold text-slate-500
-                                dark:text-slate-400 uppercase
-                                tracking-wide">
+                                dark:text-slate-400 uppercase tracking-wide">
                     Document Summary
                   </p>
                 </div>
                 <div className="px-4 py-1">
-                  <ReviewRow label="Title" value={title || '—'} />
+                  <ReviewRow label="Title"  value={title || '—'} />
                   <ReviewRow
                     label="Fields"
                     value={`${fields.length} placed`}
@@ -1177,7 +1239,8 @@ export default function DocumentEditor() {
                     key={i}
                     className="flex items-center gap-3 p-3 rounded-xl
                                bg-white dark:bg-slate-800
-                               border border-slate-100 dark:border-slate-700"
+                               border border-slate-100
+                               dark:border-slate-700"
                   >
                     <div
                       className="w-7 h-7 rounded-lg flex items-center
@@ -1201,8 +1264,7 @@ export default function DocumentEditor() {
               </div>
 
               {/* Info box */}
-              <div className="p-4 rounded-2xl
-                              bg-sky-50 dark:bg-sky-900/20
+              <div className="p-4 rounded-2xl bg-sky-50 dark:bg-sky-900/20
                               border border-sky-100 dark:border-sky-800">
                 <div className="flex gap-2.5">
                   <AlertCircle className="w-4 h-4 text-sky-500
@@ -1215,16 +1277,17 @@ export default function DocumentEditor() {
                 </div>
               </div>
 
-              {/* Send button (also in header, duplicated here for UX) */}
+              {/* Send button */}
               <Button
                 onClick={handleSend}
                 disabled={processing || !fileReady}
                 className="w-full h-11 rounded-xl
                            bg-[#28ABDF] hover:bg-[#2399c8] text-white
-                           font-semibold gap-2 shadow-md shadow-sky-400/25
-                           transition-all hover:-translate-y-0.5
-                           active:translate-y-0
-                           disabled:opacity-60 disabled:cursor-not-allowed"
+                           font-semibold gap-2 shadow-md
+                           shadow-sky-400/25 transition-all
+                           hover:-translate-y-0.5 active:translate-y-0
+                           disabled:opacity-60
+                           disabled:cursor-not-allowed"
               >
                 {processing
                   ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -1236,7 +1299,7 @@ export default function DocumentEditor() {
           )}
         </aside>
 
-        {/* ── PDF VIEWER ────────────────────────────────────────── */}
+        {/* ── PDF VIEWER ──────────────────────────────────── */}
         <section className={`
           flex-1 flex flex-col min-w-0 overflow-hidden
           bg-slate-100 dark:bg-slate-950
@@ -1246,9 +1309,8 @@ export default function DocumentEditor() {
           }
         `}>
           {fileReady ? (
-            <div className="flex-1 overflow-auto
-                            flex justify-center items-start
-                            p-4 lg:p-8">
+            <div className="flex-1 overflow-auto flex justify-center
+                            items-start p-4 lg:p-8">
               <div className="shadow-2xl shadow-slate-300/40
                               dark:shadow-black/60 rounded-xl
                               overflow-hidden
@@ -1297,7 +1359,6 @@ export default function DocumentEditor() {
             </div>
           )}
         </section>
-
       </main>
     </div>
   );

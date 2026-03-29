@@ -9,53 +9,54 @@ const BASE = (
   'https://nextsignbackendfinal.vercel.app/api'
 ).replace(/\/$/, '');
 
-const TIMEOUT_NORMAL  = 15_000;  // 15s
-const TIMEOUT_UPLOAD  = 60_000;  // 60s
-const TIMEOUT_SIGN    = 45_000;  // 45s (PDF processing)
-const MAX_RETRIES     = 1;
-const RETRY_DELAY_MS  = 2_000;
-const CACHE_TTL_MS    = 30_000;  // 30s
+const TIMEOUT_NORMAL = 20_000;  // 20s
+const TIMEOUT_UPLOAD = 90_000;  // 90s
+const TIMEOUT_SIGN   = 60_000;  // 60s
+const MAX_RETRIES    = 1;
+const RETRY_DELAY_MS = 2_000;
+const CACHE_TTL_MS   = 30_000;  // 30s
 
 // ═══════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 function getTimeout(config) {
   const url = config.url || '';
-  if (config.data instanceof FormData)     return TIMEOUT_UPLOAD;
-  if (url.includes('upload'))              return TIMEOUT_UPLOAD;
-  if (url.includes('sign/submit'))         return TIMEOUT_SIGN;
-  if (url.includes('template'))            return TIMEOUT_SIGN;
+  if (config.data instanceof FormData) return TIMEOUT_UPLOAD;
+  if (url.includes('upload'))          return TIMEOUT_UPLOAD;
+  if (url.includes('upload-logo'))     return TIMEOUT_UPLOAD;
+  if (url.includes('sign/submit'))     return TIMEOUT_SIGN;
+  if (url.includes('template'))        return TIMEOUT_SIGN;
   return TIMEOUT_NORMAL;
 }
 
 function isRetryable(error) {
-  if (axios.isCancel(error))  return false;
-  if (!error.response)        return true; // network error
+  if (axios.isCancel(error)) return false;
+  if (!error.response)       return true;
   return [408, 429, 502, 503, 504].includes(error.response.status);
 }
 
 function getCacheKey(config) {
-  const params = config.params ? JSON.stringify(config.params) : '';
+  const params = config.params
+    ? JSON.stringify(config.params)
+    : '';
   return `${(config.method || 'get').toUpperCase()}:${config.url || ''}${params}`;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // CACHE + DEDUP
 // ═══════════════════════════════════════════════════════════════
-const requestCache = new Map();  // { key → { data, timestamp } }
-const inflightMap  = new Map();  // { key → Promise } dedup
+const requestCache = new Map();
+const inflightMap  = new Map();
 
 export const apiCache = {
-  // Invalidate specific URL
   invalidate(url, params = {}) {
     const key = `GET:${url}${JSON.stringify(params)}`;
     requestCache.delete(key);
     inflightMap.delete(key);
   },
 
-  // Invalidate by pattern (e.g. all /documents)
   invalidatePattern(pattern) {
     for (const key of requestCache.keys()) {
       if (key.includes(pattern)) {
@@ -65,18 +66,15 @@ export const apiCache = {
     }
   },
 
-  // Clear all cache
   clear() {
     requestCache.clear();
     inflightMap.clear();
   },
 
-  // Prefetch (warm cache)
   prefetch(url, params = {}) {
     api.get(url, { params }).catch(() => {});
   },
 
-  // Debug
   inspect() {
     const result = {};
     requestCache.forEach((v, k) => {
@@ -93,15 +91,15 @@ export const apiCache = {
 // ERROR NORMALIZER
 // ═══════════════════════════════════════════════════════════════
 function normalizeError(error) {
-  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const isOffline =
+    typeof navigator !== 'undefined' && !navigator.onLine;
 
-  // Network / timeout
   if (!error.response) {
     return {
       __network: true,
       __offline: isOffline,
       __timeout: error.code === 'ECONNABORTED',
-      message:   isOffline
+      message: isOffline
         ? 'No internet connection. Please check your network.'
         : error.code === 'ECONNABORTED'
           ? 'Request timed out. Please try again.'
@@ -111,14 +109,14 @@ function normalizeError(error) {
     };
   }
 
-  // Server error
   const data = error.response.data;
   return {
-    message: data?.message || data?.error || `Server error (${error.response.status})`,
-    code:    data?.code    || null,
-    status:  error.response.status,
+    message: data?.message || data?.error ||
+      `Server error (${error.response.status})`,
+    code:   data?.code || null,
+    status: error.response.status,
     data,
-    retry:   isRetryable(error),
+    retry:  isRetryable(error),
   };
 }
 
@@ -140,18 +138,21 @@ export const api = axios.create({
 // ═══════════════════════════════════════════════════════════════
 api.interceptors.request.use(
   (config) => {
-    // ── Auth token ─────────────────────────────────────────
+    // Auth token
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // ── FormData → let browser set Content-Type ────────────
+    // FormData → browser নিজেই Content-Type set করবে
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
+      if (config.headers.common) {
+        delete config.headers.common['Content-Type'];
+      }
     }
 
-    // ── Dynamic timeout ────────────────────────────────────
+    // Dynamic timeout
     config.timeout = getTimeout(config);
 
     return config;
@@ -163,11 +164,12 @@ api.interceptors.request.use(
 // RESPONSE INTERCEPTOR
 // ═══════════════════════════════════════════════════════════════
 api.interceptors.response.use(
-  // ── Success ──────────────────────────────────────────────
+
+  // ── Success ───────────────────────────────────────────────
   (response) => {
     const config = response.config;
 
-    // Cache GET responses
+    // GET → cache
     if (config?.method?.toLowerCase() === 'get') {
       const key = getCacheKey(config);
       requestCache.set(key, {
@@ -175,6 +177,14 @@ api.interceptors.response.use(
         timestamp: Date.now(),
       });
       inflightMap.delete(key);
+    }
+
+    // upload-and-send → dashboard cache clear
+    if (
+      config?.method?.toLowerCase() === 'post' &&
+      config?.url?.includes('upload-and-send')
+    ) {
+      apiCache.invalidatePattern('/documents');
     }
 
     return response;
@@ -192,39 +202,45 @@ api.interceptors.response.use(
     const key    = getCacheKey(config);
     const status = error.response?.status;
 
-    // ── 401 → logout ───────────────────────────────────────
+    // 401 → logout
     if (status === 401) {
       localStorage.removeItem('token');
       inflightMap.delete(key);
 
-      if (
-        typeof window !== 'undefined' &&
-        !window.location.pathname.includes('/login') &&
-        !window.location.pathname.includes('/sign/')
-      ) {
+      const isPublicPage =
+        window.location.pathname.includes('/login')    ||
+        window.location.pathname.includes('/sign/')    ||
+        window.location.pathname.includes('/register');
+
+      if (typeof window !== 'undefined' && !isPublicPage) {
         window.location.href = '/login?expired=true';
       }
+
       return Promise.reject(normalizeError(error));
     }
 
-    // ── Non-retryable ──────────────────────────────────────
+    // Non-retryable 4xx
     if ([400, 403, 404, 409, 410, 422].includes(status)) {
       inflightMap.delete(key);
       return Promise.reject(normalizeError(error));
     }
 
-    // ── Retry ──────────────────────────────────────────────
+    // Retry
     if (isRetryable(error)) {
       config.__retryCount = (config.__retryCount || 0) + 1;
 
       if (config.__retryCount <= MAX_RETRIES) {
-        console.warn(`🔁 Retry ${config.__retryCount}/${MAX_RETRIES}: ${config.url}`);
+        console.warn(
+          `🔁 Retry ${config.__retryCount}/${MAX_RETRIES}: ${config.url}`,
+        );
 
-        // Stale-while-revalidate for GET
+        // Stale cache hit → GET এ সাথে সাথে return
         const cached = requestCache.get(key);
         if (cached && config.method?.toLowerCase() === 'get') {
-          // Return stale immediately, refresh in background
-          setTimeout(() => api(config).catch(() => {}), RETRY_DELAY_MS);
+          setTimeout(
+            () => api(config).catch(() => {}),
+            RETRY_DELAY_MS,
+          );
           return Promise.resolve({
             data:        cached.data,
             status:      200,
@@ -252,7 +268,7 @@ api.get = function cachedGet(url, config = {}) {
   const mergedConfig = { ...config, url, method: 'get' };
   const key          = getCacheKey(mergedConfig);
 
-  // ── Fresh cache hit ───────────────────────────────────────
+  // Fresh cache hit
   if (!config.noCache) {
     const cached = requestCache.get(key);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -264,12 +280,12 @@ api.get = function cachedGet(url, config = {}) {
     }
   }
 
-  // ── Dedup: same request already in-flight ─────────────────
+  // Dedup
   if (inflightMap.has(key)) {
     return inflightMap.get(key);
   }
 
-  // ── New request ───────────────────────────────────────────
+  // New request
   const promise = _originalGet(url, config).finally(() => {
     inflightMap.delete(key);
   });
@@ -279,57 +295,61 @@ api.get = function cachedGet(url, config = {}) {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// NAMED API METHODS (typed, clean)
+// NAMED API METHODS
 // ═══════════════════════════════════════════════════════════════
 
 // ── Auth ──────────────────────────────────────────────────────
 export const authApi = {
-  login:          (data)   => api.post('/auth/login',           data),
-  register:       (data)   => api.post('/auth/register',        data),
-  googleAuth:     (data)   => api.post('/auth/google',          data),
-  getMe:          ()       => api.get('/auth/me'),
-  updateProfile:  (data)   => api.put('/auth/profile',          data),
-  changePassword: (data)   => api.put('/auth/change-password',  data),
-  logout:         ()       => api.post('/auth/logout'),
+  login:          (data) => api.post('/auth/login',          data),
+  register:       (data) => api.post('/auth/register',       data),
+  googleAuth:     (data) => api.post('/auth/google',         data),
+  getMe:          ()     => api.get('/auth/me'),
+  updateProfile:  (data) => api.put('/auth/profile',         data),
+  changePassword: (data) => api.put('/auth/change-password', data),
+  logout:         ()     => api.post('/auth/logout'),
 };
 
 // ── Documents ─────────────────────────────────────────────────
 export const documentApi = {
-  // Dashboard list
   getAll: (params = {}) =>
     api.get('/documents', { params }),
 
-  // Single document
   getOne: (id) =>
     api.get(`/documents/${id}`),
 
-  // Audit log
   getAudit: (id) =>
     api.get(`/documents/${id}/audit`, { noCache: true }),
 
-  // Upload PDF only
   upload: (formData) =>
     api.post('/documents/upload', formData),
 
-  // Upload logo
+  // image/* এখন server accept করে
   uploadLogo: (formData) =>
     api.post('/documents/upload-logo', formData),
 
-  // Save draft
   update: (id, data) =>
     api.put(`/documents/${id}`, data),
 
-  // Send for signing
+  // send হলে cache clear
   send: (formData) =>
-    api.post('/documents/upload-and-send', formData),
+    api.post('/documents/upload-and-send', formData).then(res => {
+      apiCache.invalidatePattern('/documents');
+      return res;
+    }),
 
-  // Delete
+  // delete হলে cache clear
   delete: (id) =>
-    api.delete(`/documents/${id}`),
+    api.delete(`/documents/${id}`).then(res => {
+      apiCache.invalidatePattern('/documents');
+      return res;
+    }),
 
-  // ── Signing (public — no auth) ──────────────────────────
+  // Public — no auth
   validateToken: (token) =>
-    api.get(`/documents/sign/validate/${token}`, { noCache: true }),
+    api.get(
+      `/documents/sign/validate/${token}`,
+      { noCache: true },
+    ),
 
   submitSignature: (data) =>
     api.post('/documents/sign/submit', data),
@@ -355,21 +375,20 @@ export const templateApi = {
   delete: (id) =>
     api.delete(`/templates/${id}`),
 
-  // Boss signs
   bossSign: (id, data) =>
     api.post(`/templates/${id}/boss-sign`, data),
 
-  // Send to employees
   distribute: (id, data) =>
     api.post(`/templates/${id}/distribute`, data),
 
-  // Get sessions (employee tracking)
   getSessions: (id) =>
     api.get(`/templates/${id}/sessions`, { noCache: true }),
 
-  // Employee signing (public)
   validateEmployeeToken: (token) =>
-    api.get(`/templates/sign/validate/${token}`, { noCache: true }),
+    api.get(
+      `/templates/sign/validate/${token}`,
+      { noCache: true },
+    ),
 
   submitEmployeeSignature: (data) =>
     api.post('/templates/sign/submit', data),
@@ -377,15 +396,32 @@ export const templateApi = {
 
 // ── Admin ─────────────────────────────────────────────────────
 export const adminApi = {
-  getStats:       ()           => api.get('/admin/stats',     { noCache: true }),
-  getUsers:       (params = {})=> api.get('/admin/users',     { params }),
-  getUser:        (id)         => api.get(`/admin/users/${id}`),
-  updateRole:     (id, role)   => api.put(`/admin/users/${id}/role`, { role }),
-  toggleStatus:   (id)         => api.put(`/admin/users/${id}/toggle-status`),
-  deleteUser:     (id)         => api.delete(`/admin/users/${id}`),
-  getDocuments:   (params = {})=> api.get('/admin/documents', { params }),
-  deleteDocument: (id)         => api.delete(`/admin/documents/${id}`),
-  getAuditLogs:   (params = {})=> api.get('/admin/audit-logs',{ params, noCache: true }),
+  getStats: () =>
+    api.get('/admin/stats', { noCache: true }),
+
+  getUsers: (params = {}) =>
+    api.get('/admin/users', { params }),
+
+  getUser: (id) =>
+    api.get(`/admin/users/${id}`),
+
+  updateRole: (id, role) =>
+    api.put(`/admin/users/${id}/role`, { role }),
+
+  toggleStatus: (id) =>
+    api.put(`/admin/users/${id}/toggle-status`),
+
+  deleteUser: (id) =>
+    api.delete(`/admin/users/${id}`),
+
+  getDocuments: (params = {}) =>
+    api.get('/admin/documents', { params }),
+
+  deleteDocument: (id) =>
+    api.delete(`/admin/documents/${id}`),
+
+  getAuditLogs: (params = {}) =>
+    api.get('/admin/audit-logs', { params, noCache: true }),
 };
 
 // ── Feedback ──────────────────────────────────────────────────
@@ -395,24 +431,32 @@ export const feedbackApi = {
 
 // ═══════════════════════════════════════════════════════════════
 // PROXY URL BUILDER
+// blob: / data: → সরাসরি return
+// Cloudinary URL → সরাসরি use (CORS allow করা আছে)
 // ═══════════════════════════════════════════════════════════════
 export function buildProxyUrl(cloudinaryUrl) {
   if (!cloudinaryUrl) return '';
+
+  // Local blob বা base64 → সরাসরি use
   if (
     cloudinaryUrl.startsWith('blob:') ||
     cloudinaryUrl.startsWith('data:')
-  ) return cloudinaryUrl;
+  ) {
+    return cloudinaryUrl;
+  }
 
-  return cloudinaryUrl; // Cloudinary URL সরাসরি use করবে
+  // Cloudinary URL → সরাসরি return
+  // (server side CORS allow করা আছে)
+  return cloudinaryUrl;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ONLINE / OFFLINE
+// ONLINE / OFFLINE EVENTS
 // ═══════════════════════════════════════════════════════════════
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
-    console.log('✅ Network restored');
-    apiCache.clear(); // Fresh data আনবে
+    console.log('✅ Network restored — clearing cache');
+    apiCache.clear();
   });
 
   window.addEventListener('offline', () => {
