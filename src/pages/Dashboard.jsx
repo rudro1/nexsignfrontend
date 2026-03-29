@@ -20,8 +20,15 @@ export default function Dashboard() {
 
   const [search, setSearch]           = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [documents, setDocuments]     = useState([]);
-  const [isLoading, setIsLoading]     = useState(true);
+  const [documents, setDocuments]     = useState(() => {
+    try {
+      const cached = localStorage.getItem(`nexsign_docs_${user?.email}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isLoading, setIsLoading]     = useState(!documents.length);
   const [isSyncing, setIsSyncing]     = useState(false);
   const [fetchError, setFetchError]   = useState(null);
 
@@ -32,7 +39,7 @@ export default function Dashboard() {
     abortRef.current = new AbortController();
 
     try {
-      if (!silent) setIsLoading(true);
+      if (!silent && !documents.length) setIsLoading(true);
       else setIsSyncing(true);
       setFetchError(null);
 
@@ -42,6 +49,7 @@ export default function Dashboard() {
 
       const rawData = res.data?.documents || [];
       setDocuments(rawData);
+      localStorage.setItem(`nexsign_docs_${user?.email}`, JSON.stringify(rawData));
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       setFetchError('Failed to load documents. Click to retry.');

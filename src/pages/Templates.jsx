@@ -17,8 +17,14 @@ import {
 const emptySigner = { name:'', email:'' };
 
 export default function Templates() {
-  const [templates,    setTemplates]    = useState([]);
-  const [loading,      setLoading]      = useState(true);
+  const { user } = useAuth();
+  const [templates,    setTemplates]    = useState(() => {
+    try {
+      const cached = localStorage.getItem(`nexsign_tpls_${user?.email}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
+  const [loading,      setLoading]      = useState(!templates.length);
   const [selected,     setSelected]     = useState(null);
   const [signers,      setSigners]      = useState([{ ...emptySigner }]);
   const [ccEmails,     setCcEmails]     = useState('');
@@ -33,15 +39,17 @@ export default function Templates() {
   // ── Load templates ──────────────────────────────────────────
   const loadTemplates = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!templates.length) setLoading(true);
       const res = await api.get('/documents/templates');
-      setTemplates(res.data?.templates || []);
+      const data = res.data?.templates || [];
+      setTemplates(data);
+      localStorage.setItem(`nexsign_tpls_${user?.email}`, JSON.stringify(data));
     } catch (err) {
       toast.error('Failed to load templates');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user, templates.length]);
 
   useEffect(() => { loadTemplates(); }, [loadTemplates]);
 

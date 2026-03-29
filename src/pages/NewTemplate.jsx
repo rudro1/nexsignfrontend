@@ -1,592 +1,493 @@
-// import React, {
-//   useState, useCallback, useRef,
-// } from 'react';
-// import { useNavigate } from 'react-router-dom';
-// import { api } from '@/api/apiClient';
-// import { useAuth } from '@/lib/AuthContext';
-// import { Button }   from '@/components/ui/button';
-// import { Input }    from '@/components/ui/input';
-// import { Card }     from '@/components/ui/Card';
-// import { Label }    from '@/components/ui/label';
-// import { toast }    from 'sonner';
-// import {
-//   ArrowLeft, Upload, ImagePlus,
-//   X, Send, Loader2, FileText, Mail,
-// } from 'lucide-react';
-// import PdfViewer    from '@/components/editor/PdfViewer';
-// import FieldToolbar from '@/components/editor/FieldToolbar';
-// import {
-//   Select, SelectContent, SelectItem,
-//   SelectTrigger, SelectValue,
-// } from '@/components/ui/select';
-
-// const FONT_FAMILIES = [
-//   { label: 'Helvetica',       value: 'Helvetica'       },
-//   { label: 'Times New Roman', value: 'Times New Roman' },
-//   { label: 'Courier',         value: 'Courier'         },
-// ];
-// const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24];
-
-// // Party config for template:
-// // partyIndex 0 = Party 1 (CEO/Owner — pre-signs)
-// // partyIndex 1 = Employee (each recipient)
-// const TEMPLATE_PARTIES = [
-//   { name: 'Party 1 (Authoriser)', color: '#0ea5e9', index: 0 },
-//   { name: 'Employee / Signer',    color: '#8b5cf6', index: 1 },
-// ];
-
-// export default function NewTemplate() {
-//   const navigate = useNavigate();
-//   const { user } = useAuth();
-
-//   const [rawFile,          setRawFile]          = useState(null);
-//   const [fileUrl,          setFileUrl]          = useState('');
-//   const [fileReady,        setFileReady]        = useState(false);
-//   const [title,            setTitle]            = useState('');
-//   const [companyLogoFile,  setCompanyLogoFile]  = useState(null);
-//   const [companyLogoPreview, setCompanyLogoPreview] = useState('');
-//   const [companyName,      setCompanyName]      = useState('');
-//   const [party1Name,       setParty1Name]       = useState(user?.full_name || '');
-//   const [party1Email,      setParty1Email]      = useState(user?.email    || '');
-//   const [ccEmail,          setCcEmail]          = useState('');
-//   const [ccList,           setCcList]           = useState([]);
-//   const [fields,           setFields]           = useState([]);
-//   const [currentPage,      setCurrentPage]      = useState(1);
-//   const [totalPages,       setTotalPages]       = useState(1);
-//   const [selectedPartyIdx, setSelectedPartyIdx] = useState(0);
-//   const [pendingType,      setPendingType]      = useState(null);
-//   const [selectedFieldId,  setSelectedFieldId]  = useState(null);
-//   const [processing,       setProcessing]       = useState(false);
-
-//   const selectedField = fields.find(f => f.id === selectedFieldId);
-
-//   // ── Handlers ────────────────────────────────────────────────
-//   const handleFileSelect = useCallback((e) => {
-//     const file = e.target.files?.[0];
-//     if (!file || file.type !== 'application/pdf') {
-//       toast.error('Please upload a PDF file.');
-//       return;
-//     }
-//     if (file.size > 15 * 1024 * 1024) {
-//       toast.error('PDF must be under 15MB.');
-//       return;
-//     }
-//     if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
-//     setRawFile(file);
-//     setTitle(prev => prev || file.name.replace(/\.pdf$/i, ''));
-//     setFileUrl(URL.createObjectURL(file));
-//     setFileReady(true);
-//     setFields([]);
-//     setCurrentPage(1);
-//     toast.success('PDF loaded!');
-//     e.target.value = '';
-//   }, [fileUrl]);
-
-//   const handleLogoSelect = useCallback((e) => {
-//     const file = e.target.files?.[0];
-//     if (!file || !file.type.startsWith('image/')) return;
-//     setCompanyLogoFile(file);
-//     setCompanyLogoPreview(URL.createObjectURL(file));
-//     e.target.value = '';
-//   }, []);
-
-//   const addCc = () => {
-//     const email = ccEmail.trim().toLowerCase();
-//     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-//       toast.error('Invalid email.');
-//       return;
-//     }
-//     if (ccList.some(r => r.email === email)) return;
-//     setCcList(p => [...p, { email, name:'' }]);
-//     setCcEmail('');
-//   };
-
-//   const updateFieldTypography = (key, val) => {
-//     if (!selectedFieldId) return;
-//     setFields(prev => prev.map(f =>
-//       f.id === selectedFieldId ? { ...f, [key]: val } : f
-//     ));
-//   };
-
-//   // ── Submit ───────────────────────────────────────────────────
-//   const handleCreate = async () => {
-//     if (!rawFile) {
-//       toast.error('Please upload a PDF.');
-//       return;
-//     }
-//     if (!title.trim()) {
-//       toast.error('Please enter a template title.');
-//       return;
-//     }
-//     if (!party1Email.trim()) {
-//       toast.error('Please enter Party 1 email.');
-//       return;
-//     }
-//     if (!fields.length) {
-//       toast.error('Please place at least one field.');
-//       return;
-//     }
-
-//     setProcessing(true);
-//     try {
-//       const formData = new FormData();
-//       formData.append('file', rawFile);
-//       formData.append('title', title.trim());
-//       formData.append('companyName', companyName.trim());
-//       formData.append('fields', JSON.stringify(fields));
-//       formData.append('party1', JSON.stringify({
-//         name:  party1Name.trim() || user?.full_name || 'Party 1',
-//         email: party1Email.trim().toLowerCase(),
-//       }));
-//       formData.append('ccList', JSON.stringify(ccList));
-
-//       // Upload logo
-//       if (companyLogoFile instanceof File) {
-//         const lf = new FormData();
-//         lf.append('logo', companyLogoFile);
-//         const lr = await api.post('/documents/upload-logo', lf);
-//         if (lr.data?.logoUrl) {
-//           formData.append('companyLogo', lr.data.logoUrl);
-//         }
-//       }
-
-//       // Optimistic navigate
-//       navigate('/templates');
-//       toast.success('Template created! Party 1 will receive a signing link.');
-
-//       await api.post('/documents/templates', formData);
-//     } catch (err) {
-//       toast.error(err.response?.data?.message || 'Failed to create template.');
-//     } finally {
-//       setProcessing(false);
-//     }
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-
-//       {/* Top bar */}
-//       <div className="sticky top-0 z-40 bg-white dark:bg-slate-900
-//                       border-b border-slate-200 dark:border-slate-700
-//                       px-4 py-3 flex items-center justify-between
-//                       gap-3 shadow-sm">
-//         <div className="flex items-center gap-3 min-w-0">
-//           <Button
-//             variant="ghost" size="icon"
-//             onClick={() => navigate('/templates')}
-//             className="rounded-xl shrink-0"
-//           >
-//             <ArrowLeft className="w-4 h-4" />
-//           </Button>
-//           <Input
-//             value={title}
-//             onChange={e => setTitle(e.target.value)}
-//             placeholder="Template Title..."
-//             className="h-9 rounded-xl border-slate-200 font-semibold
-//                        max-w-xs focus:border-[#28ABDF]"
-//           />
-//         </div>
-//         <Button
-//           onClick={handleCreate}
-//           disabled={processing}
-//           className="bg-[#28ABDF] hover:bg-[#2399c8] text-white
-//                      rounded-xl gap-2 px-6 h-9 font-semibold shrink-0"
-//         >
-//           {processing
-//             ? <Loader2 className="w-4 h-4 animate-spin" />
-//             : <><Send className="w-4 h-4" /> Create Template</>
-//           }
-//         </Button>
-//       </div>
-
-//       <div className="flex h-[calc(100vh-57px)]">
-
-//         {/* Sidebar */}
-//         <div className="w-80 shrink-0 border-r border-slate-200
-//                         dark:border-slate-700 bg-white dark:bg-slate-900
-//                         overflow-y-auto flex flex-col gap-4 p-4">
-
-//           {/* Branding */}
-//           <Card className="p-4 rounded-2xl border-slate-100
-//                            dark:border-slate-800">
-//             <p className="text-xs font-bold text-slate-500
-//                           uppercase tracking-wider mb-3">
-//               Branding
-//             </p>
-
-//             {/* Logo */}
-//             {companyLogoPreview ? (
-//               <div className="relative inline-block mb-3">
-//                 <img
-//                   src={companyLogoPreview}
-//                   alt="Logo"
-//                   className="h-12 max-w-[160px] object-contain
-//                              rounded-lg border border-slate-200"
-//                 />
-//                 <button
-//                   onClick={() => {
-//                     setCompanyLogoPreview('');
-//                     setCompanyLogoFile(null);
-//                   }}
-//                   className="absolute -top-1.5 -right-1.5 bg-red-500
-//                              text-white rounded-full p-0.5 shadow"
-//                 >
-//                   <X className="w-3 h-3" />
-//                 </button>
-//               </div>
-//             ) : (
-//               <label className="flex items-center gap-2 cursor-pointer
-//                                 border-2 border-dashed border-slate-200
-//                                 rounded-xl p-3 mb-3
-//                                 hover:border-[#28ABDF] transition-colors">
-//                 <ImagePlus className="w-4 h-4 text-slate-400" />
-//                 <span className="text-xs text-slate-400">Upload Logo</span>
-//                 <input
-//                   type="file"
-//                   accept="image/*"
-//                   className="hidden"
-//                   onChange={handleLogoSelect}
-//                 />
-//               </label>
-//             )}
-
-//             <Input
-//               value={companyName}
-//               onChange={e => setCompanyName(e.target.value)}
-//               placeholder="Company Name"
-//               className="h-9 rounded-xl text-sm border-slate-200"
-//             />
-//           </Card>
-
-//           {/* PDF */}
-//           <Card className="p-4 rounded-2xl border-slate-100
-//                            dark:border-slate-800">
-//             <p className="text-xs font-bold text-slate-500
-//                           uppercase tracking-wider mb-3">
-//               Template PDF
-//             </p>
-//             <label className="flex flex-col items-center gap-2
-//                               cursor-pointer border-2 border-dashed
-//                               border-slate-200 rounded-xl p-4
-//                               hover:border-[#28ABDF] transition-colors">
-//               {fileReady
-//                 ? <><FileText className="w-8 h-8 text-[#28ABDF]" />
-//                     <p className="text-xs font-semibold text-[#28ABDF]">
-//                       PDF Loaded ✓
-//                     </p></>
-//                 : <><Upload className="w-8 h-8 text-slate-300" />
-//                     <p className="text-xs text-slate-400">Upload PDF</p></>
-//               }
-//               <input
-//                 type="file"
-//                 accept="application/pdf"
-//                 className="hidden"
-//                 onChange={handleFileSelect}
-//               />
-//             </label>
-//           </Card>
-
-//           {/* Party 1 */}
-//           <Card className="p-4 rounded-2xl border-slate-100
-//                            dark:border-slate-800">
-//             <div className="flex items-center gap-2 mb-3">
-//               <div className="w-3 h-3 rounded-full bg-[#0ea5e9]" />
-//               <p className="text-xs font-bold text-slate-600
-//                             uppercase tracking-wider">
-//                 Party 1 (Authoriser)
-//               </p>
-//             </div>
-//             <p className="text-[10px] text-slate-400 mb-2">
-//               Party 1 signs the template once. Their signature
-//               appears pre-filled for all future recipients.
-//             </p>
-//             <div className="space-y-2">
-//               <Input
-//                 value={party1Name}
-//                 onChange={e => setParty1Name(e.target.value)}
-//                 placeholder="Name"
-//                 className="h-9 rounded-xl text-sm border-slate-200"
-//               />
-//               <Input
-//                 value={party1Email}
-//                 onChange={e => setParty1Email(e.target.value)}
-//                 placeholder="Email"
-//                 type="email"
-//                 className="h-9 rounded-xl text-sm border-slate-200"
-//               />
-//             </div>
-//           </Card>
-
-//           {/* CC */}
-//           <Card className="p-4 rounded-2xl border-slate-100
-//                            dark:border-slate-800">
-//             <div className="flex items-center gap-2 mb-3">
-//               <Mail className="w-4 h-4 text-[#28ABDF]" />
-//               <p className="text-xs font-bold text-slate-600
-//                             uppercase tracking-wider">
-//                 CC Recipients
-//               </p>
-//             </div>
-//             <div className="flex gap-2">
-//               <Input
-//                 value={ccEmail}
-//                 onChange={e => setCcEmail(e.target.value)}
-//                 onKeyDown={e =>
-//                   e.key === 'Enter' && (e.preventDefault(), addCc())
-//                 }
-//                 placeholder="email@example.com"
-//                 className="h-9 text-xs rounded-xl flex-1"
-//               />
-//               <Button
-//                 size="sm" onClick={addCc}
-//                 className="h-9 px-3 bg-[#28ABDF] text-white rounded-xl"
-//               >
-//                 Add
-//               </Button>
-//             </div>
-//             {ccList.length > 0 && (
-//               <div className="mt-2 space-y-1">
-//                 {ccList.map(r => (
-//                   <div key={r.email}
-//                        className="flex items-center justify-between
-//                                   bg-sky-50 border border-sky-100
-//                                   rounded-xl px-3 py-1.5">
-//                     <span className="text-[11px] text-sky-700 truncate">
-//                       {r.email}
-//                     </span>
-//                     <button
-//                       onClick={() =>
-//                         setCcList(p =>
-//                           p.filter(x => x.email !== r.email)
-//                         )
-//                       }
-//                       className="text-slate-400 hover:text-red-500"
-//                     >
-//                       <X className="w-3 h-3" />
-//                     </button>
-//                   </div>
-//                 ))}
-//               </div>
-//             )}
-//           </Card>
-
-//           {/* Field toolbar */}
-//           {fileReady && (
-//             <Card className="p-4 rounded-2xl border-slate-100
-//                              dark:border-slate-800">
-//               <FieldToolbar
-//                 parties={TEMPLATE_PARTIES}
-//                 selectedPartyIndex={selectedPartyIdx}
-//                 onPartySelect={setSelectedPartyIdx}
-//                 onAddField={type => setPendingType(type)}
-//                 pendingFieldType={pendingType}
-//               />
-//             </Card>
-//           )}
-
-//           {/* Typography */}
-//           {selectedField?.type === 'text' && (
-//             <Card className="p-4 rounded-2xl bg-sky-50/50
-//                              border-[#28ABDF]/20
-//                              dark:border-slate-800">
-//               <p className="text-xs font-bold text-slate-600
-//                             uppercase tracking-wider mb-3">
-//                 Text Style (Fixed for Signer)
-//               </p>
-//               <div className="space-y-2">
-//                 <Select
-//                   value={selectedField.fontFamily || 'Helvetica'}
-//                   onValueChange={v =>
-//                     updateFieldTypography('fontFamily', v)
-//                   }
-//                 >
-//                   <SelectTrigger className="h-9 rounded-xl text-xs">
-//                     <SelectValue />
-//                   </SelectTrigger>
-//                   <SelectContent>
-//                     {FONT_FAMILIES.map(f => (
-//                       <SelectItem key={f.value} value={f.value}>
-//                         <span style={{ fontFamily: f.value }}>
-//                           {f.label}
-//                         </span>
-//                       </SelectItem>
-//                     ))}
-//                   </SelectContent>
-//                 </Select>
-
-//                 <Select
-//                   value={String(selectedField.fontSize || 14)}
-//                   onValueChange={v =>
-//                     updateFieldTypography('fontSize', Number(v))
-//                   }
-//                 >
-//                   <SelectTrigger className="h-9 rounded-xl text-xs">
-//                     <SelectValue />
-//                   </SelectTrigger>
-//                   <SelectContent>
-//                     {FONT_SIZES.map(s => (
-//                       <SelectItem key={s} value={String(s)}>
-//                         {s}px
-//                       </SelectItem>
-//                     ))}
-//                   </SelectContent>
-//                 </Select>
-
-//                 <div className="bg-white border border-slate-200
-//                                 rounded-xl p-2 text-center">
-//                   <span
-//                     style={{
-//                       fontFamily: selectedField.fontFamily,
-//                       fontSize:   `${selectedField.fontSize||14}px`,
-//                     }}
-//                   >
-//                     Preview Text
-//                   </span>
-//                 </div>
-//               </div>
-//             </Card>
-//           )}
-
-//           {/* Summary */}
-//           {fields.length > 0 && (
-//             <div className="bg-slate-50 dark:bg-slate-900/50
-//                             rounded-xl p-3 border border-slate-100
-//                             dark:border-slate-800 text-xs">
-//               <p className="font-bold text-slate-500 uppercase
-//                             tracking-wide mb-1">
-//                 {fields.length} field
-//                 {fields.length !== 1 ? 's' : ''} placed
-//               </p>
-//               {TEMPLATE_PARTIES.map((p, i) => {
-//                 const c = fields.filter(
-//                   f => Number(f.partyIndex) === i
-//                 ).length;
-//                 return c > 0 ? (
-//                   <div key={i}
-//                        className="flex justify-between py-0.5">
-//                     <span className="text-slate-500">{p.name}</span>
-//                     <span className="font-bold text-[#28ABDF]">
-//                       {c}
-//                     </span>
-//                   </div>
-//                 ) : null;
-//               })}
-//             </div>
-//           )}
-//         </div>
-
-//         {/* PDF Viewer */}
-//         <div className="flex-1 bg-slate-100 dark:bg-slate-950
-//                         overflow-hidden min-h-0">
-//           {fileReady ? (
-//             <PdfViewer
-//               fileUrl={fileUrl}
-//               fields={fields}
-//               onFieldsChange={setFields}
-//               currentPage={currentPage}
-//               onPageChange={setCurrentPage}
-//               onTotalPagesChange={setTotalPages}
-//               pendingFieldType={pendingType}
-//               selectedPartyIndex={selectedPartyIdx}
-//               parties={TEMPLATE_PARTIES}
-//               onFieldPlaced={() => setPendingType(null)}
-//               selectedFieldId={selectedFieldId}
-//               onFieldSelect={setSelectedFieldId}
-//             />
-//           ) : (
-//             <div className="h-full flex flex-col items-center
-//                             justify-center text-slate-300 px-8
-//                             text-center">
-//               <FileText className="w-16 h-16 opacity-20 mb-4" />
-//               <p className="font-semibold text-slate-400 text-lg">
-//                 Upload a PDF to start
-//               </p>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import {
+  Select, SelectContent, SelectItem,
+  SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
-import { ArrowLeft, Upload, Send, Loader2, FileText } from 'lucide-react';
-import PdfViewer from '@/components/editor/PdfViewer';
+import {
+  Upload, Send, ArrowLeft, FileText,
+  Loader2, Mail, X, ImagePlus, ChevronRight,
+  CheckCircle2, Users, Plus, Trash2, PenTool,
+} from 'lucide-react';
+import FieldToolbar  from '@/components/editor/FieldToolbar';
+import PdfViewer     from '@/components/editor/PdfViewer';
+
+const FONT_FAMILIES = [
+  { label: 'Helvetica',        value: 'Helvetica'       },
+  { label: 'Times New Roman',  value: 'Times New Roman' },
+  { label: 'Courier',          value: 'Courier'         },
+];
+const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24];
+
+const TEMPLATE_PARTIES = [
+  { name: 'Boss / Authoriser', color: '#0ea5e9', order: 0 },
+  { name: 'Employee / Signer', color: '#8b5cf6', order: 1 },
+];
 
 export default function NewTemplate() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const [rawFile, setRawFile] = useState(null);
-  const [fileUrl, setFileUrl] = useState('');
-  const [title, setTitle] = useState('');
-  const [fields, setFields] = useState([]);
-  const [processing, setProcessing] = useState(false);
+  const navigate  = useNavigate();
+  const { user }  = useAuth();
 
-  const handleFileSelect = (e) => {
+  // ── Wizard State ───────────────────────────────────────────
+  const [step, setStep] = useState(1);
+
+  // ── Core state ───────────────────────────────────────────────
+  const [rawFile,    setRawFile]    = useState(null);
+  const [title,      setTitle]      = useState('');
+  const [fileUrl,    setFileUrl]    = useState('');
+  const [fileReady,  setFileReady]  = useState(false);
+  const [fields,     setFields]     = useState([]);
+  const [companyLogoFile, setCompanyLogoFile] = useState(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState('');
+  const [companyName,    setCompanyName]    = useState('');
+
+  // ── Boss Info ───────────────────────────────────────────────
+  const [bossName,   setBossName]   = useState(user?.full_name || '');
+  const [bossEmail,  setBossEmail]  = useState(user?.email || '');
+
+  // ── Employee List ───────────────────────────────────────────
+  const [employees,  setEmployees]  = useState([]);
+  const [empName,    setEmpName]    = useState('');
+  const [empEmail,   setEmpEmail]   = useState('');
+
+  // ── Editor state ─────────────────────────────────────────────
+  const [currentPage,        setCurrentPage]        = useState(1);
+  const [totalPages,         setTotalPages]          = useState(1);
+  const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
+  const [pendingFieldType,   setPendingFieldType]   = useState(null);
+  const [processing,         setProcessing]         = useState(false);
+  const [selectedFieldId,    setSelectedFieldId]    = useState(null);
+
+  const selectedField = useMemo(() => fields.find(f => f.id === selectedFieldId), [fields, selectedFieldId]);
+
+  const handleFileSelect = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Please upload a valid PDF.');
+      return;
+    }
+    if (fileUrl?.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
     setRawFile(file);
-    setTitle(file.name.replace(/\.pdf$/i, ''));
+    setTitle(prev => prev || file.name.replace(/\.pdf$/i, ''));
     setFileUrl(URL.createObjectURL(file));
+    setFileReady(true);
+    setFields([]);
+    setCurrentPage(1);
+    e.target.value = '';
+  }, [fileUrl]);
+
+  const handleLogoSelect = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCompanyLogoFile(file);
+    setCompanyLogoPreview(URL.createObjectURL(file));
+    e.target.value = '';
+  }, []);
+
+  const addEmployee = () => {
+    const email = empEmail.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Invalid email address.');
+      return;
+    }
+    setEmployees(prev => [...prev, { email, name: empName.trim() }]);
+    setEmpEmail(''); setEmpName('');
   };
 
-  const handleCreate = async () => {
-    if (!rawFile || !title.trim()) return toast.error('Please upload a PDF and set a title.');
-    
+  const handleCsvUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const [header, ...rows] = lines;
+      const headers = header.split(',').map(h => h.trim().toLowerCase());
+      const ni = headers.indexOf('name');
+      const ei = headers.indexOf('email');
+      
+      if (ni === -1 || ei === -1) {
+        toast.error('CSV must have "name" and "email" headers.');
+        return;
+      }
+
+      const newEmps = rows.map(r => {
+        const cols = r.split(',').map(c => c.trim());
+        return { name: cols[ni], email: cols[ei].toLowerCase() };
+      }).filter(emp => emp.name && emp.email);
+
+      setEmployees(prev => [...prev, ...newEmps]);
+      toast.success(`${newEmps.length} employees added from CSV!`);
+    } catch (err) {
+      toast.error('Failed to parse CSV.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const updateFieldTypography = (key, value) => {
+    if (!selectedFieldId) return;
+    setFields(prev => prev.map(f => f.id === selectedFieldId ? { ...f, [key]: value } : f));
+  };
+
+  const validate = () => {
+    if (!fileUrl) { toast.error('Please upload a PDF.'); return false; }
+    if (!title.trim()) { toast.error('Please enter a template name.'); return false; }
+    if (!bossEmail.trim()) { toast.error('Boss email is required.'); return false; }
+    if (!fields.length) { toast.error('Place at least one field.'); return false; }
+    if (employees.length === 0) { toast.error('Add at least one employee.'); return false; }
+    return true;
+  };
+
+  const handleSend = async () => {
+    if (!validate()) return;
     setProcessing(true);
     try {
       const formData = new FormData();
-      // Append Metadata
-      formData.append('title', title.trim());
-      formData.append('fields', JSON.stringify(fields));
-      formData.append('party1', JSON.stringify({ name: user?.full_name || 'Admin', email: user?.email }));
-      
-      // Append file LAST (Critical for Multer)
       formData.append('file', rawFile);
+      formData.append('title', title.trim());
+      formData.append('companyName', companyName.trim());
+      formData.append('fields', JSON.stringify(fields));
+      formData.append('boss', JSON.stringify({ name: bossName.trim(), email: bossEmail.trim().toLowerCase() }));
+      formData.append('employees', JSON.stringify(employees));
+      formData.append('totalPages', String(totalPages));
 
-      // Do NOT set Content-Type header. Axios sets it automatically with the boundary.
-      await api.post('/documents/templates', formData);
+      if (companyLogoFile) {
+        const logoForm = new FormData();
+        logoForm.append('logo', companyLogoFile);
+        const logoRes = await api.post('/documents/upload-logo', logoForm);
+        if (logoRes.data?.logoUrl) formData.append('companyLogo', logoRes.data.logoUrl);
+      }
 
-      toast.success('Template created!');
+      await api.post('/documents/templates/create-and-send', formData);
       navigate('/templates');
+      toast.success('Template created and sent to Boss!');
     } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Upload failed. Please check file size.');
+      toast.error(err.response?.data?.message || 'Failed to create template.');
     } finally {
       setProcessing(false);
     }
   };
 
+  const nextStep = () => {
+    if (step === 1 && (!fileUrl || !title.trim())) return toast.error('Upload PDF and enter title');
+    if (step === 2 && !fields.length) return toast.error('Please place at least one field');
+    if (step === 3 && (!bossName.trim() || !bossEmail.trim())) return toast.error('Fill Boss details');
+    if (step === 4 && employees.length === 0) return toast.error('Add at least one employee');
+    if (step < 5) setStep(step + 1);
+  };
+
+  const prevStep = () => {
+    if (step > 1) setStep(step - 1);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="sticky top-0 z-50 bg-white border-b px-6 py-3 flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/templates')}><ArrowLeft className="w-5" /></Button>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Template Title..." className="border-0 font-bold text-lg focus:ring-0" />
+    <div className="flex flex-col h-screen bg-[#F8FAFC] dark:bg-slate-950 overflow-hidden font-sans">
+      {/* ── TOP NAV ── */}
+      <header className="h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between z-50 shadow-sm">
+        <div className="flex items-center gap-6 flex-1 mr-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/templates')} className="rounded-2xl h-12 w-12 shrink-0 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100">
+            <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-300" />
+          </Button>
+          <div className="flex flex-col min-w-0">
+            <input
+              type="text" value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="Enter Template Name..."
+              className="bg-transparent border-none focus:ring-0 font-black text-slate-900 dark:text-white truncate text-xl p-0 uppercase tracking-tight"
+            />
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Step {step} of 5:</span>
+              <span className="text-[10px] font-black text-[#28ABDF] uppercase tracking-[0.2em]">
+                {step === 1 && 'Upload & Branding'}
+                {step === 2 && 'Define Fields'}
+                {step === 3 && 'Boss Information'}
+                {step === 4 && 'Employee List'}
+                {step === 5 && 'Review & Finalize'}
+              </span>
+            </div>
+          </div>
         </div>
-        <Button onClick={handleCreate} disabled={processing} className="bg-[#28ABDF] hover:bg-[#2399c8] rounded-xl px-6">
-          {processing ? <Loader2 className="animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />} Create
-        </Button>
+
+        <div className="flex items-center gap-3">
+          {step > 1 && (
+            <Button variant="outline" onClick={prevStep} className="rounded-2xl h-12 px-6 font-black uppercase tracking-widest border-2">
+              Back
+            </Button>
+          )}
+          {step < 5 ? (
+            <Button onClick={nextStep} className="bg-slate-900 dark:bg-white dark:text-slate-900 text-white rounded-2xl h-12 px-8 font-black uppercase tracking-widest gap-2 shadow-xl">
+              Next <ChevronRight className="w-5 h-5" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSend} disabled={processing || !fileReady}
+              className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-2xl h-12 px-10 font-black uppercase tracking-widest gap-2 shadow-xl shadow-sky-500/20"
+            >
+              {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+              Send to Boss
+            </Button>
+          )}
+        </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden">
-        <aside className="w-80 border-r bg-white p-6 space-y-6">
-           <label className="border-2 border-dashed rounded-2xl p-6 flex flex-col items-center cursor-pointer hover:border-[#28ABDF] transition-colors">
-             <Upload className="w-8 h-8 text-slate-400 mb-2" />
-             <span className="text-sm font-medium">Click to change PDF</span>
-             <input type="file" onChange={handleFileSelect} className="hidden" />
-           </label>
-           <div className="text-xs text-slate-400">Supported: PDF up to 20MB</div>
-        </aside>
+      {/* ── MAIN CONTENT ── */}
+      <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         
-        <section className="flex-1 bg-slate-100 p-6 overflow-auto">
-          {fileUrl ? <PdfViewer fileUrl={fileUrl} fields={fields} onFieldsChange={setFields} /> : <div className="h-full flex items-center justify-center text-slate-400 italic">No document selected</div>}
+        {/* SIDEBAR WIZARD */}
+        <aside className="w-full md:w-[400px] border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto flex-shrink-0 z-40 shadow-lg">
+          
+          {/* STEP 1: UPLOAD & BRANDING */}
+          {step === 1 && (
+            <div className="p-8 space-y-10 animate-in fade-in slide-in-from-left-4 duration-300">
+              <section className="space-y-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-2xl bg-sky-50 dark:bg-sky-900/30 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-[#28ABDF]" />
+                  </div>
+                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">1. Template Source</h3>
+                </div>
+                
+                {!fileReady ? (
+                  <label className="flex flex-col items-center justify-center w-full h-48 border-4 border-dashed border-slate-100 dark:border-slate-800 rounded-[2.5rem] cursor-pointer hover:border-[#28ABDF] hover:bg-sky-50/30 transition-all group">
+                    <Upload className="w-12 h-12 text-slate-200 group-hover:text-[#28ABDF] mb-4 transition-transform group-hover:-translate-y-1" />
+                    <span className="text-xs font-black text-slate-400 group-hover:text-slate-600 uppercase tracking-widest">Drop PDF here or click</span>
+                    <input type="file" className="hidden" accept=".pdf" onChange={handleFileSelect} />
+                  </label>
+                ) : (
+                  <div className="p-6 bg-sky-50/50 dark:bg-sky-900/10 border-2 border-sky-100 dark:border-sky-800 rounded-[2rem] flex items-center gap-4 relative group">
+                    <div className="h-14 w-14 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                      <FileText className="w-7 h-7 text-[#28ABDF]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-black text-slate-900 dark:text-white truncate">{title}.pdf</p>
+                      <button onClick={() => setFileReady(false)} className="text-[10px] font-black text-[#28ABDF] hover:underline uppercase tracking-widest mt-1">Replace Document</button>
+                    </div>
+                    <div className="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full shadow-lg">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <section className="space-y-6 pt-10 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                    <ImagePlus className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">2. Company Info</h3>
+                </div>
+                
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name</Label>
+                    <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="e.g. Acme Corporation" className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold px-5 focus:ring-[#28ABDF] focus:border-[#28ABDF]" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Logo</Label>
+                    <div className="flex items-center gap-5">
+                      <label className="cursor-pointer h-20 w-20 rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 flex items-center justify-center hover:border-[#28ABDF] transition-all shrink-0 overflow-hidden bg-white dark:bg-slate-800 shadow-sm group">
+                        {companyLogoPreview ? (
+                          <img src={companyLogoPreview} alt="Logo" className="h-full w-full object-contain p-2" />
+                        ) : (
+                          <ImagePlus className="w-8 h-8 text-slate-200 group-hover:text-[#28ABDF]" />
+                        )}
+                        <input type="file" className="hidden" accept="image/*" onChange={handleLogoSelect} />
+                      </label>
+                      <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-wider">
+                        Recommended: Transparent PNG.<br/>Will appear in request emails.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* STEP 2: DEFINE FIELDS */}
+          {step === 2 && (
+            <div className="p-8 space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                  <PenTool className="w-5 h-5 text-indigo-500" />
+                </div>
+                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Define Fields</h3>
+              </div>
+              
+              <FieldToolbar
+                parties={TEMPLATE_PARTIES}
+                selectedPartyIndex={selectedPartyIndex}
+                onPartySelect={setSelectedPartyIndex}
+                onAddField={type => setPendingFieldType(type)}
+              />
+
+              {selectedField?.type === 'text' && (
+                <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Text Configuration</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <Select value={selectedField.fontFamily || 'Helvetica'} onValueChange={v => updateFieldTypography('fontFamily', v)}>
+                      <SelectTrigger className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold"><SelectValue /></SelectTrigger>
+                      <SelectContent>{FONT_FAMILIES.map(f => (<SelectItem key={f.value} value={f.value} className="font-bold">{f.label}</SelectItem>))}</SelectContent>
+                    </Select>
+                    <Select value={String(selectedField.fontSize || 12)} onValueChange={v => updateFieldTypography('fontSize', Number(v))}>
+                      <SelectTrigger className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold"><SelectValue /></SelectTrigger>
+                      <SelectContent>{FONT_SIZES.map(s => (<SelectItem key={s} value={String(s)} className="font-bold">{s}px</SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3: BOSS INFO */}
+          {step === 3 && (
+            <div className="p-8 space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-purple-500" />
+                </div>
+                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Boss Information</h3>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Boss Name</Label>
+                  <Input value={bossName} onChange={e => setBossName(e.target.value)} placeholder="e.g. John Doe" className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold px-5" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Boss Email</Label>
+                  <Input value={bossEmail} onChange={e => setBossEmail(e.target.value)} placeholder="boss@company.com" className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold px-5" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: EMPLOYEE LIST */}
+          {step === 4 && (
+            <div className="p-8 space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-[#28ABDF]" />
+                </div>
+                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Employee List</h3>
+              </div>
+
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Employee Name</Label>
+                    <Input value={empName} onChange={e => setEmpName(e.target.value)} placeholder="Recipient Name" className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold px-5" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</Label>
+                    <Input value={empEmail} onChange={e => setEmpEmail(e.target.value)} placeholder="email@company.com" className="h-12 rounded-2xl border-slate-200 dark:border-slate-800 font-bold px-5" />
+                  </div>
+                </div>
+                <Button onClick={addEmployee} variant="outline" className="w-full h-12 rounded-2xl border-2 font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">+ Add Employee</Button>
+                
+                <div className="relative py-4">
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100 dark:border-slate-800"></span></div>
+                  <div className="relative flex justify-center text-[10px] font-black uppercase"><span className="bg-white dark:bg-slate-900 px-2 text-slate-400 tracking-widest">Or Upload CSV</span></div>
+                </div>
+
+                <label className="flex flex-col items-center justify-center w-full p-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl cursor-pointer hover:border-[#28ABDF] hover:bg-sky-50/30 transition-all group">
+                  <Upload className="w-6 h-6 text-slate-300 group-hover:text-[#28ABDF] mb-2" />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Click to upload CSV</span>
+                  <input type="file" className="hidden" accept=".csv" onChange={handleCsvUpload} />
+                </label>
+
+                <div className="space-y-3 pt-4">
+                  {employees.map((emp, i) => (
+                    <div key={i} className="flex items-center justify-between p-5 bg-white dark:bg-slate-800 rounded-[1.5rem] border border-slate-100 dark:border-slate-700 shadow-sm group">
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{emp.name || 'No Name'}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">{emp.email}</p>
+                      </div>
+                      <button onClick={() => setEmployees(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-200 hover:text-red-500 transition-colors">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: REVIEW */}
+          {step === 5 && (
+            <div className="p-8 space-y-10 animate-in fade-in slide-in-from-left-4 duration-300">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-2xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                </div>
+                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Final Review</h3>
+              </div>
+
+              <div className="space-y-6">
+                <div className="p-6 bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm space-y-4">
+                  <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-700">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Template</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{title}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-700">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Boss</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{bossName}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-700">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Employees</span>
+                    <span className="text-xs font-black text-[#28ABDF] uppercase tracking-tight">{employees.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fields</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{fields.length}</span>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-sky-50/50 dark:bg-sky-900/10 rounded-[2rem] border border-sky-100 dark:border-sky-800 text-center">
+                  <p className="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-[0.15em] leading-relaxed">
+                    The Boss will receive the template first. Once signed, it will be sent to all {employees.length} employees simultaneously.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* CENTER VIEWER */}
+        <section className="flex-1 flex flex-col min-w-0 bg-slate-100 dark:bg-slate-950 order-1 md:order-2">
+          <div className="flex-1 overflow-auto p-4 md:p-12 flex justify-center items-start min-h-0">
+            {fileReady ? (
+              <div className="max-w-full w-fit shadow-2xl shadow-slate-300/50 dark:shadow-black/50 rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800">
+                <PdfViewer
+                  fileUrl={fileUrl}
+                  fields={fields}
+                  onFieldsChange={setFields}
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                  onTotalPagesChange={setTotalPages}
+                  selectedPartyIndex={selectedPartyIndex}
+                  pendingFieldType={pendingFieldType}
+                  parties={TEMPLATE_PARTIES}
+                  onFieldPlaced={() => setPendingFieldType(null)}
+                  selectedFieldId={selectedFieldId}
+                  onFieldSelect={setSelectedFieldId}
+                />
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 px-8 text-center animate-pulse">
+                <FileText className="w-24 h-24 opacity-10 mb-6" />
+                <p className="font-black text-slate-400 dark:text-slate-600 text-2xl uppercase tracking-tighter">
+                  Upload a PDF to begin workspace
+                </p>
+              </div>
+            )}
+          </div>
         </section>
       </main>
     </div>

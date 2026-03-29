@@ -483,14 +483,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/manage/:id"
-        element={
-          <ProtectedRoute>
-            <DocumentEditor />
-          </ProtectedRoute>
-        }
-      />
 
       {/* ── Admin ──────────────────────────────────────────── */}
       <Route
