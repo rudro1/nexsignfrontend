@@ -487,7 +487,7 @@ function AppRoutes() {
         path="/manage/:id"
         element={
           <ProtectedRoute>
-            <Audit />
+            <DocumentEditor />
           </ProtectedRoute>
         }
       />
