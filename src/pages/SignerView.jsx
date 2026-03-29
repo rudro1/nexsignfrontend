@@ -14,13 +14,9 @@ import { toast }  from 'sonner';
 import { Button } from '@/components/ui/button';
 import { api }    from '@/api/apiClient';
 
-// ✅ CDN worker — Vite compatible
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
 const cn = (...c) => c.filter(Boolean).join(' ');
 
 function useDocumentTitle(title) {
@@ -34,6 +30,29 @@ function useDocumentTitle(title) {
 function formatDate(d) {
   return new Date(d).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
+  });
+}
+
+// ✅ GPS location নেওয়া — browser geolocation API
+async function getBrowserGPS() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        latitude:  pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy:  pos.coords.accuracy,
+      }),
+      (err) => {
+        console.warn('[GPS] denied or failed:', err.message);
+        resolve(null);
+      },
+      {
+        timeout:            8000,
+        maximumAge:         0,
+        enableHighAccuracy: true,
+      },
+    );
   });
 }
 
@@ -112,7 +131,7 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
     if (!isOpen || inputMode !== 'draw') return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect   = canvas.getBoundingClientRect();
+    const rect    = canvas.getBoundingClientRect();
     canvas.width  = rect.width  || 500;
     canvas.height = rect.height || 200;
     const ctx = canvas.getContext('2d');
@@ -181,7 +200,7 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
       const c   = document.createElement('canvas');
       c.width   = 500; c.height = 160;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle    = '#ffffff';
       ctx.fillRect(0, 0, 500, 160);
       ctx.font         = `52px ${selectedFont}`;
       ctx.fillStyle    = '#1e293b';
@@ -204,7 +223,6 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
     >
       <div className="bg-white w-full sm:rounded-2xl sm:max-w-lg
                       shadow-2xl overflow-hidden rounded-t-3xl">
-        {/* Header */}
         <div className="bg-gradient-to-r from-[#28ABDF] to-[#1a8cbf]
                         px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5 text-white">
@@ -225,7 +243,6 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-slate-100">
           {['draw', 'type'].map(m => (
             <button key={m} type="button" onClick={() => setInputMode(m)}
@@ -240,7 +257,6 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
           ))}
         </div>
 
-        {/* Body */}
         <div className="p-5">
           {inputMode === 'draw' ? (
             <div className="space-y-3">
@@ -397,8 +413,8 @@ function InlineInput({ field, onChange, type = 'text' }) {
 }
 
 function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW }) {
-  const meta = FIELD_META[field.type] || FIELD_META.text;
-  const Icon = meta.icon;
+  const meta   = FIELD_META[field.type] || FIELD_META.text;
+  const Icon   = meta.icon;
   const filled = !!field.value;
   const pxW    = canvasW ? (field.width / 100) * canvasW : 100;
 
@@ -464,7 +480,6 @@ function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW
               )}
             </div>
           )}
-
           {isMine && field.type === 'text' && (
             <InlineInput field={field} onChange={onChange} type="text" />
           )}
@@ -531,7 +546,6 @@ function PdfRenderer({
     return f?.id || null;
   }, [pageFields, signerIndex]);
 
-  // Load PDF
   useEffect(() => {
     if (!pdfUrl) return;
     let cancelled = false;
@@ -546,7 +560,6 @@ function PdfRenderer({
           withCredentials: false,
           cMapPacked:      true,
         }).promise;
-
         if (cancelled) return;
         pdfDocRef.current = doc;
         onTotalPages?.(doc.numPages);
@@ -560,7 +573,6 @@ function PdfRenderer({
     return () => { cancelled = true; };
   }, [pdfUrl, retryKey]); // eslint-disable-line
 
-  // Render page
   const renderPage = useCallback(async () => {
     const doc    = pdfDocRef.current;
     const canvas = canvasRef.current;
@@ -597,7 +609,6 @@ function PdfRenderer({
     if (!loading && !error) renderPage();
   }, [loading, error, renderPage]);
 
-  // ResizeObserver
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -611,7 +622,6 @@ function PdfRenderer({
     return () => { obs.disconnect(); clearTimeout(debounceRef.current); };
   }, [loading, error, renderPage]);
 
-  // Auto-scroll to first unfilled field
   useEffect(() => {
     if (!firstUnfilledId || !canvasSize.width || loading) return;
     const field = pageFields.find(f => f.id === firstUnfilledId);
@@ -633,8 +643,6 @@ function PdfRenderer({
 
   return (
     <div className="flex flex-col h-full">
-
-      {/* Toolbar */}
       <div className="flex items-center justify-between
                       px-4 py-2.5 bg-white dark:bg-slate-900
                       border-b border-slate-200 dark:border-slate-800
@@ -681,21 +689,17 @@ function PdfRenderer({
         </div>
       </div>
 
-      {/* Canvas area */}
       <div ref={scrollRef}
            className="flex-1 overflow-auto bg-slate-200
                       dark:bg-slate-950 p-3 sm:p-5">
         <div ref={containerRef}>
-
           {loading && (
             <div className="w-full bg-white rounded-sm animate-pulse
                             flex items-center justify-center"
                  style={{ minHeight: 700 }}>
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-8 h-8 text-slate-300 animate-spin" />
-                <p className="text-sm text-slate-300 font-medium">
-                  Loading document…
-                </p>
+                <p className="text-sm text-slate-300 font-medium">Loading document…</p>
               </div>
             </div>
           )}
@@ -704,15 +708,8 @@ function PdfRenderer({
             <div className="flex flex-col items-center justify-center gap-4 py-20">
               <AlertCircle className="w-10 h-10 text-red-400" />
               <p className="font-semibold text-slate-600">Failed to load PDF</p>
-              <p className="text-xs text-slate-400 max-w-xs text-center">
-                Make sure your connection is stable and the link is valid.
-              </p>
               <Button size="sm" variant="outline"
-                onClick={() => {
-                  setError(false);
-                  setLoading(true);
-                  setRetryKey(k => k + 1);
-                }}
+                onClick={() => { setError(false); setLoading(true); setRetryKey(k => k + 1); }}
                 className="rounded-xl gap-1.5">
                 <RotateCcw className="w-3.5 h-3.5" /> Retry
               </Button>
@@ -826,13 +823,11 @@ export default function SignerView() {
     docInfo ? `Sign: ${docInfo.title} — NeXsign` : 'Sign Document — NeXsign',
   );
 
-  // Auto-jump to first page with signer's fields
   const jumpToFirstFieldPage = useCallback((allFields, idx) => {
     const myFields = allFields.filter(f => f.partyIndex === idx);
     if (!myFields.length) return;
-    const pages    = [...new Set(myFields.map(f => f.page || 1))].sort((a, b) => a - b);
-    const first    = pages[0];
-    if (first && first !== 1) setCurrentPage(first);
+    const pages = [...new Set(myFields.map(f => f.page || 1))].sort((a, b) => a - b);
+    if (pages[0] && pages[0] !== 1) setCurrentPage(pages[0]);
   }, []);
 
   // ── Validate token ──────────────────────────────────────────
@@ -860,7 +855,6 @@ export default function SignerView() {
         setFields(allFields);
         setTotalPages(doc.totalPages || 1);
 
-        // ✅ FIX: PDF proxy URL — clean build
         const apiBase = (import.meta.env.VITE_API_BASE_URL || '')
           .replace(/\/api\/?$/, '')
           .replace(/\/$/, '');
@@ -922,14 +916,27 @@ export default function SignerView() {
 
     setSubmitting(true);
     try {
-      // ✅ FIX: clientTime — ISO string পাঠাও
-      // Backend এ new Date(clientTime).toUTCString() করা হবে
+      // ✅ FIX 1: Server time use করা হচ্ছে
+      // clientTime browser থেকে নেওয়া হচ্ছে শুধু reference হিসেবে
+      // backend server time দিয়ে overwrite করবে
       const clientTime = new Date().toISOString();
+
+      // ✅ FIX 2: GPS location নেওয়া হচ্ছে
+      // toast দেখাও যাতে user জানে
+      let gpsCoords = null;
+      try {
+        toast.info('Getting your location…', { duration: 3000 });
+        gpsCoords = await getBrowserGPS();
+      } catch (_) {}
 
       const res = await api.post('/documents/sign/submit', {
         token,
         fields,
         clientTime,
+        // ✅ GPS coordinates পাঠানো হচ্ছে
+        // backend reverse geocode করবে
+        latitude:  gpsCoords?.latitude  ?? null,
+        longitude: gpsCoords?.longitude ?? null,
       });
 
       if (!mountedRef.current) return;
@@ -937,9 +944,6 @@ export default function SignerView() {
       const { completed } = res.data;
 
       if (completed) {
-        // ✅ FIX: finalize আলাদাভাবে call করতে হবে না
-        // backend _finalizeDocument নিজেই call করে
-        // শুধু phase set করো
         setPhase('completed');
       } else {
         setPhase('signed_next');
@@ -1041,7 +1045,6 @@ export default function SignerView() {
     <div className="flex flex-col h-screen bg-slate-100
                     dark:bg-slate-950 overflow-hidden">
 
-      {/* Header */}
       <header className="h-14 sm:h-16 bg-white dark:bg-slate-900
                          border-b border-slate-200 dark:border-slate-800
                          flex items-center justify-between
@@ -1093,10 +1096,8 @@ export default function SignerView() {
         </div>
       </header>
 
-      {/* Progress */}
       <FieldProgress fields={fields} signerIndex={signerInfo?.index} />
 
-      {/* PDF */}
       <main className="flex-1 min-h-0">
         <PdfRenderer
           pdfUrl={pdfUrl}
@@ -1111,7 +1112,6 @@ export default function SignerView() {
         />
       </main>
 
-      {/* Modal */}
       <SignatureModal
         isOpen={showModal}
         onClose={() => { setShowModal(false); setActiveField(null); }}
