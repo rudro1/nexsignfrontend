@@ -347,6 +347,7 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
 }
 
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // Field Overlay
 // ─────────────────────────────────────────────────────────────
 const FIELD_META = {
@@ -357,6 +358,42 @@ const FIELD_META = {
   checkbox:  { icon: CheckSquare, label: '',              color: '#f59e0b', border: 'border-amber-400',  bg: 'bg-amber-50/90'   },
   number:    { icon: Hash,        label: 'Number',        color: '#6366f1', border: 'border-indigo-400', bg: 'bg-indigo-50/90'  },
 };
+
+// ✅ Text/Number input — uncontrolled + onBlur fix
+function InlineInput({ field, onChange, type = 'text' }) {
+  const inputRef  = useRef(null);
+  const localRef  = useRef(field.value || '');
+
+  // sync initial value once
+  useEffect(() => {
+    if (inputRef.current && !inputRef.current.value && field.value) {
+      inputRef.current.value = field.value;
+      localRef.current       = field.value;
+    }
+  }, []); // eslint-disable-line
+
+  return (
+    <input
+      ref={inputRef}
+      type={type}
+      defaultValue={field.value || ''}
+      placeholder={field.placeholder || (type === 'number' ? '0' : 'Type here...')}
+      className="absolute inset-0 w-full h-full bg-white/95 px-2
+                 text-xs border-none outline-none z-10 text-slate-700"
+      onClick={e => e.stopPropagation()}
+      onChange={e => {
+        // ✅ local ref এ রাখো — re-render হবে না
+        localRef.current = e.target.value;
+      }}
+      onBlur={e => {
+        // ✅ blur এ একবারে parent কে জানাও
+        if (localRef.current !== field.value) {
+          onChange(field.id, localRef.current);
+        }
+      }}
+    />
+  );
+}
 
 function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW }) {
   const meta   = FIELD_META[field.type] || FIELD_META.text;
@@ -373,9 +410,8 @@ function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW
         filled ? 'border-opacity-50' : 'border-dashed',
         meta.border, meta.bg,
         isMine
-          ? 'cursor-pointer hover:brightness-95 hover:shadow-lg'
+          ? 'cursor-pointer hover:brightness-95 hover:shadow-md'
           : 'opacity-40 cursor-not-allowed',
-        // ✅ Highlight — signer এর নিজের unfilled fields glow করবে
         isHighlighted && !filled
           ? 'ring-2 ring-offset-1 ring-yellow-400 animate-pulse shadow-lg shadow-yellow-200'
           : '',
@@ -390,72 +426,85 @@ function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW
       title={isMine ? `Click to fill ${field.type}` : 'Belongs to another signer'}
     >
       {filled ? (
+        // ── Filled state ──
         field.type === 'signature' || field.type === 'initial' ? (
-          <img src={field.value} alt={field.type}
-            className="w-full h-full object-contain p-0.5" draggable={false} />
+          <img
+            src={field.value} alt={field.type}
+            className="w-full h-full object-contain p-0.5"
+            draggable={false}
+          />
         ) : field.type === 'checkbox' ? (
           <CheckSquare className="w-5 h-5 text-amber-500" />
         ) : (
-          <span className="px-1.5 truncate w-full text-center font-medium text-slate-700"
-            style={{ fontSize: Math.min(pxW * 0.1, 13) }}>
+          <span
+            className="px-1.5 truncate w-full text-center font-medium text-slate-700"
+            style={{ fontSize: Math.min(pxW * 0.1, 13) }}
+          >
             {field.value}
           </span>
         )
       ) : (
-        <div className="flex items-center gap-1 px-1.5 pointer-events-none">
-          {field.required && (
-            <span className="text-red-400 text-[9px] font-black leading-none">*</span>
+        // ── Empty state ──
+        <>
+          {/* Placeholder label — input type এ hide হবে */}
+          {field.type !== 'text' && field.type !== 'number' && field.type !== 'date' && (
+            <div className="flex items-center gap-1 px-1.5 pointer-events-none">
+              {field.required && (
+                <span className="text-red-400 text-[9px] font-black leading-none">*</span>
+              )}
+              <Icon
+                size={Math.min(pxW * 0.12, 13)}
+                style={{ color: meta.color, flexShrink: 0 }}
+              />
+              {meta.label && (
+                <span
+                  className="font-semibold truncate"
+                  style={{ color: meta.color, fontSize: Math.min(pxW * 0.09, 11) }}
+                >
+                  {meta.label}
+                </span>
+              )}
+            </div>
           )}
-          <Icon size={Math.min(pxW * 0.12, 13)} style={{ color: meta.color, flexShrink: 0 }} />
-          {meta.label && (
-            <span className="font-semibold truncate"
-              style={{ color: meta.color, fontSize: Math.min(pxW * 0.09, 11) }}>
-              {meta.label}
-            </span>
-          )}
-        </div>
-      )}
 
-      {/* Inline inputs */}
-      {isMine && !filled && field.type === 'text' && (
-        <input type="text"
-          className="absolute inset-0 w-full h-full bg-white/95 px-2
-                     text-xs border-none outline-none z-10 text-slate-700"
-          placeholder={field.placeholder || 'Type here...'}
-          onClick={e => e.stopPropagation()}
-          onChange={e => onChange(field.id, e.target.value)}
-        />
-      )}
-      {isMine && !filled && field.type === 'number' && (
-        <input type="number"
-          className="absolute inset-0 w-full h-full bg-white/95 px-2
-                     text-xs border-none outline-none z-10 text-slate-700"
-          placeholder="0"
-          onClick={e => e.stopPropagation()}
-          onChange={e => onChange(field.id, e.target.value)}
-        />
-      )}
-      {isMine && !filled && field.type === 'date' && (
-        <input type="date"
-          className="absolute inset-0 w-full h-full bg-white/95 px-1
-                     text-xs border-none outline-none z-10 text-slate-700"
-          onClick={e => e.stopPropagation()}
-          onChange={e => onChange(field.id, e.target.value)}
-        />
-      )}
-      {isMine && field.type === 'checkbox' && (
-        <input type="checkbox"
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-          onClick={e => {
-            e.stopPropagation();
-            onChange(field.id, e.target.checked ? 'checked' : '');
-          }}
-        />
+          {/* ✅ Text input — uncontrolled */}
+          {isMine && field.type === 'text' && (
+            <InlineInput field={field} onChange={onChange} type="text" />
+          )}
+
+          {/* ✅ Number input — uncontrolled */}
+          {isMine && field.type === 'number' && (
+            <InlineInput field={field} onChange={onChange} type="number" />
+          )}
+
+          {/* ✅ Date input */}
+          {isMine && field.type === 'date' && (
+            <input
+              type="date"
+              defaultValue={field.value || ''}
+              className="absolute inset-0 w-full h-full bg-white/95 px-1
+                         text-xs border-none outline-none z-10 text-slate-700"
+              onClick={e => e.stopPropagation()}
+              onChange={e => onChange(field.id, e.target.value)}
+            />
+          )}
+
+          {/* ✅ Checkbox */}
+          {isMine && field.type === 'checkbox' && (
+            <input
+              type="checkbox"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              onClick={e => {
+                e.stopPropagation();
+                onChange(field.id, e.target.checked ? 'checked' : '');
+              }}
+            />
+          )}
+        </>
       )}
     </div>
   );
 }
-
 // ─────────────────────────────────────────────────────────────
 // PDF Renderer
 // ─────────────────────────────────────────────────────────────
@@ -886,30 +935,47 @@ export default function SignerView() {
   }, [activeField, handleFieldChange]);
 
   // ── Submit ──────────────────────────────────────────────────
-  const handleSubmit = useCallback(async () => {
-    const mine    = fields.filter(f => f.partyIndex === signerInfo?.index);
-    const missing = mine.filter(f => f.required && !f.value);
+const handleSubmit = useCallback(async () => {
+  const mine    = fields.filter(f => f.partyIndex === signerInfo?.index);
+  const missing = mine.filter(f => f.required && !f.value);
 
-    if (missing.length) {
-      toast.error(
-        `Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`,
-      );
-      // Jump to first missing field page
-      if (missing[0]?.page) setCurrentPage(missing[0].page);
-      return;
+  if (missing.length) {
+    toast.error(
+      `Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`
+    );
+    if (missing[0]?.page) setCurrentPage(missing[0].page);
+    return;
+  }
+
+  setSubmitting(true);
+  try {
+    const res = await api.post('/documents/sign/submit', { token, fields });
+    if (!mountedRef.current) return;
+
+    const { completed, document: updatedDoc } = res.data;
+
+    if (completed) {
+      // ✅ Finalize — separate call, non-blocking
+      // docId টা response থেকে নাও
+      const docId = updatedDoc?._id || res.data?.docId;
+      if (docId) {
+        // Fire and forget — UI block হবে না
+        api.post(`/documents/sign/finalize/${docId}`)
+          .catch(e => console.error('[finalize]', e?.message));
+      }
+      setPhase('completed');
+    } else {
+      setPhase('signed_next');
     }
 
-    setSubmitting(true);
-    try {
-      const res = await api.post('/documents/sign/submit', { token, fields });
-      if (!mountedRef.current) return;
-      setPhase(res.data.completed ? 'completed' : 'signed_next');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit. Please try again.');
-    } finally {
-      if (mountedRef.current) setSubmitting(false);
-    }
-  }, [fields, signerInfo, token]);
+  } catch (err) {
+    toast.error(
+      err.response?.data?.message || 'Failed to submit. Please try again.'
+    );
+  } finally {
+    if (mountedRef.current) setSubmitting(false);
+  }
+}, [fields, signerInfo, token]);
 
   // ── Phase screens ───────────────────────────────────────────
   if (phase === 'loading') {
