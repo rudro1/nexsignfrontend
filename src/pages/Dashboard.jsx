@@ -275,56 +275,120 @@ export default function Dashboard() {
   }, [authLoading, isAdmin]);
 
   // ── Socket events ────────────────────────────────────────────
-  useEffect(() => {
-    if (!socket) return;
+  // useEffect(() => {
+  //   if (!socket) return;
 
-    const upsert = (payload) => {
-      if (!mountedRef.current) return;
-      // payload = full doc or { documentId, ... }
-      const docData = payload?.document || payload;
-      if (!docData?._id) return;
+  //   const upsert = (payload) => {
+  //     if (!mountedRef.current) return;
+  //     // payload = full doc or { documentId, ... }
+  //     const docData = payload?.document || payload;
+  //     if (!docData?._id) return;
 
-      setDocuments(prev => {
-        const idx  = prev.findIndex(d => d._id === docData._id);
-        const next = idx !== -1
-          ? prev.map(d => d._id === docData._id ? { ...d, ...docData } : d)
-          : [docData, ...prev];
-        writeCache(user?._id, next);
-        return next;
-      });
-    };
+  //     setDocuments(prev => {
+  //       const idx  = prev.findIndex(d => d._id === docData._id);
+  //       const next = idx !== -1
+  //         ? prev.map(d => d._id === docData._id ? { ...d, ...docData } : d)
+  //         : [docData, ...prev];
+  //       writeCache(user?._id, next);
+  //       return next;
+  //     });
+  //   };
 
-    const remove = (payload) => {
-      if (!mountedRef.current) return;
-      const id = payload?.documentId || payload?.id || payload?._id;
-      if (!id) return;
-      setDocuments(prev => {
-        const next = prev.filter(d => d._id !== id);
-        writeCache(user?._id, next);
-        return next;
-      });
-    };
+  //   const remove = (payload) => {
+  //     if (!mountedRef.current) return;
+  //     const id = payload?.documentId || payload?.id || payload?._id;
+  //     if (!id) return;
+  //     setDocuments(prev => {
+  //       const next = prev.filter(d => d._id !== id);
+  //       writeCache(user?._id, next);
+  //       return next;
+  //     });
+  //   };
 
-    // Refetch on these events (status changed)
-    const refetch = () => fetchDocuments(true);
+  //   // Refetch on these events (status changed)
+  //   const refetch = () => fetchDocuments(true);
 
-    socket.on('document:created',      upsert);
-    socket.on('document:updated',      upsert);
-    socket.on('document:party_signed', refetch);
-    socket.on('document:completed',    refetch);
-    socket.on('document:finalized',    refetch);
-    socket.on('document:deleted',      remove);
+  //   socket.on('document:created',      upsert);
+  //   socket.on('document:updated',      upsert);
+  //   socket.on('document:party_signed', refetch);
+  //   socket.on('document:completed',    refetch);
+  //   socket.on('document:finalized',    refetch);
+  //   socket.on('document:deleted',      remove);
 
-    return () => {
-      socket.off('document:created',      upsert);
-      socket.off('document:updated',      upsert);
-      socket.off('document:party_signed', refetch);
-      socket.off('document:completed',    refetch);
-      socket.off('document:finalized',    refetch);
-      socket.off('document:deleted',      remove);
-    };
-  }, [socket, user?._id, fetchDocuments]);
+  //   return () => {
+  //     socket.off('document:created',      upsert);
+  //     socket.off('document:updated',      upsert);
+  //     socket.off('document:party_signed', refetch);
+  //     socket.off('document:completed',    refetch);
+  //     socket.off('document:finalized',    refetch);
+  //     socket.off('document:deleted',      remove);
+  //   };
+  // }, [socket, user?._id, fetchDocuments]);
+// ── Socket events ─────────────────────────────────────────────
+useEffect(() => {
+  if (!socket) return;
 
+  const upsert = (payload) => {
+    if (!mountedRef.current) return;
+    const docData = payload?.document || payload;
+    if (!docData?._id) return;
+
+    setDocuments(prev => {
+      const idx  = prev.findIndex(d => d._id === docData._id);
+      const next = idx !== -1
+        ? prev.map(d => d._id === docData._id ? { ...d, ...docData } : d)
+        : [docData, ...prev];
+      writeCache(user?._id, next);
+      return next;
+    });
+  };
+
+  const remove = (payload) => {
+    if (!mountedRef.current) return;
+    const id = payload?.documentId || payload?.id || payload?._id;
+    if (!id) return;
+    setDocuments(prev => {
+      const next = prev.filter(d => d._id !== id);
+      writeCache(user?._id, next);
+      return next;
+    });
+  };
+
+  // ✅ FIX: document:finalized এ signedFileUrl update
+  const onFinalized = (payload) => {
+    if (!mountedRef.current) return;
+    const { documentId, signedPdfUrl } = payload;
+    if (!documentId || !signedPdfUrl) return;
+
+    setDocuments(prev => {
+      const next = prev.map(d =>
+        d._id === documentId
+          ? { ...d, signedFileUrl: signedPdfUrl, status: 'completed' }
+          : d
+      );
+      writeCache(user?._id, next);
+      return next;
+    });
+  };
+
+  const refetch = () => fetchDocuments(true);
+
+  socket.on('document:created',      upsert);
+  socket.on('document:updated',      upsert);
+  socket.on('document:party_signed', refetch);
+  socket.on('document:completed',    refetch);
+  socket.on('document:finalized',    onFinalized); // ✅ FIX
+  socket.on('document:deleted',      remove);
+
+  return () => {
+    socket.off('document:created',      upsert);
+    socket.off('document:updated',      upsert);
+    socket.off('document:party_signed', refetch);
+    socket.off('document:completed',    refetch);
+    socket.off('document:finalized',    onFinalized); // ✅ FIX
+    socket.off('document:deleted',      remove);
+  };
+}, [socket, user?._id, fetchDocuments]);
   // ── Search debounce ──────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput), 300);
