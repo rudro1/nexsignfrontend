@@ -2,7 +2,7 @@
 // import { Button } from '@/components/ui/button';
 // import { Input } from '@/components/ui/input';
 // import { Label } from '@/components/ui/label';
-// import { Card } from '@/components/ui/Card';
+// import { Card } from '@/components/ui/card';
 // import { Plus, Trash2, GripVertical, User } from 'lucide-react';
 
 // const PARTY_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#6366f1', '#14b8a6'];

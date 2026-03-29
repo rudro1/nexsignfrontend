@@ -5,7 +5,7 @@
 // import { useAuth } from '@/lib/AuthContext';
 // import { Button } from '@/components/ui/button';
 // import { Input } from '@/components/ui/input';
-// import { Card } from '@/components/ui/Card';
+// import { Card } from '@/components/ui/card';
 // import { Label } from '@/components/ui/label';
 // import {
 //   Select, SelectContent, SelectItem,
@@ -661,7 +661,7 @@ import { api, buildProxyUrl } from '@/api/apiClient';
 import { useAuth }   from '@/lib/AuthContext';
 import { Button }    from '@/components/ui/button';
 import { Input }     from '@/components/ui/input';
-import { Card }      from '@/components/ui/Card';
+import { Card }      from '@/components/ui/card';
 import { toast }     from 'sonner';
 import {
   ArrowLeft, Send, Loader2, FileText,

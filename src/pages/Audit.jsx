@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';

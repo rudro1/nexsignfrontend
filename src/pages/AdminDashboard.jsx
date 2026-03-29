@@ -3,7 +3,7 @@
 // import { useNavigate, Link } from 'react-router-dom';
 // import { api } from '@/api/apiClient';
 // import { useAuth } from '@/lib/AuthContext';
-// import { Card } from '@/components/ui/Card';
+// import { Card } from '@/components/ui/card';
 // import { Button } from '@/components/ui/button';
 // import { Badge } from '@/components/ui/badge';
 // import { Input } from '@/components/ui/input';
@@ -1295,7 +1295,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
