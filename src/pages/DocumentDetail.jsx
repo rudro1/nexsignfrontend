@@ -24,6 +24,12 @@ function fmtDateTime(d) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Validate MongoDB ObjectId (24 hex chars)
+// ─────────────────────────────────────────────────────────────────
+const isValidObjectId = (id) =>
+  !!id && id !== 'new' && /^[a-f\d]{24}$/i.test(id);
+
+// ─────────────────────────────────────────────────────────────────
 // Status config
 // ─────────────────────────────────────────────────────────────────
 const STATUS_CFG = {
@@ -37,7 +43,7 @@ const STATUS_CFG = {
 };
 
 function StatusBadge({ status }) {
-  const s = STATUS_CFG[status] || STATUS_CFG.pending;
+  const s = STATUS_CFG[status] || STATUS_CFG.draft;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1
                       rounded-full text-xs font-semibold ${s.bg} ${s.text}`}>
@@ -86,15 +92,9 @@ const Ic = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
   ),
-  Send: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-    </svg>
-  ),
   Clock: () => (
     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-      <circle cx="12" cy="12" r="10" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+      <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
     </svg>
   ),
   MapPin: () => (
@@ -397,7 +397,7 @@ function CcRow({ cc }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// MAIN — FIX: Guard against invalid IDs like "new"
+// MAIN
 // ─────────────────────────────────────────────────────────────────
 export default function DocumentDetail() {
   const { id }   = useParams();
@@ -422,20 +422,20 @@ export default function DocumentDetail() {
   }, []);
 
   // ══════════════════════════════════════════════════════════════
-  // FIX: If id is "new" or not a valid MongoDB ObjectId,
-  // redirect immediately — don't make API call
+  // GUARD: If id is not a valid MongoDB ObjectId, redirect to
+  // the new document editor rather than hitting the backend with /new.
+  // This fixes the 500 error on /api/documents/new
   // ══════════════════════════════════════════════════════════════
   useEffect(() => {
-    const isValidId = id && id !== 'new' && /^[a-f\d]{24}$/i.test(id);
-    if (!isValidId) {
+    if (!isValidObjectId(id)) {
+      // id is "new" or garbage — send to editor
       navigate('/documents/new', { replace: true });
     }
   }, [id, navigate]);
 
   // ── Load document ─────────────────────────────────────────────
   const loadDoc = useCallback(async () => {
-    // Extra guard — don't call if invalid id
-    if (!id || id === 'new' || !/^[a-f\d]{24}$/i.test(id)) return;
+    if (!isValidObjectId(id)) return;
 
     setLoading(true);
     setError(null);
@@ -459,7 +459,7 @@ export default function DocumentDetail() {
 
   // ── Load audit ────────────────────────────────────────────────
   const loadAudit = useCallback(async () => {
-    if (!id || id === 'new' || !/^[a-f\d]{24}$/i.test(id)) return;
+    if (!isValidObjectId(id)) return;
 
     setAuditLoading(true);
     try {
@@ -474,9 +474,11 @@ export default function DocumentDetail() {
   }, [id]);
 
   useEffect(() => {
-    loadDoc();
-    loadAudit();
-  }, [loadDoc, loadAudit]);
+    if (isValidObjectId(id)) {
+      loadDoc();
+      loadAudit();
+    }
+  }, [loadDoc, loadAudit, id]);
 
   // ── Socket: real-time updates ─────────────────────────────────
   useEffect(() => {
@@ -533,9 +535,9 @@ export default function DocumentDetail() {
     return Math.round((done / doc.parties.length) * 100);
   }, [doc]);
 
-  // ── Early return for invalid id ───────────────────────────────
-  if (!id || id === 'new' || !/^[a-f\d]{24}$/i.test(id)) {
-    return null; // useEffect will redirect
+  // ── Early return for invalid id (redirect in progress) ───────
+  if (!isValidObjectId(id)) {
+    return null;
   }
 
   if (loading) return <PageSkeleton />;
@@ -585,7 +587,6 @@ export default function DocumentDetail() {
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl
                          shadow-xl text-sm font-semibold text-white
-                         animate-fade-in
                          ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}>
           {toast.msg}
         </div>
@@ -889,25 +890,7 @@ export default function DocumentDetail() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={party.status === 'signed' ? 'completed' : party.status} />
-                    {party.signingToken
-                      && party.status !== 'completed'
-                      && party.status !== 'signed' && (
-                      <button
-                        onClick={() => copySigningLink(party)}
-                        className="flex items-center gap-1.5 px-2.5 py-1
-                                   rounded-lg border border-slate-200
-                                   dark:border-slate-700 text-xs font-medium
-                                   text-slate-500 dark:text-slate-400
-                                   hover:border-[#28ABDF] hover:text-[#28ABDF]
-                                   transition-colors"
-                      >
-                        <Ic.Copy />
-                        {copying ? 'Copied!' : 'Copy link'}
-                      </button>
-                    )}
-                  </div>
+                  <StatusBadge status={party.status === 'signed' ? 'completed' : party.status} />
                 </div>
 
                 {party.signedAt && (

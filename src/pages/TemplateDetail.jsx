@@ -347,7 +347,6 @@ export default function TemplateDetail() {
 
   // ── Load template ─────────────────────────────────────────────
   const loadTemplate = useCallback(async () => {
-    if (!id || id === 'new') return;
     setLoading(true);
     setError(null);
     try {
@@ -363,7 +362,6 @@ export default function TemplateDetail() {
 
   // ── Load sessions ─────────────────────────────────────────────
   const loadSessions = useCallback(async () => {
-    if (!id || id === 'new') return;
     setSessionsLoading(true);
     try {
       const res = await api.get(`/templates/${id}/sessions`, { noCache: true });
@@ -376,13 +374,9 @@ export default function TemplateDetail() {
   }, [id]);
 
   useEffect(() => {
-    if (id === 'new') {
-      setLoading(false);
-      return;
-    }
     loadTemplate();
     loadSessions();
-  }, [id, loadTemplate, loadSessions]);
+  }, [loadTemplate, loadSessions]);
 
   // ── Socket realtime ───────────────────────────────────────────
   useEffect(() => {

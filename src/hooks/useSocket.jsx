@@ -37,9 +37,9 @@ export default function useSocket() {
 
     // ── Create new socket ──────────────────────────────────────
     const socket = io(SOCKET_URL, {
-      // FIX: Vercel serverless does NOT support persistent websockets
-      // Adding polling as fallback for better compatibility
-      transports:           ['polling', 'websocket'],
+      // FIX: Vercel serverless does NOT support polling
+      // websocket only → no CORS preflight issue
+      transports:           ['websocket'],
       withCredentials:      true,
       reconnection:         true,
       reconnectionDelay:    2000,
