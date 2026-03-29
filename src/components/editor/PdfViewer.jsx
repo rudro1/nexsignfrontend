@@ -965,8 +965,11 @@ export default function PdfViewer({
   fileUrl,
   fields,
   onFieldsChange,
+  onUpdateField,
+  onDeleteField,
   currentPage,
   onPageChange,
+  totalPages: totalPagesProp,
   onTotalPagesChange,
   pendingFieldType,
   selectedPartyIndex,
@@ -988,6 +991,13 @@ export default function PdfViewer({
   const [error,      setError]      = useState(null);
   const [totalPages, setTotalPages] = useState(0);
   const [scale,      setScale]      = useState(1.0);
+
+  // Sync totalPages from prop if provided
+  useEffect(() => {
+    if (totalPagesProp !== undefined) {
+      setTotalPages(totalPagesProp);
+    }
+  }, [totalPagesProp]);
 
   const fieldsRef = useRef(fields);
   useEffect(() => { fieldsRef.current = fields; }, [fields]);
@@ -1176,15 +1186,23 @@ export default function PdfViewer({
 
   // ── Update / remove ───────────────────────────────────────
   const updateField = useCallback((id, patch) => {
-    onFieldsChange(
-      fieldsRef.current.map(f => f.id === id ? { ...f, ...patch } : f)
-    );
-  }, [onFieldsChange]);
+    if (onUpdateField) {
+      onUpdateField(id, patch);
+    } else {
+      onFieldsChange(
+        fieldsRef.current.map(f => f.id === id ? { ...f, ...patch } : f)
+      );
+    }
+  }, [onFieldsChange, onUpdateField]);
 
   const removeField = useCallback((id) => {
-    onFieldsChange(fieldsRef.current.filter(f => f.id !== id));
-    if (selectedFieldId === id) onFieldSelect?.(null);
-  }, [onFieldsChange, selectedFieldId, onFieldSelect]);
+    if (onDeleteField) {
+      onDeleteField(id);
+    } else {
+      onFieldsChange(fieldsRef.current.filter(f => f.id !== id));
+      if (selectedFieldId === id) onFieldSelect?.(null);
+    }
+  }, [onFieldsChange, onDeleteField, selectedFieldId, onFieldSelect]);
 
   // ── Zoom ──────────────────────────────────────────────────
   const zoomIn  = () => setScale(s => Math.min(s + 0.2, 3.0));

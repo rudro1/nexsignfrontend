@@ -158,6 +158,11 @@ export default function DocumentEditor() {
     ));
   };
 
+  const deleteField = (id) => {
+    setFields(prev => prev.filter(f => f.id !== id));
+    if (selectedFieldId === id) setSelectedFieldId(null);
+  };
+
   // ── Validation ───────────────────────────────────────────────
   const validate = () => {
     if (!rawFile && !fileUrl) {
@@ -409,7 +414,10 @@ export default function DocumentEditor() {
                 parties={parties}
                 selectedPartyIndex={selectedPartyIndex}
                 onPartySelect={setSelectedPartyIndex}
-                onAddField={type => setPendingFieldType(type)}
+                onAddField={type => {
+                  setPendingFieldType(type);
+                  setSelectedFieldId(null);
+                }}
                 pendingFieldType={pendingFieldType}
                 disabled={!fileReady}
               />
@@ -456,8 +464,13 @@ export default function DocumentEditor() {
                 fileUrl={fileUrl}
                 fields={fields}
                 onFieldsChange={setFields}
+                onUpdateField={(id, patch) => {
+                  setFields(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f));
+                }}
+                onDeleteField={deleteField}
                 currentPage={currentPage}
                 onPageChange={setCurrentPage}
+                totalPages={totalPages}
                 onTotalPagesChange={setTotalPages}
                 selectedPartyIndex={selectedPartyIndex}
                 pendingFieldType={pendingFieldType}

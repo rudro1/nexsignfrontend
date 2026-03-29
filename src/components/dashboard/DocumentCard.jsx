@@ -53,8 +53,6 @@ const DocumentCard = React.memo(({ doc }) => {
     return statusConfig[doc.status] || statusConfig.draft;
   }, [doc.status, doc.isTemplate]);
 
-  const StatusIcon = config.icon;
-
   const progress = useMemo(() => {
     if (!parties.length) return 0;
     const signed = parties.filter(p => p.status === 'signed').length;
@@ -80,11 +78,30 @@ const DocumentCard = React.memo(({ doc }) => {
     if (doc.isTemplate) {
       navigate(`/templates/${doc._id}`);
     } else if (doc.status === 'draft') {
-      navigate(`/editor/${doc._id}`);
+      navigate(`/DocumentEditor?id=${doc._id}`);
     } else {
       navigate(`/audit/${doc._id}`);
     }
   }, [doc, navigate]);
+
+  const handleView = useCallback((e) => {
+    e.stopPropagation();
+    if (doc.signedFileUrl) {
+      window.open(doc.signedFileUrl, '_blank');
+    }
+  }, [doc.signedFileUrl]);
+
+  const handleDownload = useCallback((e) => {
+    e.stopPropagation();
+    if (doc.signedFileUrl) {
+      const link = document.createElement('a');
+      link.href = doc.signedFileUrl;
+      link.download = `${doc.title || 'signed_document'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }, [doc.signedFileUrl, doc.title]);
 
   return (
     <Card 
@@ -151,16 +168,37 @@ const DocumentCard = React.memo(({ doc }) => {
               )}
             </div>
 
-            <Button 
-              size="sm" 
-              onClick={handleAction}
-              className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-100 dark:border-slate-700 hover:border-[#28ABDF] hover:text-[#28ABDF] rounded-2xl px-6 h-11 font-black transition-all shadow-sm"
-            >
-              <span className="text-[10px] font-black uppercase tracking-widest mr-2">
-                {doc.isTemplate ? 'USE TEMPLATE' : (doc.status === 'draft' ? 'EDIT' : 'MANAGE')}
-              </span>
-              <ArrowRight className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {doc.status === 'completed' && doc.signedFileUrl ? (
+                <>
+                  <Button 
+                    size="sm" 
+                    onClick={handleView}
+                    className="bg-sky-50 hover:bg-sky-100 text-[#28ABDF] rounded-xl px-4 h-10 font-black transition-all border-none"
+                  >
+                    VIEW
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleDownload}
+                    className="bg-[#28ABDF] hover:bg-[#2399c8] text-white rounded-xl px-4 h-10 font-black transition-all shadow-sm"
+                  >
+                    DOWNLOAD
+                  </Button>
+                </>
+              ) : (
+                <Button 
+                  size="sm" 
+                  onClick={handleAction}
+                  className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-100 dark:border-slate-700 hover:border-[#28ABDF] hover:text-[#28ABDF] rounded-2xl px-6 h-11 font-black transition-all shadow-sm"
+                >
+                  <span className="text-[10px] font-black uppercase tracking-widest mr-2">
+                    {doc.isTemplate ? 'USE TEMPLATE' : (doc.status === 'draft' ? 'EDIT' : 'MANAGE')}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Next Action Indicator */}

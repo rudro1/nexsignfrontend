@@ -60,7 +60,6 @@
 // }
 // src/components/editor/FieldToolbar.jsx
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
@@ -94,6 +93,7 @@ export default function FieldToolbar({
   onPartySelect,
   onAddField,
   pendingFieldType,
+  disabled = false,
 }) {
   if (!parties || parties.length === 0) return null;
 
@@ -102,7 +102,7 @@ export default function FieldToolbar({
     PARTY_COLORS[selectedPartyIndex % PARTY_COLORS.length];
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
 
       {/* Header */}
       <p className="text-[10px] font-bold text-slate-400

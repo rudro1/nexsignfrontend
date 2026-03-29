@@ -444,6 +444,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/manage/:id"
+        element={
+          <ProtectedRoute>
+            <DocumentEditor />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/editor/:id"
         element={
           <ProtectedRoute>
