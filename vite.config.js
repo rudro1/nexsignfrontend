@@ -64,14 +64,14 @@ export default defineConfig(({ mode }) => {
     },
 
     // ── Optimize deps ─────────────────────────────────────────
-    optimizeDeps: {
-      include: [
-        'react', 'react-dom', 'react-router-dom',
-        '@tanstack/react-query',
-        'framer-motion', 'lucide-react',
-        'sonner', 'date-fns', 'axios',
-      ],
-      exclude: ['pdfjs-dist'],
-    },
+  optimizeDeps: {
+  include: [
+    'react', 'react-dom', 'react-router-dom',
+    '@tanstack/react-query',
+    'framer-motion', 'lucide-react',
+    'sonner', 'date-fns', 'axios',
+    'pdfjs-dist',  // ← add করো
+  ],
+},
   };
 });

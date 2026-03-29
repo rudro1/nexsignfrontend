@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorker   from 'pdfjs-dist/build/pdf.worker.entry';
+
 import {
   Loader2, CheckCircle2, XCircle, ChevronLeft,
   ChevronRight, ZoomIn, ZoomOut, PenLine, Send,
@@ -15,7 +15,8 @@ import { toast }   from 'sonner';
 import { Button }  from '@/components/ui/button';
 import { api }     from '@/api/apiClient';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// ✅ এটা দাও
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
