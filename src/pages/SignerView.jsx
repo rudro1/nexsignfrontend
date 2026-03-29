@@ -102,7 +102,7 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
     if (!isOpen) return;
     setIsEmpty(true); setTypedText(''); setInputMode('draw');
     const link = document.createElement('link');
-    link.rel = 'stylesheet';
+    link.rel  = 'stylesheet';
     link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap';
     document.head.appendChild(link);
     return () => { try { document.head.removeChild(link); } catch {} };
@@ -112,7 +112,7 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
     if (!isOpen || inputMode !== 'draw') return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
+    const rect   = canvas.getBoundingClientRect();
     canvas.width  = rect.width  || 500;
     canvas.height = rect.height || 200;
     const ctx = canvas.getContext('2d');
@@ -178,14 +178,14 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
       onAccept(canvasRef.current.toDataURL('image/png'));
     } else {
       if (!typedText.trim()) { toast.error('Please type your signature.'); return; }
-      const c = document.createElement('canvas');
-      c.width = 500; c.height = 160;
+      const c   = document.createElement('canvas');
+      c.width   = 500; c.height = 160;
       const ctx = c.getContext('2d');
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 500, 160);
-      ctx.font = `52px ${selectedFont}`;
-      ctx.fillStyle = '#1e293b';
-      ctx.textAlign = 'center';
+      ctx.font         = `52px ${selectedFont}`;
+      ctx.fillStyle    = '#1e293b';
+      ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(typedText.trim().slice(0, 30), 250, 80);
       onAccept(c.toDataURL('image/png'));
@@ -250,7 +250,7 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
                   className="w-full touch-none cursor-crosshair block"
                   style={{ height: '180px' }}
                   onMouseDown={startDraw} onMouseMove={draw}
-                  onMouseUp={stopDraw}   onMouseLeave={stopDraw}
+                  onMouseUp={stopDraw}    onMouseLeave={stopDraw}
                   onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
                 />
                 {isEmpty && (
@@ -268,8 +268,12 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
                   <div className="flex gap-1.5">
                     {PEN_COLORS.map(c => (
                       <button key={c} type="button" onClick={() => setPenColor(c)}
-                        className={cn('w-5 h-5 rounded-full transition-all',
-                          penColor === c ? 'ring-2 ring-offset-1 ring-slate-400 scale-110' : 'hover:scale-110')}
+                        className={cn(
+                          'w-5 h-5 rounded-full transition-all',
+                          penColor === c
+                            ? 'ring-2 ring-offset-1 ring-slate-400 scale-110'
+                            : 'hover:scale-110',
+                        )}
                         style={{ backgroundColor: c }}
                       />
                     ))}
@@ -277,10 +281,12 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
                   <div className="flex gap-1 ml-1">
                     {[1.5, 2.5, 4].map(w => (
                       <button key={w} type="button" onClick={() => setPenWidth(w)}
-                        className={cn('h-6 px-2 rounded-lg border text-[10px] font-bold transition-all',
+                        className={cn(
+                          'h-6 px-2 rounded-lg border text-[10px] font-bold transition-all',
                           penWidth === w
                             ? 'border-[#28ABDF] bg-sky-50 text-[#28ABDF]'
-                            : 'border-slate-200 text-slate-400 hover:border-slate-300')}>
+                            : 'border-slate-200 text-slate-400 hover:border-slate-300',
+                        )}>
                         {w === 1.5 ? 'S' : w === 2.5 ? 'M' : 'L'}
                       </button>
                     ))}
@@ -306,10 +312,12 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
                 {FONTS.map(f => (
                   <button key={f.value} type="button"
                     onClick={() => setSelectedFont(f.value)}
-                    className={cn('px-3 py-1.5 rounded-lg border text-sm transition-all',
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg border text-sm transition-all',
                       selectedFont === f.value
                         ? 'border-[#28ABDF] bg-sky-50 text-[#28ABDF] font-semibold'
-                        : 'border-slate-200 text-slate-500')}
+                        : 'border-slate-200 text-slate-500',
+                    )}
                     style={{ fontFamily: f.value }}>
                     {f.label}
                   </button>
@@ -347,7 +355,6 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
 }
 
 // ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
 // Field Overlay
 // ─────────────────────────────────────────────────────────────
 const FIELD_META = {
@@ -359,12 +366,10 @@ const FIELD_META = {
   number:    { icon: Hash,        label: 'Number',        color: '#6366f1', border: 'border-indigo-400', bg: 'bg-indigo-50/90'  },
 };
 
-// ✅ Text/Number input — uncontrolled + onBlur fix
 function InlineInput({ field, onChange, type = 'text' }) {
-  const inputRef  = useRef(null);
-  const localRef  = useRef(field.value || '');
+  const inputRef = useRef(null);
+  const localRef = useRef(field.value || '');
 
-  // sync initial value once
   useEffect(() => {
     if (inputRef.current && !inputRef.current.value && field.value) {
       inputRef.current.value = field.value;
@@ -381,12 +386,8 @@ function InlineInput({ field, onChange, type = 'text' }) {
       className="absolute inset-0 w-full h-full bg-white/95 px-2
                  text-xs border-none outline-none z-10 text-slate-700"
       onClick={e => e.stopPropagation()}
-      onChange={e => {
-        // ✅ local ref এ রাখো — re-render হবে না
-        localRef.current = e.target.value;
-      }}
-      onBlur={e => {
-        // ✅ blur এ একবারে parent কে জানাও
+      onChange={e => { localRef.current = e.target.value; }}
+      onBlur={() => {
         if (localRef.current !== field.value) {
           onChange(field.id, localRef.current);
         }
@@ -396,8 +397,8 @@ function InlineInput({ field, onChange, type = 'text' }) {
 }
 
 function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW }) {
-  const meta   = FIELD_META[field.type] || FIELD_META.text;
-  const Icon   = meta.icon;
+  const meta = FIELD_META[field.type] || FIELD_META.text;
+  const Icon = meta.icon;
   const filled = !!field.value;
   const pxW    = canvasW ? (field.width / 100) * canvasW : 100;
 
@@ -426,7 +427,6 @@ function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW
       title={isMine ? `Click to fill ${field.type}` : 'Belongs to another signer'}
     >
       {filled ? (
-        // ── Filled state ──
         field.type === 'signature' || field.type === 'initial' ? (
           <img
             src={field.value} alt={field.type}
@@ -444,9 +444,7 @@ function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW
           </span>
         )
       ) : (
-        // ── Empty state ──
         <>
-          {/* Placeholder label — input type এ hide হবে */}
           {field.type !== 'text' && field.type !== 'number' && field.type !== 'date' && (
             <div className="flex items-center gap-1 px-1.5 pointer-events-none">
               {field.required && (
@@ -467,17 +465,12 @@ function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW
             </div>
           )}
 
-          {/* ✅ Text input — uncontrolled */}
           {isMine && field.type === 'text' && (
             <InlineInput field={field} onChange={onChange} type="text" />
           )}
-
-          {/* ✅ Number input — uncontrolled */}
           {isMine && field.type === 'number' && (
             <InlineInput field={field} onChange={onChange} type="number" />
           )}
-
-          {/* ✅ Date input */}
           {isMine && field.type === 'date' && (
             <input
               type="date"
@@ -488,8 +481,6 @@ function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW
               onChange={e => onChange(field.id, e.target.value)}
             />
           )}
-
-          {/* ✅ Checkbox */}
           {isMine && field.type === 'checkbox' && (
             <input
               type="checkbox"
@@ -505,6 +496,7 @@ function FieldOverlay({ field, isMine, isHighlighted, onClick, onChange, canvasW
     </div>
   );
 }
+
 // ─────────────────────────────────────────────────────────────
 // PDF Renderer
 // ─────────────────────────────────────────────────────────────
@@ -527,21 +519,19 @@ function PdfRenderer({
   const [scale,      setScale]      = useState(1);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
-  // ✅ Current page fields
   const pageFields = useMemo(
     () => fields.filter(f => (f.page || 1) === currentPage),
     [fields, currentPage],
   );
 
-  // ✅ First unfilled field of signer on this page (for highlight)
   const firstUnfilledId = useMemo(() => {
     const f = pageFields.find(
-      f => f.partyIndex === signerIndex && f.required && !f.value
+      f => f.partyIndex === signerIndex && f.required && !f.value,
     );
     return f?.id || null;
   }, [pageFields, signerIndex]);
 
-  // ✅ Load PDF
+  // Load PDF
   useEffect(() => {
     if (!pdfUrl) return;
     let cancelled = false;
@@ -570,7 +560,7 @@ function PdfRenderer({
     return () => { cancelled = true; };
   }, [pdfUrl, retryKey]); // eslint-disable-line
 
-  // ✅ Render page
+  // Render page
   const renderPage = useCallback(async () => {
     const doc    = pdfDocRef.current;
     const canvas = canvasRef.current;
@@ -621,13 +611,11 @@ function PdfRenderer({
     return () => { obs.disconnect(); clearTimeout(debounceRef.current); };
   }, [loading, error, renderPage]);
 
-  // ✅ Auto-scroll to first unfilled field when page renders
+  // Auto-scroll to first unfilled field
   useEffect(() => {
     if (!firstUnfilledId || !canvasSize.width || loading) return;
     const field = pageFields.find(f => f.id === firstUnfilledId);
     if (!field || !scrollRef.current) return;
-
-    // Short delay — canvas render শেষ হওয়ার পর scroll
     const t = setTimeout(() => {
       const top = (field.y / 100) * canvasSize.height;
       scrollRef.current?.scrollTo({
@@ -637,9 +625,6 @@ function PdfRenderer({
     }, 400);
     return () => clearTimeout(t);
   }, [firstUnfilledId, canvasSize, loading, currentPage]); // eslint-disable-line
-
-  // ✅ Auto jump to page that has signer's first field
-  const myFields = fields.filter(f => f.partyIndex === signerIndex);
 
   const clamp = (delta) =>
     setScale(s => Math.min(2, Math.max(0.5, Math.round((s + delta) * 10) / 10)));
@@ -654,8 +639,6 @@ function PdfRenderer({
                       px-4 py-2.5 bg-white dark:bg-slate-900
                       border-b border-slate-200 dark:border-slate-800
                       shrink-0 gap-3 flex-wrap">
-
-        {/* Page nav */}
         <div className="flex items-center gap-1.5">
           <Button variant="outline" size="icon"
             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
@@ -675,7 +658,6 @@ function PdfRenderer({
           </Button>
         </div>
 
-        {/* Zoom */}
         <div className="flex items-center gap-1.5">
           <Button variant="outline" size="icon"
             onClick={() => clamp(-0.1)} disabled={scale <= 0.5}
@@ -693,7 +675,6 @@ function PdfRenderer({
           </Button>
         </div>
 
-        {/* Field count */}
         <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400">
           <FileText className="w-3.5 h-3.5" />
           {myPageFieldCount} field{myPageFieldCount !== 1 ? 's' : ''} on page
@@ -704,10 +685,8 @@ function PdfRenderer({
       <div ref={scrollRef}
            className="flex-1 overflow-auto bg-slate-200
                       dark:bg-slate-950 p-3 sm:p-5">
-
         <div ref={containerRef}>
 
-          {/* Loading skeleton */}
           {loading && (
             <div className="w-full bg-white rounded-sm animate-pulse
                             flex items-center justify-center"
@@ -721,24 +700,25 @@ function PdfRenderer({
             </div>
           )}
 
-          {/* Error */}
           {error && !loading && (
-            <div className="flex flex-col items-center justify-center
-                            gap-4 py-20">
+            <div className="flex flex-col items-center justify-center gap-4 py-20">
               <AlertCircle className="w-10 h-10 text-red-400" />
               <p className="font-semibold text-slate-600">Failed to load PDF</p>
               <p className="text-xs text-slate-400 max-w-xs text-center">
                 Make sure your connection is stable and the link is valid.
               </p>
               <Button size="sm" variant="outline"
-                onClick={() => { setError(false); setLoading(true); setRetryKey(k => k + 1); }}
+                onClick={() => {
+                  setError(false);
+                  setLoading(true);
+                  setRetryKey(k => k + 1);
+                }}
                 className="rounded-xl gap-1.5">
                 <RotateCcw className="w-3.5 h-3.5" /> Retry
               </Button>
             </div>
           )}
 
-          {/* PDF + overlays */}
           {!loading && !error && (
             <div className="relative mx-auto bg-white shadow-2xl
                             shadow-black/20 rounded-sm"
@@ -747,8 +727,6 @@ function PdfRenderer({
                    height: canvasSize.height || 'auto',
                  }}>
               <canvas ref={canvasRef} className="block rounded-sm" />
-
-              {/* ✅ Field overlays */}
               {canvasSize.width > 0 && pageFields.map(field => (
                 <FieldOverlay
                   key={field.id}
@@ -763,7 +741,6 @@ function PdfRenderer({
             </div>
           )}
 
-          {/* Page dots */}
           {!loading && !error && totalPages > 1 && totalPages <= 20 && (
             <div className="flex items-center justify-center gap-1.5 mt-4 mb-2">
               {Array.from({ length: totalPages }).map((_, i) => (
@@ -821,7 +798,7 @@ function FieldProgress({ fields, signerIndex }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN
+// MAIN — SignerView
 // ─────────────────────────────────────────────────────────────
 export default function SignerView() {
   const { token } = useParams();
@@ -849,15 +826,13 @@ export default function SignerView() {
     docInfo ? `Sign: ${docInfo.title} — NeXsign` : 'Sign Document — NeXsign',
   );
 
-  // ✅ Auto-jump to first page that has signer's fields
-  const jumpToFirstFieldPage = useCallback((allFields, idx, pages) => {
+  // Auto-jump to first page with signer's fields
+  const jumpToFirstFieldPage = useCallback((allFields, idx) => {
     const myFields = allFields.filter(f => f.partyIndex === idx);
     if (!myFields.length) return;
-    const pages_with_fields = [...new Set(myFields.map(f => f.page || 1))].sort();
-    const firstPage = pages_with_fields[0];
-    if (firstPage && firstPage !== 1) {
-      setCurrentPage(firstPage);
-    }
+    const pages    = [...new Set(myFields.map(f => f.page || 1))].sort((a, b) => a - b);
+    const first    = pages[0];
+    if (first && first !== 1) setCurrentPage(first);
   }, []);
 
   // ── Validate token ──────────────────────────────────────────
@@ -885,16 +860,14 @@ export default function SignerView() {
         setFields(allFields);
         setTotalPages(doc.totalPages || 1);
 
-        // ✅ Proxy URL — backend থেকে PDF serve করবে
-        const base = (import.meta.env.VITE_API_BASE_URL || '')
-          .replace(/\/api$/, '')
+        // ✅ FIX: PDF proxy URL — clean build
+        const apiBase = (import.meta.env.VITE_API_BASE_URL || '')
+          .replace(/\/api\/?$/, '')
           .replace(/\/$/, '');
-        setPdfUrl(`${base}/api/documents/sign/${token}/pdf`);
+        setPdfUrl(`${apiBase}/api/documents/sign/${token}/pdf`);
 
         setPhase('ready');
-
-        // ✅ Auto-jump to signer's first field page
-        jumpToFirstFieldPage(allFields, party.index, doc.totalPages || 1);
+        jumpToFirstFieldPage(allFields, party.index);
 
       } catch (err) {
         if (err.name === 'CanceledError' || err.name === 'AbortError') return;
@@ -931,51 +904,55 @@ export default function SignerView() {
     handleFieldChange(activeField.id, dataUrl);
     setShowModal(false);
     setActiveField(null);
-    toast.success('Signature applied! ✓');
+    toast.success('Signature applied!');
   }, [activeField, handleFieldChange]);
 
   // ── Submit ──────────────────────────────────────────────────
-const handleSubmit = useCallback(async () => {
-  const mine    = fields.filter(f => f.partyIndex === signerInfo?.index);
-  const missing = mine.filter(f => f.required && !f.value);
+  const handleSubmit = useCallback(async () => {
+    const mine    = fields.filter(f => f.partyIndex === signerInfo?.index);
+    const missing = mine.filter(f => f.required && !f.value);
 
-  if (missing.length) {
-    toast.error(
-      `Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`
-    );
-    if (missing[0]?.page) setCurrentPage(missing[0].page);
-    return;
-  }
-
-  setSubmitting(true);
-  try {
-    const res = await api.post('/documents/sign/submit', { token, fields });
-    if (!mountedRef.current) return;
-
-    const { completed, document: updatedDoc } = res.data;
-
-    if (completed) {
-      // ✅ Finalize — separate call, non-blocking
-      // docId টা response থেকে নাও
-      const docId = updatedDoc?._id || res.data?.docId;
-      if (docId) {
-        // Fire and forget — UI block হবে না
-        api.post(`/documents/sign/finalize/${docId}`)
-          .catch(e => console.error('[finalize]', e?.message));
-      }
-      setPhase('completed');
-    } else {
-      setPhase('signed_next');
+    if (missing.length) {
+      toast.error(
+        `Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`,
+      );
+      if (missing[0]?.page) setCurrentPage(missing[0].page);
+      return;
     }
 
-  } catch (err) {
-    toast.error(
-      err.response?.data?.message || 'Failed to submit. Please try again.'
-    );
-  } finally {
-    if (mountedRef.current) setSubmitting(false);
-  }
-}, [fields, signerInfo, token]);
+    setSubmitting(true);
+    try {
+      // ✅ FIX: clientTime — ISO string পাঠাও
+      // Backend এ new Date(clientTime).toUTCString() করা হবে
+      const clientTime = new Date().toISOString();
+
+      const res = await api.post('/documents/sign/submit', {
+        token,
+        fields,
+        clientTime,
+      });
+
+      if (!mountedRef.current) return;
+
+      const { completed } = res.data;
+
+      if (completed) {
+        // ✅ FIX: finalize আলাদাভাবে call করতে হবে না
+        // backend _finalizeDocument নিজেই call করে
+        // শুধু phase set করো
+        setPhase('completed');
+      } else {
+        setPhase('signed_next');
+      }
+
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message || 'Failed to submit. Please try again.',
+      );
+    } finally {
+      if (mountedRef.current) setSubmitting(false);
+    }
+  }, [fields, signerInfo, token]);
 
   // ── Phase screens ───────────────────────────────────────────
   if (phase === 'loading') {
@@ -1036,13 +1013,14 @@ const handleSubmit = useCallback(async () => {
     return (
       <StatusScreen icon={ShieldCheck} color="green"
         title="Document Fully Signed!"
-        message={`All parties have signed "${docInfo?.title}". A completed copy has been sent to all parties.`}>
+        message={`All parties have signed "${docInfo?.title}". A completed copy will be sent to all parties shortly.`}>
         <div className="space-y-3">
           <div className="flex items-center gap-2.5 p-3 rounded-xl
                           bg-emerald-50 border border-emerald-100">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
             <p className="text-xs text-emerald-700 text-left">
-              A signed copy has been sent to <strong>{signerInfo?.email}</strong>
+              A signed copy will be sent to{' '}
+              <strong>{signerInfo?.email}</strong>
             </p>
           </div>
           <Button onClick={() => navigate('/')}
@@ -1093,7 +1071,8 @@ const handleSubmit = useCallback(async () => {
           </div>
 
           <Button
-            onClick={handleSubmit} disabled={submitting}
+            onClick={handleSubmit}
+            disabled={submitting}
             className={cn(
               'h-9 sm:h-10 px-4 sm:px-5 rounded-xl font-semibold text-sm',
               'gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0',
