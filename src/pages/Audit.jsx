@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,8 +22,7 @@ const formatTime = (v) => {
 };
 
 export default function Audit() {
-  const [params] = useSearchParams();
-  const id = params.get('id');
+  const { id } = useParams();
   const [loading, setLoading] = useState(true);
   const [audit, setAudit] = useState(null);
 

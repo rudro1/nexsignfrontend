@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { api } from '@/api/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem,
@@ -13,7 +12,7 @@ import {
 import { toast } from 'sonner';
 import {
   Upload, Send, ArrowLeft, FileText,
-  Loader2, Mail, X, ImagePlus, Type,
+  Loader2, Mail, X, ImagePlus,
 } from 'lucide-react';
 import PartyManager from '@/components/editor/PartyManager';
 import FieldToolbar  from '@/components/editor/FieldToolbar';
@@ -30,11 +29,13 @@ const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24];
 export default function DocumentEditor() {
   const navigate  = useNavigate();
   const location  = useLocation();
+  const { id: pathId } = useParams();
   const { user }  = useAuth();
 
   const [docId] = useState(() => {
-    const id = new URLSearchParams(location.search).get('id');
-    return id === 'new' ? null : id;
+    if (pathId && pathId !== 'new') return pathId;
+    const qId = new URLSearchParams(location.search).get('id');
+    return qId === 'new' ? null : qId;
   });
 
   // ── Core state ───────────────────────────────────────────────
@@ -405,8 +406,11 @@ export default function DocumentEditor() {
           <div className="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 sticky top-0 z-40">
             <div className="flex items-center gap-4">
               <FieldToolbar
+                parties={parties}
+                selectedPartyIndex={selectedPartyIndex}
+                onPartySelect={setSelectedPartyIndex}
                 onAddField={type => setPendingFieldType(type)}
-                selectedParty={parties[selectedPartyIndex]}
+                pendingFieldType={pendingFieldType}
                 disabled={!fileReady}
               />
             </div>
@@ -454,12 +458,13 @@ export default function DocumentEditor() {
                 onFieldsChange={setFields}
                 currentPage={currentPage}
                 onPageChange={setCurrentPage}
-                onTotalPages={setTotalPages}
+                onTotalPagesChange={setTotalPages}
                 selectedPartyIndex={selectedPartyIndex}
                 pendingFieldType={pendingFieldType}
+                parties={parties}
                 onFieldPlaced={() => setPendingFieldType(null)}
                 selectedFieldId={selectedFieldId}
-                onSelectField={setSelectedFieldId}
+                onFieldSelect={setSelectedFieldId}
               />
             </div>
           </div>

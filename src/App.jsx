@@ -444,6 +444,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/editor/:id"
+        element={
+          <ProtectedRoute>
+            <DocumentEditor />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/templates"
         element={
           <ProtectedRoute>
@@ -460,7 +468,15 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/audit"
+        path="/audit/:id"
+        element={
+          <ProtectedRoute>
+            <Audit />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manage/:id"
         element={
           <ProtectedRoute>
             <Audit />

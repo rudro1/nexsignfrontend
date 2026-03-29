@@ -87,40 +87,44 @@ const DocumentCard = React.memo(({ doc }) => {
   }, [doc, navigate]);
 
   return (
-    <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 backdrop-blur-sm">
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl transition-colors duration-300 ${config.color.split(' ')[0]} bg-opacity-10 group-hover:bg-opacity-20`}>
-              <FileText className={`w-5 h-5 ${config.color.split(' ')[1]}`} />
+    <Card 
+      onClick={handleAction}
+      className="group relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm cursor-pointer rounded-[2.5rem] p-6 md:p-8"
+    >
+      <div className="flex flex-col h-full">
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className={`p-3 rounded-2xl transition-colors duration-300 ${config.color.split(' ')[0]} bg-opacity-20 group-hover:bg-opacity-30`}>
+              <FileText className={`w-6 h-6 ${config.color.split(' ')[1]}`} />
             </div>
             <div className="min-w-0">
-              <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
-                {doc.title || 'Untitled Document'}
+              <h3 className="text-xl font-black text-slate-900 dark:text-white truncate group-hover:text-[#28ABDF] transition-colors uppercase tracking-tight">
+                {doc.title || 'Untitled'}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <Clock className="w-3 h-3" />
-                {formattedDate}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  {formattedDate}
+                </p>
+              </div>
             </div>
           </div>
-          <Badge className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${config.color}`}>
-            <StatusIcon className="w-3 h-3 mr-1 inline-block" />
+          <Badge className={`rounded-xl px-4 py-1.5 text-[10px] font-black uppercase tracking-widest ${config.color} border-none`}>
             {config.label}
           </Badge>
         </div>
 
-        <div className="space-y-4">
+        <div className="flex-1 space-y-6">
           {/* Progress Bar */}
           {!doc.isTemplate && parties.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-[11px] font-semibold">
-                <span className="text-slate-500">Signing Progress</span>
-                <span className="text-sky-600">{progress}%</span>
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                <span className="text-slate-400">Signing Progress</span>
+                <span className="text-[#28ABDF]">{progress}%</span>
               </div>
-              <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
                 <div 
-                  className="h-full bg-sky-500 rounded-full transition-all duration-500 ease-out"
+                  className="h-full bg-[#28ABDF] rounded-full transition-all duration-700 ease-in-out shadow-[0_0_15px_rgba(40,171,223,0.3)]"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -128,12 +132,12 @@ const DocumentCard = React.memo(({ doc }) => {
           )}
 
           {/* Parties Avatars */}
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex -space-x-2">
+          <div className="flex items-center justify-between pt-4 border-t dark:border-slate-800">
+            <div className="flex -space-x-3">
               {parties.slice(0, 4).map((p, i) => (
                 <div 
                   key={i}
-                  className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-1 ring-slate-100 dark:ring-slate-800"
+                  className="w-10 h-10 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center text-[11px] font-black text-white shadow-md ring-1 ring-slate-100 dark:ring-slate-800 transition-transform hover:scale-110 hover:z-10"
                   style={{ backgroundColor: PARTY_COLORS[i % PARTY_COLORS.length] }}
                   title={p.name}
                 >
@@ -141,33 +145,30 @@ const DocumentCard = React.memo(({ doc }) => {
                 </div>
               ))}
               {parties.length > 4 && (
-                <div className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-500 shadow-sm ring-1 ring-slate-100 dark:ring-slate-800">
+                <div className="w-10 h-10 rounded-full border-4 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[11px] font-black text-slate-500 shadow-md ring-1 ring-slate-100 dark:ring-slate-800">
                   +{parties.length - 4}
                 </div>
-              )}
-              {parties.length === 0 && (
-                <span className="text-xs text-slate-400 italic font-medium">No parties added</span>
               )}
             </div>
 
             <Button 
               size="sm" 
               onClick={handleAction}
-              className="h-8 rounded-lg px-3 bg-slate-50 hover:bg-sky-50 text-slate-600 hover:text-sky-600 dark:bg-slate-800 dark:hover:bg-sky-900/30 dark:text-slate-400 border-none transition-all duration-300"
+              className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-100 dark:border-slate-700 hover:border-[#28ABDF] hover:text-[#28ABDF] rounded-2xl px-6 h-11 font-black transition-all shadow-sm"
             >
-              <span className="text-xs font-bold mr-1.5">
-                {doc.isTemplate ? 'Use Template' : (doc.status === 'draft' ? 'Edit' : 'Manage')}
+              <span className="text-[10px] font-black uppercase tracking-widest mr-2">
+                {doc.isTemplate ? 'USE TEMPLATE' : (doc.status === 'draft' ? 'EDIT' : 'MANAGE')}
               </span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-4 h-4" />
             </Button>
           </div>
 
           {/* Next Action Indicator */}
           {currentSigner && (
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-sky-50/50 dark:bg-sky-900/10 border border-sky-100/50 dark:border-sky-800/30">
-              <div className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
-              <p className="text-[10px] font-medium text-sky-700 dark:text-sky-400 truncate">
-                Waiting for: <span className="font-bold">{currentSigner.name}</span>
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/10 border border-sky-100 dark:border-sky-800/30">
+              <div className="w-2 h-2 rounded-full bg-[#28ABDF] animate-pulse shadow-[0_0_8px_rgba(40,171,223,0.5)]" />
+              <p className="text-[10px] font-black uppercase tracking-widest text-sky-700 dark:text-sky-400 truncate">
+                Waiting for: <span className="text-slate-900 dark:text-white">{currentSigner.name}</span>
               </p>
             </div>
           )}
