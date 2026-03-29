@@ -488,6 +488,7 @@ export default function DocumentDetail() {
 
   // ── Load document ─────────────────────────────────────────────
   const loadDoc = useCallback(async () => {
+    if (!id || id === 'new') return;
     setLoading(true);
     setError(null);
     try {
@@ -504,6 +505,7 @@ export default function DocumentDetail() {
 
   // ── Load audit ────────────────────────────────────────────────
   const loadAudit = useCallback(async () => {
+    if (!id || id === 'new') return;
     setAuditLoading(true);
     try {
       const res = await api.get(`/documents/${id}/audit`, { noCache: true });
@@ -517,9 +519,13 @@ export default function DocumentDetail() {
   }, [id]);
 
   useEffect(() => {
+    if (id === 'new') {
+      setLoading(false);
+      return;
+    }
     loadDoc();
     loadAudit();
-  }, [loadDoc, loadAudit]);
+  }, [id, loadDoc, loadAudit]);
 
   // ── Socket: real-time updates ─────────────────────────────────
   useEffect(() => {
