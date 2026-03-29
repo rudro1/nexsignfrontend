@@ -367,21 +367,28 @@ export default function Audit() {
 
   // ── Fetch ─────────────────────────────────────────────────────
   const fetchAudit = useCallback(async (silent = false) => {
-    // FIX: prevent calling API for 'new' documents or empty IDs
-    if (!id || id === 'new') return;
+    if (!id) return;
+    silent ? setSyncing(true) : setLoading(true);
+    setError(null);
 
     try {
-      silent ? setSyncing(true) : setLoading(true);
-      setError(null);
-
       const res = await api.get(`/documents/${id}/audit`);
-      setAudit(res.data?.audit || null);
+      if (mountedRef.current) {
+        setAudit(res.data?.audit || res.data || null);
+      }
     } catch (err) {
-      console.error('❌ Failed to fetch audit log:', err.message);
-      setError(err.response?.data?.message || 'Failed to load audit trail');
+      if (mountedRef.current) {
+        const msg = err.response?.data?.error
+                 || err.response?.data?.message
+                 || 'Failed to load audit log.';
+        setError(msg);
+        if (!silent) toast.error(msg);
+      }
     } finally {
-      setLoading(false);
-      setSyncing(false);
+      if (mountedRef.current) {
+        setLoading(false);
+        setSyncing(false);
+      }
     }
   }, [id]);
 

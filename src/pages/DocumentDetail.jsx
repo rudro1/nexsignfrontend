@@ -131,7 +131,7 @@ const Ic = {
     </svg>
   ),
   Spinner: () => (
-    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
     </svg>
@@ -197,12 +197,10 @@ function DeleteModal({ title, onConfirm, onCancel, loading }) {
                       shadow-2xl border border-slate-100 dark:border-slate-800
                       p-6 w-full max-w-sm z-10">
         <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-2xl
-                        flex items-center justify-center mx-auto mb-4
-                        text-red-500">
+                        flex items-center justify-center mx-auto mb-4 text-red-500">
           <Ic.Trash />
         </div>
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white
-                       text-center mb-1">
+        <h3 className="text-lg font-bold text-slate-800 dark:text-white text-center mb-1">
           Delete Document?
         </h3>
         <p className="text-sm text-slate-500 text-center mb-6">
@@ -228,8 +226,7 @@ function DeleteModal({ title, onConfirm, onCancel, loading }) {
             disabled={loading}
             className="flex-1 h-10 rounded-xl bg-red-500 hover:bg-red-600
                        text-white text-sm font-semibold transition-colors
-                       flex items-center justify-center gap-2
-                       disabled:opacity-60"
+                       flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {loading ? <Ic.Spinner /> : <Ic.Trash />}
             Delete
@@ -247,104 +244,60 @@ function SigningTimeline({ parties }) {
   return (
     <div className="space-y-3">
       {(parties || []).map((party, idx) => {
-        const isDone    = party.status === 'completed' || party.status === 'signed';
-        const isActive  = party.status === 'in_progress' || party.status === 'sent';
+        const isDone     = party.status === 'completed' || party.status === 'signed';
+        const isActive   = party.status === 'in_progress' || party.status === 'sent';
         const isDeclined = party.status === 'declined';
 
         return (
           <div key={idx} className="relative">
-            {/* Connector line */}
             {idx < parties.length - 1 && (
               <div className={`absolute left-[18px] top-10 w-0.5 h-6 z-0
                 ${isDone
                   ? 'bg-emerald-300 dark:bg-emerald-700'
-                  : 'bg-slate-200 dark:bg-slate-700'
-                }`}
+                  : 'bg-slate-200 dark:bg-slate-700'}`}
               />
             )}
-
-            <div className={`relative z-10 flex items-start gap-3 p-3.5
-                             rounded-xl transition-colors
+            <div className={`relative z-10 flex items-start gap-3 p-3.5 rounded-xl transition-colors
               ${isActive
                 ? 'bg-sky-50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/50'
                 : isDone
                   ? 'bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-100 dark:border-emerald-800/50'
                   : isDeclined
                     ? 'bg-red-50 dark:bg-red-900/15 border border-red-100 dark:border-red-800/50'
-                    : 'bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700'
-              }`}>
-
-              {/* Avatar */}
-              <div className={`w-9 h-9 rounded-xl flex items-center
-                               justify-center text-sm font-bold
-                               text-white shrink-0 shadow-sm
-                ${isDone      ? 'bg-emerald-500'
-                : isActive    ? 'bg-[#28ABDF]'
-                : isDeclined  ? 'bg-red-500'
-                               : 'bg-slate-300 dark:bg-slate-600'
-                }`}
-                style={!isDone && !isActive && !isDeclined && party.color
-                  ? { backgroundColor: party.color }
-                  : {}
-                }
+                    : 'bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700'}`}>
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center
+                             text-sm font-bold text-white shrink-0 shadow-sm
+                  ${isDone ? 'bg-emerald-500' : isActive ? 'bg-[#28ABDF]' : isDeclined ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                style={!isDone && !isActive && !isDeclined && party.color ? { backgroundColor: party.color } : {}}
               >
-                {isDone
-                  ? <Ic.Check />
-                  : (party.name || 'U')[0].toUpperCase()
-                }
+                {isDone ? <Ic.Check /> : (party.name || 'U')[0].toUpperCase()}
               </div>
-
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800
-                                   dark:text-white truncate">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
                       {party.name}
                     </p>
-                    <p className="text-xs text-slate-400 truncate">
-                      {party.email}
-                    </p>
+                    <p className="text-xs text-slate-400 truncate">{party.email}</p>
                   </div>
-                  <StatusBadge status={
-                    party.status === 'signed' ? 'completed' : (party.status || 'pending')
-                  } />
+                  <StatusBadge status={party.status === 'signed' ? 'completed' : (party.status || 'pending')} />
                 </div>
-
-                {/* Signed meta */}
                 {party.signedAt && (
-                  <div className="flex flex-wrap items-center gap-3 mt-2
-                                  text-[11px] text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <Ic.Clock />
-                      {fmtDateTime(party.signedAt)}
-                    </span>
-                    {party.ipAddress && (
-                      <span className="flex items-center gap-1">
-                        <Ic.Globe />
-                        {party.ipAddress}
-                      </span>
-                    )}
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-400">
+                    <span className="flex items-center gap-1"><Ic.Clock />{fmtDateTime(party.signedAt)}</span>
+                    {party.ipAddress && <span className="flex items-center gap-1"><Ic.Globe />{party.ipAddress}</span>}
                     {(party.city || party.postalCode) && (
                       <span className="flex items-center gap-1">
                         <Ic.MapPin />
                         {[party.city, party.postalCode].filter(Boolean).join(', ')}
                       </span>
                     )}
-                    {party.device && (
-                      <span className="flex items-center gap-1">
-                        <Ic.Monitor />
-                        {party.device}
-                      </span>
-                    )}
+                    {party.device && <span className="flex items-center gap-1"><Ic.Monitor />{party.device}</span>}
                   </div>
                 )}
               </div>
-
-              {/* Order badge */}
-              <div className="text-[10px] font-bold text-slate-400
-                               bg-slate-100 dark:bg-slate-700
-                               px-2 py-0.5 rounded-full shrink-0">
+              <div className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full shrink-0">
                 #{idx + 1}
               </div>
             </div>
@@ -360,67 +313,53 @@ function SigningTimeline({ parties }) {
 // ─────────────────────────────────────────────────────────────────
 function AuditEntry({ entry }) {
   const [expanded, setExpanded] = useState(false);
-
   const actionColors = {
-    created:  'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
-    sent:     'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400',
-    viewed:   'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-    signed:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
-    declined: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
-    completed:'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400',
-    voided:   'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    created:   'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
+    sent:      'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400',
+    viewed:    'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    signed:    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+    declined:  'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+    completed: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400',
+    voided:    'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
   };
-
   const cls = actionColors[entry.action] || actionColors.viewed;
 
   return (
-    <div className="flex gap-3 py-3 border-b border-slate-50
-                    dark:border-slate-800 last:border-0">
+    <div className="flex gap-3 py-3 border-b border-slate-50 dark:border-slate-800 last:border-0">
       <div className="mt-0.5 shrink-0">
-        <span className={`text-[10px] font-bold px-2 py-0.5
-                          rounded-full capitalize ${cls}`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${cls}`}>
           {entry.action}
         </span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-slate-700
-                       dark:text-slate-300 truncate">
+        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
           {entry.actorName || entry.signerName || 'System'}
           {entry.actorEmail && (
-            <span className="text-slate-400 font-normal ml-1">
-              · {entry.actorEmail}
-            </span>
+            <span className="text-slate-400 font-normal ml-1">· {entry.actorEmail}</span>
           )}
         </p>
         <p className="text-[11px] text-slate-400 mt-0.5">
           {fmtDateTime(entry.timestamp || entry.createdAt)}
         </p>
-
-        {/* Details toggle */}
-        {(entry.device || entry.browser || entry.os || entry.ip
-          || entry.city || entry.postalCode) && (
+        {(entry.device || entry.browser || entry.os || entry.ip || entry.city || entry.postalCode) && (
           <button
             onClick={() => setExpanded(e => !e)}
-            className="text-[11px] text-[#28ABDF] hover:underline
-                       mt-1 font-medium"
+            className="text-[11px] text-[#28ABDF] hover:underline mt-1 font-medium"
           >
             {expanded ? 'Hide details' : 'Show details'}
           </button>
         )}
-
         {expanded && (
           <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
             {[
-              { icon: Ic.Monitor, label: 'Device',   val: entry.device   },
-              { icon: Ic.Globe,   label: 'Browser',  val: entry.browser  },
-              { icon: Ic.Globe,   label: 'OS',       val: entry.os       },
-              { icon: Ic.Globe,   label: 'IP',       val: entry.ip || entry.ipAddress },
-              { icon: Ic.MapPin,  label: 'City',     val: entry.city     },
-              { icon: Ic.MapPin,  label: 'Postal',   val: entry.postalCode },
+              { icon: Ic.Monitor, label: 'Device',  val: entry.device },
+              { icon: Ic.Globe,   label: 'Browser', val: entry.browser },
+              { icon: Ic.Globe,   label: 'OS',      val: entry.os },
+              { icon: Ic.Globe,   label: 'IP',      val: entry.ip || entry.ipAddress },
+              { icon: Ic.MapPin,  label: 'City',    val: entry.city },
+              { icon: Ic.MapPin,  label: 'Postal',  val: entry.postalCode },
             ].filter(r => r.val).map(({ icon: Icon, label, val }) => (
-              <div key={label}
-                   className="flex items-center gap-1.5 text-[11px]
-                              text-slate-500 dark:text-slate-400">
+              <div key={label} className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                 <Icon />
                 <span className="text-slate-400">{label}:</span>
                 <span className="font-medium truncate">{val}</span>
@@ -441,18 +380,14 @@ function CcRow({ cc }) {
     <div className="flex items-center gap-3 p-3 rounded-xl
                     bg-slate-50 dark:bg-slate-800/60
                     border border-slate-100 dark:border-slate-700">
-      <div className="w-8 h-8 rounded-lg bg-[#28ABDF]/10
-                      flex items-center justify-center shrink-0">
+      <div className="w-8 h-8 rounded-lg bg-[#28ABDF]/10 flex items-center justify-center shrink-0">
         <Ic.Mail />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-slate-800
-                       dark:text-white truncate">
+        <p className="text-xs font-semibold text-slate-800 dark:text-white truncate">
           {cc.name || 'No name'}
           {cc.designation && (
-            <span className="text-slate-400 font-normal ml-1">
-              · {cc.designation}
-            </span>
+            <span className="text-slate-400 font-normal ml-1">· {cc.designation}</span>
           )}
         </p>
         <p className="text-[11px] text-slate-400 truncate">{cc.email}</p>
@@ -462,7 +397,7 @@ function CcRow({ cc }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// MAIN
+// MAIN — FIX: Guard against invalid IDs like "new"
 // ─────────────────────────────────────────────────────────────────
 export default function DocumentDetail() {
   const { id }   = useParams();
@@ -470,15 +405,15 @@ export default function DocumentDetail() {
   const socket   = useSocket();
   const { toast, show: showToast } = useToast();
 
-  const [doc,         setDoc]         = useState(null);
-  const [auditLogs,   setAuditLogs]   = useState([]);
-  const [loading,     setLoading]     = useState(true);
+  const [doc,          setDoc]          = useState(null);
+  const [auditLogs,    setAuditLogs]    = useState([]);
+  const [loading,      setLoading]      = useState(true);
   const [auditLoading, setAuditLoading] = useState(false);
-  const [error,       setError]       = useState(null);
-  const [activeTab,   setActiveTab]   = useState('overview');
-  const [showDelete,  setShowDelete]  = useState(false);
-  const [deleting,    setDeleting]    = useState(false);
-  const [copying,     setCopying]     = useState(false);
+  const [error,        setError]        = useState(null);
+  const [activeTab,    setActiveTab]    = useState('overview');
+  const [showDelete,   setShowDelete]   = useState(false);
+  const [deleting,     setDeleting]     = useState(false);
+  const [copying,      setCopying]      = useState(false);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -486,9 +421,22 @@ export default function DocumentDetail() {
     return () => { mountedRef.current = false; };
   }, []);
 
+  // ══════════════════════════════════════════════════════════════
+  // FIX: If id is "new" or not a valid MongoDB ObjectId,
+  // redirect immediately — don't make API call
+  // ══════════════════════════════════════════════════════════════
+  useEffect(() => {
+    const isValidId = id && id !== 'new' && /^[a-f\d]{24}$/i.test(id);
+    if (!isValidId) {
+      navigate('/documents/new', { replace: true });
+    }
+  }, [id, navigate]);
+
   // ── Load document ─────────────────────────────────────────────
   const loadDoc = useCallback(async () => {
-    if (!id || id === 'new') return;
+    // Extra guard — don't call if invalid id
+    if (!id || id === 'new' || !/^[a-f\d]{24}$/i.test(id)) return;
+
     setLoading(true);
     setError(null);
     try {
@@ -496,16 +444,23 @@ export default function DocumentDetail() {
       if (mountedRef.current)
         setDoc(res.data?.document || res.data);
     } catch (err) {
-      if (mountedRef.current)
-        setError(err.response?.data?.message || 'Failed to load document.');
+      if (mountedRef.current) {
+        const status = err.status || err.response?.status;
+        if (status === 404) {
+          navigate('/dashboard', { replace: true });
+        } else {
+          setError(err.message || 'Failed to load document.');
+        }
+      }
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [id]);
+  }, [id, navigate]);
 
   // ── Load audit ────────────────────────────────────────────────
   const loadAudit = useCallback(async () => {
-    if (!id || id === 'new') return;
+    if (!id || id === 'new' || !/^[a-f\d]{24}$/i.test(id)) return;
+
     setAuditLoading(true);
     try {
       const res = await api.get(`/documents/${id}/audit`, { noCache: true });
@@ -519,28 +474,24 @@ export default function DocumentDetail() {
   }, [id]);
 
   useEffect(() => {
-    if (id === 'new') {
-      setLoading(false);
-      return;
-    }
     loadDoc();
     loadAudit();
-  }, [id, loadDoc, loadAudit]);
+  }, [loadDoc, loadAudit]);
 
   // ── Socket: real-time updates ─────────────────────────────────
   useEffect(() => {
-    if (!socket) return;
+    if (!socket?.on) return;
     const onUpdate = (updated) => {
       if (!mountedRef.current) return;
       if (updated._id === id || updated.id === id) {
         setDoc(prev => prev ? { ...prev, ...updated } : updated);
       }
     };
-    socket.on('document:updated', onUpdate);
-    socket.on('document:signed',  onUpdate);
+    const cleanup1 = socket.on('document:updated', onUpdate);
+    const cleanup2 = socket.on('document:signed',  onUpdate);
     return () => {
-      socket.off('document:updated', onUpdate);
-      socket.off('document:signed',  onUpdate);
+      if (typeof cleanup1 === 'function') cleanup1();
+      if (typeof cleanup2 === 'function') cleanup2();
     };
   }, [socket, id]);
 
@@ -551,14 +502,14 @@ export default function DocumentDetail() {
       await api.delete(`/documents/${id}`);
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      showToast(err.response?.data?.message || 'Delete failed.', 'error');
+      showToast(err.message || 'Delete failed.', 'error');
       setShowDelete(false);
     } finally {
       if (mountedRef.current) setDeleting(false);
     }
   }, [id, navigate, showToast]);
 
-  // ── Copy link ─────────────────────────────────────────────────
+  // ── Copy signing link ─────────────────────────────────────────
   const copySigningLink = useCallback(async (party) => {
     if (!party?.signingToken) return;
     const url = `${window.location.origin}/sign/${party.signingToken}`;
@@ -582,7 +533,11 @@ export default function DocumentDetail() {
     return Math.round((done / doc.parties.length) * 100);
   }, [doc]);
 
-  // ── Render ────────────────────────────────────────────────────
+  // ── Early return for invalid id ───────────────────────────────
+  if (!id || id === 'new' || !/^[a-f\d]{24}$/i.test(id)) {
+    return null; // useEffect will redirect
+  }
+
   if (loading) return <PageSkeleton />;
 
   if (error) {
@@ -592,13 +547,11 @@ export default function DocumentDetail() {
         <div className="bg-white dark:bg-slate-900 rounded-2xl
                         border border-slate-100 dark:border-slate-800
                         p-8 max-w-md w-full text-center">
-          <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30
-                          rounded-2xl flex items-center justify-center
-                          mx-auto mb-4 text-red-500">
+          <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-2xl
+                          flex items-center justify-center mx-auto mb-4 text-red-500">
             <Ic.Warning />
           </div>
-          <h2 className="text-lg font-bold text-slate-800
-                         dark:text-white mb-2">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-2">
             Failed to Load
           </h2>
           <p className="text-sm text-slate-500 mb-6">{error}</p>
@@ -608,16 +561,14 @@ export default function DocumentDetail() {
               className="flex-1 h-10 rounded-xl border border-slate-200
                          dark:border-slate-700 text-sm font-semibold
                          text-slate-600 dark:text-slate-300
-                         hover:bg-slate-50 dark:hover:bg-slate-800
-                         transition-colors"
+                         hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               Back
             </button>
             <button
               onClick={loadDoc}
-              className="flex-1 h-10 rounded-xl bg-[#28ABDF]
-                         hover:bg-sky-600 text-white text-sm
-                         font-semibold transition-colors"
+              className="flex-1 h-10 rounded-xl bg-[#28ABDF] hover:bg-sky-600
+                         text-white text-sm font-semibold transition-colors"
             >
               Retry
             </button>
@@ -627,17 +578,15 @@ export default function DocumentDetail() {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F1A]">
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3
-                         rounded-xl shadow-xl text-sm font-semibold
-                         text-white transition-all
-                         ${toast.type === 'error'
-                           ? 'bg-red-500' : 'bg-emerald-500'}`}>
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl
+                         shadow-xl text-sm font-semibold text-white
+                         animate-fade-in
+                         ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}>
           {toast.msg}
         </div>
       )}
@@ -652,12 +601,9 @@ export default function DocumentDetail() {
         />
       )}
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8
-                      py-6 sm:py-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
-        {/* ════════════════════════════════════════════════════
-            HEADER
-        ════════════════════════════════════════════════════ */}
+        {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-start
                         justify-between gap-4 mb-7">
           <div className="flex items-start gap-3">
@@ -680,12 +626,10 @@ export default function DocumentDetail() {
                 </h1>
                 <StatusBadge status={doc?.status} />
               </div>
-              <div className="flex flex-wrap items-center gap-2
-                              text-xs text-slate-400">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 {doc?.companyName && (
                   <>
-                    <span className="font-medium text-slate-600
-                                     dark:text-slate-300">
+                    <span className="font-medium text-slate-600 dark:text-slate-300">
                       {doc.companyName}
                     </span>
                     <span>·</span>
@@ -707,10 +651,10 @@ export default function DocumentDetail() {
                          flex items-center justify-center
                          hover:border-[#28ABDF] hover:text-[#28ABDF]
                          text-slate-400 transition-colors shadow-sm"
+              title="Refresh"
             >
               <Ic.Refresh />
             </button>
-
             {doc?.fileUrl && (
               <a
                 href={doc.fileUrl}
@@ -718,8 +662,8 @@ export default function DocumentDetail() {
                 rel="noopener noreferrer"
                 className="h-9 px-4 rounded-xl border border-slate-200
                            dark:border-slate-700 bg-white dark:bg-slate-900
-                           text-sm font-semibold text-slate-600
-                           dark:text-slate-300 flex items-center gap-2
+                           text-sm font-semibold text-slate-600 dark:text-slate-300
+                           flex items-center gap-2
                            hover:border-[#28ABDF] hover:text-[#28ABDF]
                            transition-colors shadow-sm"
               >
@@ -727,7 +671,6 @@ export default function DocumentDetail() {
                 <span className="hidden sm:inline">Download</span>
               </a>
             )}
-
             <button
               onClick={() => setShowDelete(true)}
               className="h-9 w-9 rounded-xl border border-slate-200
@@ -735,32 +678,27 @@ export default function DocumentDetail() {
                          flex items-center justify-center
                          hover:border-red-300 hover:text-red-500
                          text-slate-400 transition-colors shadow-sm"
+              title="Delete"
             >
               <Ic.Trash />
             </button>
           </div>
         </div>
 
-        {/* ════════════════════════════════════════════════════
-            PROGRESS BAR
-        ════════════════════════════════════════════════════ */}
+        {/* PROGRESS BAR */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl
                         border border-slate-100 dark:border-slate-800
                         shadow-sm p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-slate-600
-                           dark:text-slate-400">
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
               Signing Progress
             </p>
             <p className={`text-xs font-bold
-              ${progress === 100
-                ? 'text-emerald-600'
-                : 'text-[#28ABDF]'}`}>
+              ${progress === 100 ? 'text-emerald-600' : 'text-[#28ABDF]'}`}>
               {progress}% Complete
             </p>
           </div>
-          <div className="h-2 bg-slate-100 dark:bg-slate-800
-                          rounded-full overflow-hidden">
+          <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700
                 ${progress === 100
@@ -776,58 +714,49 @@ export default function DocumentDetail() {
               ).length || 0} of {doc?.parties?.length || 0} signed
             </p>
             {doc?.completedAt && (
-              <p className="text-[11px] text-emerald-600
-                             dark:text-emerald-400 font-medium">
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
                 Completed {fmtDateTime(doc.completedAt)}
               </p>
             )}
           </div>
         </div>
 
-        {/* ════════════════════════════════════════════════════
-            TABS
-        ════════════════════════════════════════════════════ */}
+        {/* TABS */}
         <div className="flex items-center gap-1 p-1
                         bg-white dark:bg-slate-900 rounded-xl
                         border border-slate-100 dark:border-slate-800
-                        shadow-sm w-fit mb-6">
+                        shadow-sm w-fit mb-6 overflow-x-auto">
           {[
-            { id: 'overview', label: 'Overview'  },
+            { id: 'overview', label: 'Overview' },
             { id: 'signers',  label: `Signers (${doc?.parties?.length || 0})` },
-            { id: 'audit',    label: `Audit Log (${auditLogs.length})`  },
+            { id: 'audit',    label: `Audit (${auditLogs.length})` },
             { id: 'cc',       label: `CC (${doc?.ccList?.length || 0})` },
           ].map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
               className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm
-                          font-semibold transition-all
+                          font-semibold transition-all whitespace-nowrap
                 ${activeTab === t.id
                   ? 'bg-[#28ABDF] text-white shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* ════════════════════════════════════════════════════
-            TAB: OVERVIEW
-        ════════════════════════════════════════════════════ */}
+        {/* TAB: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="grid lg:grid-cols-5 gap-5">
-
-            {/* Left: Timeline */}
             <div className="lg:col-span-3 space-y-4">
               <div className="bg-white dark:bg-slate-900 rounded-2xl
                               border border-slate-100 dark:border-slate-800
                               shadow-sm p-5">
                 <h3 className="text-sm font-semibold text-slate-700
                                dark:text-slate-300 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-sky-100
-                                   dark:bg-sky-900/40 flex items-center
-                                   justify-center text-[#28ABDF]">
+                  <span className="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-900/40
+                                   flex items-center justify-center text-[#28ABDF]">
                     <Ic.Users />
                   </span>
                   Signing Order
@@ -835,16 +764,14 @@ export default function DocumentDetail() {
                 <SigningTimeline parties={doc?.parties} />
               </div>
 
-              {/* PDF preview */}
               {doc?.fileUrl && (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl
                                 border border-slate-100 dark:border-slate-800
                                 shadow-sm p-5">
                   <h3 className="text-sm font-semibold text-slate-700
                                  dark:text-slate-300 mb-3 flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-slate-100
-                                     dark:bg-slate-800 flex items-center
-                                     justify-center text-slate-500">
+                    <span className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800
+                                     flex items-center justify-center text-slate-500">
                       <Ic.FileText />
                     </span>
                     Document Preview
@@ -877,10 +804,7 @@ export default function DocumentDetail() {
               )}
             </div>
 
-            {/* Right: Meta */}
             <div className="lg:col-span-2 space-y-4">
-
-              {/* Document info */}
               <div className="bg-white dark:bg-slate-900 rounded-2xl
                               border border-slate-100 dark:border-slate-800
                               shadow-sm p-5">
@@ -890,20 +814,18 @@ export default function DocumentDetail() {
                 </h3>
                 <div className="space-y-0">
                   {[
-                    { label: 'Status',   value: <StatusBadge status={doc?.status} /> },
-                    { label: 'Created',  value: fmtDate(doc?.createdAt) },
-                    { label: 'Updated',  value: fmtDate(doc?.updatedAt) },
-                    { label: 'Pages',    value: doc?.totalPages || '—'  },
-                    { label: 'Fields',   value: doc?.fields?.length || 0 },
-                    { label: 'CC',       value: doc?.ccList?.length || 0 },
+                    { label: 'Status',  value: <StatusBadge status={doc?.status} /> },
+                    { label: 'Created', value: fmtDate(doc?.createdAt) },
+                    { label: 'Updated', value: fmtDate(doc?.updatedAt) },
+                    { label: 'Pages',   value: doc?.totalPages || '—'  },
+                    { label: 'Fields',  value: doc?.fields?.length || 0 },
+                    { label: 'CC',      value: doc?.ccList?.length || 0 },
                   ].map(({ label, value }) => (
                     <div key={label}
-                         className="flex items-center justify-between
-                                    py-2.5 border-b border-slate-50
-                                    dark:border-slate-800 last:border-0">
+                         className="flex items-center justify-between py-2.5
+                                    border-b border-slate-50 dark:border-slate-800 last:border-0">
                       <span className="text-xs text-slate-400">{label}</span>
-                      <span className="text-xs font-semibold text-slate-700
-                                       dark:text-slate-300">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                         {value}
                       </span>
                     </div>
@@ -911,7 +833,6 @@ export default function DocumentDetail() {
                 </div>
               </div>
 
-              {/* Branding */}
               {(doc?.companyName || doc?.companyLogo) && (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl
                                 border border-slate-100 dark:border-slate-800
@@ -929,8 +850,7 @@ export default function DocumentDetail() {
                       />
                     )}
                     {doc.companyName && (
-                      <p className="text-sm font-semibold text-slate-800
-                                    dark:text-white">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white">
                         {doc.companyName}
                       </p>
                     )}
@@ -941,42 +861,38 @@ export default function DocumentDetail() {
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════
-            TAB: SIGNERS
-        ════════════════════════════════════════════════════ */}
+        {/* TAB: SIGNERS */}
         {activeTab === 'signers' && (
           <div className="space-y-3">
             {(doc?.parties || []).map((party, i) => (
-              <div
-                key={i}
-                className="bg-white dark:bg-slate-900 rounded-2xl
-                           border border-slate-100 dark:border-slate-800
-                           shadow-sm p-5"
-              >
-                <div className="flex items-start justify-between
-                                gap-3 flex-wrap mb-3">
+              <div key={i}
+                   className="bg-white dark:bg-slate-900 rounded-2xl
+                              border border-slate-100 dark:border-slate-800
+                              shadow-sm p-5">
+                <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
                   <div className="flex items-center gap-3">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center
-                                  justify-center text-white font-bold
-                                  text-sm shadow-sm shrink-0"
+                                  justify-center text-white font-bold text-sm
+                                  shadow-sm shrink-0"
                       style={{ backgroundColor: party.color || '#0ea5e9' }}
                     >
                       {(party.name || 'U')[0].toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-slate-800
-                                    dark:text-white">
+                      <p className="text-sm font-bold text-slate-800 dark:text-white">
                         {party.name}
                       </p>
                       <p className="text-xs text-slate-400">{party.email}</p>
+                      {party.designation && (
+                        <p className="text-[11px] text-slate-400">{party.designation}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatusBadge status={
-                      party.status === 'signed' ? 'completed' : party.status
-                    } />
-                    {party.signingToken && party.status !== 'completed'
+                    <StatusBadge status={party.status === 'signed' ? 'completed' : party.status} />
+                    {party.signingToken
+                      && party.status !== 'completed'
                       && party.status !== 'signed' && (
                       <button
                         onClick={() => copySigningLink(party)}
@@ -988,34 +904,29 @@ export default function DocumentDetail() {
                                    transition-colors"
                       >
                         <Ic.Copy />
-                        Copy link
+                        {copying ? 'Copied!' : 'Copy link'}
                       </button>
                     )}
                   </div>
                 </div>
 
                 {party.signedAt && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3
-                                  gap-3 mt-3 p-3 rounded-xl
-                                  bg-emerald-50 dark:bg-emerald-900/15
-                                  border border-emerald-100
-                                  dark:border-emerald-800/50">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 p-3
+                                  rounded-xl bg-emerald-50 dark:bg-emerald-900/15
+                                  border border-emerald-100 dark:border-emerald-800/50">
                     {[
-                      { icon: Ic.Clock,   label: 'Signed at',  val: fmtDateTime(party.signedAt) },
-                      { icon: Ic.Globe,   label: 'IP',         val: party.ipAddress },
-                      { icon: Ic.MapPin,  label: 'Location',   val: [party.city, party.postalCode].filter(Boolean).join(', ') },
-                      { icon: Ic.Monitor, label: 'Device',     val: party.device   },
-                      { icon: Ic.Globe,   label: 'Browser',    val: party.browser  },
-                      { icon: Ic.Globe,   label: 'OS',         val: party.os       },
+                      { icon: Ic.Clock,   label: 'Signed at', val: fmtDateTime(party.signedAt) },
+                      { icon: Ic.Globe,   label: 'IP',        val: party.ipAddress },
+                      { icon: Ic.MapPin,  label: 'Location',  val: [party.city, party.postalCode].filter(Boolean).join(', ') },
+                      { icon: Ic.Monitor, label: 'Device',    val: party.device },
+                      { icon: Ic.Globe,   label: 'Browser',   val: party.browser },
+                      { icon: Ic.Globe,   label: 'OS',        val: party.os },
                     ].filter(r => r.val).map(({ icon: Icon, label, val }) => (
                       <div key={label} className="space-y-0.5">
-                        <p className="text-[10px] text-slate-400 uppercase
-                                       tracking-wide flex items-center gap-1">
-                          <Icon />
-                          {label}
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                          <Icon />{label}
                         </p>
-                        <p className="text-xs font-semibold text-slate-700
-                                       dark:text-slate-300 truncate">
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
                           {val}
                         </p>
                       </div>
@@ -1035,16 +946,12 @@ export default function DocumentDetail() {
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════
-            TAB: AUDIT LOG
-        ════════════════════════════════════════════════════ */}
+        {/* TAB: AUDIT LOG */}
         {activeTab === 'audit' && (
           <div className="bg-white dark:bg-slate-900 rounded-2xl
-                          border border-slate-100 dark:border-slate-800
-                          shadow-sm">
-            <div className="px-5 py-4 border-b border-slate-50
-                            dark:border-slate-800 flex items-center
-                            justify-between">
+                          border border-slate-100 dark:border-slate-800 shadow-sm">
+            <div className="px-5 py-4 border-b border-slate-50 dark:border-slate-800
+                            flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-700
                              dark:text-slate-300 flex items-center gap-2">
                 <Ic.Shield />
@@ -1059,16 +966,14 @@ export default function DocumentDetail() {
                 Refresh
               </button>
             </div>
-
-            <div className="px-5 divide-y divide-slate-50
-                            dark:divide-slate-800">
+            <div className="px-5 divide-y divide-slate-50 dark:divide-slate-800">
               {auditLoading ? (
                 <div className="py-10 flex justify-center">
                   <Ic.Spinner />
                 </div>
               ) : auditLogs.length === 0 ? (
-                <div className="py-12 text-center text-slate-400">
-                  <p className="text-sm">No audit events yet</p>
+                <div className="py-12 text-center">
+                  <p className="text-sm text-slate-400">No audit events yet</p>
                 </div>
               ) : (
                 auditLogs.map((entry, i) => (
@@ -1079,16 +984,14 @@ export default function DocumentDetail() {
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════
-            TAB: CC
-        ════════════════════════════════════════════════════ */}
+        {/* TAB: CC */}
         {activeTab === 'cc' && (
           <div className="space-y-3">
             {doc?.ccList?.length > 0 ? (
               <>
                 <p className="text-xs text-slate-400 px-0.5">
-                  {doc.ccList.length} CC recipient{doc.ccList.length !== 1 ? 's' : ''}
-                  — received a copy of signed documents
+                  {doc.ccList.length} CC recipient{doc.ccList.length !== 1 ? 's' : ''} —
+                  received a copy of signed documents
                 </p>
                 {doc.ccList.map((cc, i) => (
                   <CcRow key={i} cc={cc} />
@@ -1098,14 +1001,12 @@ export default function DocumentDetail() {
               <div className="py-16 text-center bg-white dark:bg-slate-900
                               rounded-2xl border border-dashed
                               border-slate-200 dark:border-slate-800">
-                <div className="w-12 h-12 rounded-2xl bg-slate-50
-                                dark:bg-slate-800 flex items-center
-                                justify-center mx-auto mb-3
+                <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800
+                                flex items-center justify-center mx-auto mb-3
                                 text-slate-300 dark:text-slate-600">
                   <Ic.Mail />
                 </div>
-                <p className="text-sm font-semibold text-slate-500
-                              dark:text-slate-400">
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
                   No CC recipients
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
