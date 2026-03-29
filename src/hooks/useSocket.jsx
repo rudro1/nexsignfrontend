@@ -3,49 +3,71 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '@/lib/AuthContext';
 
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL?.replace('/api', '')
-  || 'https://nextsignbackendfinal.vercel.app';
+// ─── Backend URL (without /api) ───────────────────────────────
+const SOCKET_URL = (
+  import.meta.env.VITE_API_BASE_URL?.replace('/api', '') ||
+  'https://nextsignbackendfinal.vercel.app'
+).replace(/\/$/, '');
 
 // ─── Singleton socket instance ────────────────────────────────
 let globalSocket = null;
 
 export default function useSocket() {
   const { user, isAuthenticated } = useAuth();
-  const socketRef = useRef(null);
-  const [connected,   setConnected]   = useState(false);
-  const [lastEvent,   setLastEvent]   = useState(null);
+  const socketRef               = useRef(null);
+  const [connected, setConnected] = useState(false);
 
   // ── Connect ──────────────────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
-    // Reuse existing connection
+    // Reuse existing live connection
     if (globalSocket?.connected) {
       socketRef.current = globalSocket;
       setConnected(true);
       return;
     }
 
+    // Destroy broken socket before creating new one
+    if (globalSocket && !globalSocket.connected) {
+      globalSocket.removeAllListeners();
+      globalSocket.disconnect();
+      globalSocket = null;
+    }
+
+    // ── Create new socket ──────────────────────────────────────
     const socket = io(SOCKET_URL, {
-      transports:       ['websocket', 'polling'],
-      withCredentials:  true,
-      reconnection:     true,
-      reconnectionDelay: 1000,
+      // FIX: Vercel serverless does NOT support polling
+      // websocket only → no CORS preflight issue
+      transports:           ['websocket'],
+      withCredentials:      true,
+      reconnection:         true,
+      reconnectionDelay:    2000,
+      reconnectionDelayMax: 10000,
       reconnectionAttempts: 5,
-      timeout:          10000,
-      auth: {
-        userId: user._id || user.uid,
-      },
+      timeout:              10000,
     });
 
-    globalSocket     = socket;
+    globalSocket      = socket;
     socketRef.current = socket;
 
     // ── Core events ────────────────────────────────────────────
     socket.on('connect', () => {
       setConnected(true);
+
+      // FIX: Join owner room after connect
+      // Backend has 'join:owner' not 'join'
+      const userId = user._id || user.uid;
+      if (userId) {
+        socket.emit('join:owner', userId);
+      }
+
       if (import.meta.env.DEV) {
-        console.log('%c🔌 Socket connected', 'color:#10b981;font-weight:bold', socket.id);
+        console.log(
+          '%c🔌 Socket connected',
+          'color:#10b981;font-weight:bold',
+          socket.id,
+        );
       }
     });
 
@@ -58,26 +80,22 @@ export default function useSocket() {
 
     socket.on('connect_error', (err) => {
       setConnected(false);
+      // Silent in production — no spam in console
       if (import.meta.env.DEV) {
-        console.warn('Socket error:', err.message);
+        console.warn('⚠️ Socket connect_error:', err.message);
       }
     });
 
-    // ── Join user room ─────────────────────────────────────────
-    socket.emit('join', {
-      userId: user._id || user.uid,
-      role:   user.role,
-    });
-
     return () => {
-      // Don't disconnect — keep singleton alive
-      // Only cleanup listeners added in this hook
+      // Intentionally NOT disconnecting here
+      // Singleton stays alive across component remounts
     };
   }, [isAuthenticated, user]);
 
   // ── Disconnect on logout ───────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated && globalSocket) {
+      globalSocket.removeAllListeners();
       globalSocket.disconnect();
       globalSocket      = null;
       socketRef.current = null;
@@ -90,6 +108,7 @@ export default function useSocket() {
     const socket = socketRef.current;
     if (!socket) return () => {};
     socket.on(event, handler);
+    // Returns cleanup function
     return () => socket.off(event, handler);
   }, []);
 
@@ -101,36 +120,48 @@ export default function useSocket() {
   // ── Emit event ─────────────────────────────────────────────
   const emit = useCallback((event, data) => {
     if (!socketRef.current?.connected) {
-      if (import.meta.env.DEV) console.warn('Socket not connected, cannot emit:', event);
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ Socket not connected, cannot emit:', event);
+      }
       return;
     }
     socketRef.current.emit(event, data);
   }, []);
 
   // ── Join a document room ───────────────────────────────────
+  // FIX: Backend uses 'join:document' with plain string id
   const joinDocument = useCallback((documentId) => {
-    emit('join-document', { documentId });
+    if (!documentId) return;
+    emit('join:document', documentId);
   }, [emit]);
 
   // ── Leave a document room ──────────────────────────────────
   const leaveDocument = useCallback((documentId) => {
-    emit('leave-document', { documentId });
+    if (!documentId) return;
+    emit('leave:document', documentId);
   }, [emit]);
 
   // ── Join a template session room ───────────────────────────
   const joinTemplate = useCallback((templateId) => {
-    emit('join-template', { templateId });
+    if (!templateId) return;
+    emit('join:template', templateId);
+  }, [emit]);
+
+  // ── Join owner room ────────────────────────────────────────
+  const joinOwner = useCallback((ownerId) => {
+    if (!ownerId) return;
+    emit('join:owner', ownerId);
   }, [emit]);
 
   return {
-    socket:        socketRef.current,
+    socket:       socketRef.current,
     connected,
-    lastEvent,
     on,
     off,
     emit,
     joinDocument,
     leaveDocument,
     joinTemplate,
+    joinOwner,
   };
 }
