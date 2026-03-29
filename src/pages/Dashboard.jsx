@@ -1,27 +1,24 @@
 // src/pages/Dashboard.jsx
-
 import React, {
   useState, useEffect, useCallback,
   useMemo, useRef,
 } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { api } from '@/api/apiClient';
+import { api, apiCache } from '@/api/apiClient';
 import { Button } from '@/components/ui/button';
 import { Input }  from '@/components/ui/input';
 import {
   Plus, Search, FileText, CheckCircle2,
   Send, RefreshCw, X, AlertTriangle,
-  Clock, FolderOpen, Loader2, Sparkles,
+  Clock, Loader2,
   TrendingUp, LayoutGrid, List,
 } from 'lucide-react';
 import StatsCard    from '@/components/dashboard/StatsCard';
 import DocumentCard from '@/components/dashboard/DocumentCard';
-import { useAuth }   from '@/lib/AuthContext';
-import  useSocket  from '@/hooks/useSocket';
+import { useAuth }  from '@/lib/AuthContext';
+import useSocket    from '@/hooks/useSocket';
 
-// ─────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────
 const CACHE_PREFIX = 'nexsign_docs_';
 
 const STATUS_TABS = [
@@ -32,9 +29,7 @@ const STATUS_TABS = [
   { value: 'declined',    label: 'Declined' },
 ];
 
-// ─────────────────────────────────────────────────────────────────
-// Cache helpers
-// ─────────────────────────────────────────────────────────────────
+// ─── Cache helpers ────────────────────────────────────────────────
 function getCacheKey(uid) {
   return uid ? `${CACHE_PREFIX}${uid}` : null;
 }
@@ -50,13 +45,10 @@ function writeCache(uid, data) {
   try {
     const key = getCacheKey(uid);
     if (key) localStorage.setItem(key, JSON.stringify(data));
-  } catch { /* quota exceeded */ }
+  } catch { /* quota */ }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────────────
-
+// ─── DocSkeleton ─────────────────────────────────────────────────
 function DocSkeleton() {
   return (
     <div className="rounded-2xl bg-white dark:bg-slate-900
@@ -83,7 +75,7 @@ function DocSkeleton() {
         <div className="flex items-center justify-between pt-2
                         border-t border-slate-50 dark:border-slate-800">
           <div className="flex gap-1.5">
-            {[1,2,3].map(i => (
+            {[1, 2, 3].map(i => (
               <div key={i} className="h-7 w-7 rounded-full
                                       bg-slate-100 dark:bg-slate-800" />
             ))}
@@ -96,14 +88,14 @@ function DocSkeleton() {
   );
 }
 
-function EmptyState({ isFiltered, onClear, statusFilter }) {
+// ─── EmptyState ──────────────────────────────────────────────────
+function EmptyState({ isFiltered, onClear }) {
   if (isFiltered) {
     return (
       <div className="col-span-full">
         <div className="flex flex-col items-center justify-center
-                        py-20 text-center
-                        bg-white dark:bg-slate-900 rounded-2xl
-                        border border-dashed
+                        py-20 text-center bg-white dark:bg-slate-900
+                        rounded-2xl border border-dashed
                         border-slate-200 dark:border-slate-800">
           <div className="w-14 h-14 rounded-2xl
                           bg-slate-50 dark:bg-slate-800
@@ -138,45 +130,42 @@ function EmptyState({ isFiltered, onClear, statusFilter }) {
   return (
     <div className="col-span-full">
       <div className="relative overflow-hidden
-                      bg-gradient-to-br from-sky-50 via-white to-indigo-50
-                      dark:from-slate-900 dark:via-slate-900
-                      dark:to-slate-900
+                      bg-gradient-to-br from-sky-50 via-white
+                      to-indigo-50 dark:from-slate-900
+                      dark:via-slate-900 dark:to-slate-900
                       rounded-2xl border border-dashed
                       border-sky-200 dark:border-slate-700
                       py-20 text-center">
-        {/* Background decoration */}
         <div className="absolute top-0 right-0 w-64 h-64
-                        bg-sky-100/50 dark:bg-sky-900/10
-                        rounded-full -translate-y-1/2 translate-x-1/2
+                        bg-sky-100/50 dark:bg-sky-900/10 rounded-full
+                        -translate-y-1/2 translate-x-1/2
                         blur-3xl pointer-events-none" />
-
         <div className="relative">
           <div className="w-20 h-20 rounded-3xl
                           bg-gradient-to-br from-[#28ABDF]/20
                           to-indigo-400/20 dark:from-sky-900/40
                           dark:to-indigo-900/40
-                          flex items-center justify-center mx-auto mb-5
-                          shadow-lg shadow-sky-100 dark:shadow-none">
+                          flex items-center justify-center
+                          mx-auto mb-5 shadow-lg
+                          shadow-sky-100 dark:shadow-none">
             <FileText className="w-9 h-9 text-[#28ABDF]" />
           </div>
-
           <h3 className="text-xl font-bold text-slate-800
                          dark:text-white mb-2">
             No documents yet
           </h3>
-          <p className="text-slate-500 dark:text-slate-400
-                        text-sm mb-8 max-w-xs mx-auto leading-relaxed">
+          <p className="text-slate-500 dark:text-slate-400 text-sm
+                        mb-8 max-w-xs mx-auto leading-relaxed">
             Upload your first PDF and send it for signature in minutes
           </p>
-
           <Link to="/documents/new">
-            <Button
-              className="bg-[#28ABDF] hover:bg-[#2399c8] text-white
-                         h-12 px-8 rounded-xl font-semibold
-                         shadow-lg shadow-sky-400/30 gap-2
-                         transition-all hover:shadow-sky-400/40
-                         hover:-translate-y-0.5 active:translate-y-0"
-            >
+            <Button className="bg-[#28ABDF] hover:bg-[#2399c8]
+                               text-white h-12 px-8 rounded-xl
+                               font-semibold shadow-lg
+                               shadow-sky-400/30 gap-2
+                               transition-all hover:shadow-sky-400/40
+                               hover:-translate-y-0.5
+                               active:translate-y-0">
               <Plus className="w-4 h-4" />
               Create First Document
             </Button>
@@ -187,6 +176,7 @@ function EmptyState({ isFiltered, onClear, statusFilter }) {
   );
 }
 
+// ─── SyncBanner ──────────────────────────────────────────────────
 function SyncBanner({ onRetry }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 rounded-xl
@@ -202,8 +192,7 @@ function SyncBanner({ onRetry }) {
         type="button"
         onClick={onRetry}
         className="text-xs font-semibold text-amber-600
-                   hover:text-amber-700 hover:underline shrink-0
-                   transition-colors"
+                   hover:text-amber-700 hover:underline shrink-0"
       >
         Retry
       </button>
@@ -211,60 +200,58 @@ function SyncBanner({ onRetry }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
 // MAIN DASHBOARD
-// ─────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
 export default function Dashboard() {
-  const navigate = useNavigate();
+  const navigate                          = useNavigate();
   const { user, isAdmin, loading: authLoading } = useAuth();
-  const socket = useSocket();
+  const socket                            = useSocket();
 
-  const [documents,    setDocuments]   = useState(() => readCache(user?._id));
-  const [isLoading,    setIsLoading]   = useState(true);
-  const [isSyncing,    setIsSyncing]   = useState(false);
-  const [fetchError,   setFetchError]  = useState(null);
-  const [searchInput,  setSearchInput] = useState('');
-  const [search,       setSearch]      = useState('');
-  const [activeTab,    setActiveTab]   = useState('all');
-  const [viewMode,     setViewMode]    = useState('grid'); // 'grid' | 'list'
+  const [documents,   setDocuments]   = useState(() => readCache(user?._id));
+  const [isLoading,   setIsLoading]   = useState(true);
+  const [isSyncing,   setIsSyncing]   = useState(false);
+  const [fetchError,  setFetchError]  = useState(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [search,      setSearch]      = useState('');
+  const [activeTab,   setActiveTab]   = useState('all');
+  const [viewMode,    setViewMode]    = useState('grid');
 
-  const abortRef   = useRef(null);
   const mountedRef = useRef(true);
 
-  // ── Cleanup ───────────────────────────────────────────────────
+  // ── Cleanup ──────────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      abortRef.current?.abort();
-    };
+    return () => { mountedRef.current = false; };
   }, []);
 
-  // ── Redirect admin ────────────────────────────────────────────
+  // ── Redirect admin ───────────────────────────────────────────
   useEffect(() => {
     if (!authLoading && isAdmin) navigate('/admin', { replace: true });
   }, [isAdmin, authLoading, navigate]);
 
-  // ── Fetch ─────────────────────────────────────────────────────
+  // ── Fetch ────────────────────────────────────────────────────
   const fetchDocuments = useCallback(async (silent = false) => {
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-
     silent ? setIsSyncing(true) : setIsLoading(true);
     setFetchError(null);
 
+    // Cache bust করো — fresh data আনো
+    apiCache.invalidatePattern('/documents');
+
     try {
-      const res  = await api.get('/documents', {
-        signal: abortRef.current.signal,
-      });
+      const res  = await api.get('/documents', { noCache: true });
       const docs = res.data?.documents ?? [];
+
       if (mountedRef.current) {
         setDocuments(docs);
         writeCache(user?._id, docs);
       }
     } catch (err) {
-      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      if (mountedRef.current) setFetchError('Failed to load documents.');
+      // Cancelled → ignore
+      if (err?.__cancelled) return;
+      if (mountedRef.current) {
+        setFetchError('Failed to load documents.');
+      }
     } finally {
       if (mountedRef.current) {
         setIsLoading(false);
@@ -273,38 +260,44 @@ export default function Dashboard() {
     }
   }, [user?._id]);
 
-  // ── Initial load ──────────────────────────────────────────────
+  // ── Initial load ─────────────────────────────────────────────
   useEffect(() => {
     if (authLoading || isAdmin) return;
     const cached = readCache(user?._id);
     if (cached.length) {
       setDocuments(cached);
       setIsLoading(false);
-      fetchDocuments(true);
+      fetchDocuments(true);   // background sync
     } else {
-      fetchDocuments(false);
+      fetchDocuments(false);  // full load
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAdmin]);
 
-  // ── Socket.io ────────────────────────────────────────────────
+  // ── Socket events ────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
 
-    const upsert = (doc) => {
+    const upsert = (payload) => {
       if (!mountedRef.current) return;
+      // payload = full doc or { documentId, ... }
+      const docData = payload?.document || payload;
+      if (!docData?._id) return;
+
       setDocuments(prev => {
-        const idx  = prev.findIndex(d => d._id === doc._id);
+        const idx  = prev.findIndex(d => d._id === docData._id);
         const next = idx !== -1
-          ? prev.map(d => d._id === doc._id ? doc : d)
-          : [doc, ...prev];
+          ? prev.map(d => d._id === docData._id ? { ...d, ...docData } : d)
+          : [docData, ...prev];
         writeCache(user?._id, next);
         return next;
       });
     };
 
-    const remove = ({ id }) => {
+    const remove = (payload) => {
       if (!mountedRef.current) return;
+      const id = payload?.documentId || payload?.id || payload?._id;
+      if (!id) return;
       setDocuments(prev => {
         const next = prev.filter(d => d._id !== id);
         writeCache(user?._id, next);
@@ -312,23 +305,33 @@ export default function Dashboard() {
       });
     };
 
-    socket.on('document:updated', upsert);
-    socket.on('document:signed',  upsert);
-    socket.on('document:deleted', remove);
-    return () => {
-      socket.off('document:updated', upsert);
-      socket.off('document:signed',  upsert);
-      socket.off('document:deleted', remove);
-    };
-  }, [socket, user?._id]);
+    // Refetch on these events (status changed)
+    const refetch = () => fetchDocuments(true);
 
-  // ── Search debounce ───────────────────────────────────────────
+    socket.on('document:created',      upsert);
+    socket.on('document:updated',      upsert);
+    socket.on('document:party_signed', refetch);
+    socket.on('document:completed',    refetch);
+    socket.on('document:finalized',    refetch);
+    socket.on('document:deleted',      remove);
+
+    return () => {
+      socket.off('document:created',      upsert);
+      socket.off('document:updated',      upsert);
+      socket.off('document:party_signed', refetch);
+      socket.off('document:completed',    refetch);
+      socket.off('document:finalized',    refetch);
+      socket.off('document:deleted',      remove);
+    };
+  }, [socket, user?._id, fetchDocuments]);
+
+  // ── Search debounce ──────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // ── Optimistic delete ─────────────────────────────────────────
+  // ── Optimistic delete ────────────────────────────────────────
   const handleDelete = useCallback((id) => {
     setDocuments(prev => {
       const next = prev.filter(d => d._id !== id);
@@ -337,26 +340,28 @@ export default function Dashboard() {
     });
   }, [user?._id]);
 
-  // ── Stats ─────────────────────────────────────────────────────
+  // ── Stats ────────────────────────────────────────────────────
   const stats = useMemo(() => ({
     total:      documents.length,
     inProgress: documents.filter(
-      d => d.status === 'in_progress' || d.status === 'sent'
+      d => d.status === 'in_progress' || d.status === 'sent',
     ).length,
     completed:  documents.filter(d => d.status === 'completed').length,
     drafts:     documents.filter(d => d.status === 'draft').length,
   }), [documents]);
 
-  // ── Filtered ──────────────────────────────────────────────────
+  // ── Filtered docs ────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return documents.filter(doc => {
-      const matchTitle = !q || (doc.title || '').toLowerCase().includes(q);
-      const matchStatus = activeTab === 'all'
-        ? true
-        : activeTab === 'in_progress'
-          ? doc.status === 'in_progress' || doc.status === 'sent'
-          : doc.status === activeTab;
+      const matchTitle =
+        !q || (doc.title || '').toLowerCase().includes(q);
+      const matchStatus =
+        activeTab === 'all'
+          ? true
+          : activeTab === 'in_progress'
+            ? doc.status === 'in_progress' || doc.status === 'sent'
+            : doc.status === activeTab;
       return matchTitle && matchStatus;
     });
   }, [documents, search, activeTab]);
@@ -378,15 +383,27 @@ export default function Dashboard() {
 
   if (authLoading || isAdmin) return null;
 
-  // ── Render ────────────────────────────────────────────────────
+  // ── Tab counts ───────────────────────────────────────────────
+  function tabCount(value) {
+    if (value === 'all') return documents.length;
+    if (value === 'in_progress')
+      return documents.filter(
+        d => d.status === 'in_progress' || d.status === 'sent',
+      ).length;
+    return documents.filter(d => d.status === value).length;
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // RENDER
+  // ════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F1A]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8
                       py-6 sm:py-10">
 
-        {/* ══════════════════════════════════════════════════════
+        {/* ════════════════════════════════════════════════════
             HEADER
-        ══════════════════════════════════════════════════════ */}
+        ════════════════════════════════════════════════════ */}
         <div className="flex flex-col sm:flex-row sm:items-center
                         sm:justify-between gap-4 mb-8">
           <div>
@@ -414,7 +431,7 @@ export default function Dashboard() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => fetchDocuments()}
+              onClick={() => fetchDocuments(false)}
               disabled={isLoading || isSyncing}
               aria-label="Refresh"
               className="h-10 w-10 rounded-xl border-slate-200
@@ -424,19 +441,19 @@ export default function Dashboard() {
                          disabled:opacity-40 transition-colors"
             >
               <RefreshCw className={`w-4 h-4
-                ${isSyncing ? 'animate-spin' : ''}`}
+                ${isLoading || isSyncing ? 'animate-spin' : ''}`}
               />
             </Button>
 
             <Link to="/documents/new">
-              <Button
-                className="h-10 px-5 rounded-xl font-semibold
-                           bg-[#28ABDF] hover:bg-[#2399c8] text-white
-                           shadow-md shadow-sky-400/25 gap-2
-                           transition-all hover:shadow-sky-400/40
-                           hover:-translate-y-0.5 active:translate-y-0
-                           active:shadow-none"
-              >
+              <Button className="h-10 px-5 rounded-xl font-semibold
+                                 bg-[#28ABDF] hover:bg-[#2399c8]
+                                 text-white shadow-md shadow-sky-400/25
+                                 gap-2 transition-all
+                                 hover:shadow-sky-400/40
+                                 hover:-translate-y-0.5
+                                 active:translate-y-0
+                                 active:shadow-none">
                 <Plus className="w-4 h-4" />
                 New Document
               </Button>
@@ -444,18 +461,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ══════════════════════════════════════════════════════
+        {/* ════════════════════════════════════════════════════
             STATS
-        ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4
-                        mb-8">
+        ════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3
+                        sm:gap-4 mb-8">
           <StatsCard
             label="Total"
             value={stats.total}
             icon={FileText}
             color="sky"
             loading={isLoading}
-            trend="+2 this week"
           />
           <StatsCard
             label="Awaiting"
@@ -470,7 +486,13 @@ export default function Dashboard() {
             icon={CheckCircle2}
             color="green"
             loading={isLoading}
-            trend={stats.completed > 0 ? `${Math.round((stats.completed / Math.max(stats.total,1))*100)}% rate` : undefined}
+            trend={
+              stats.completed > 0
+                ? `${Math.round(
+                    (stats.completed / Math.max(stats.total, 1)) * 100,
+                  )}% rate`
+                : undefined
+            }
           />
           <StatsCard
             label="Drafts"
@@ -481,14 +503,14 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* ══════════════════════════════════════════════════════
-            TOOLBAR  (search + tabs + view toggle)
-        ══════════════════════════════════════════════════════ */}
+        {/* ════════════════════════════════════════════════════
+            TOOLBAR
+        ════════════════════════════════════════════════════ */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl
                         border border-slate-100 dark:border-slate-800
                         shadow-sm mb-6 overflow-hidden">
 
-          {/* Top row: search + view toggle */}
+          {/* Search + view toggle */}
           <div className="flex items-center gap-3 px-4 pt-4 pb-3
                           border-b border-slate-50
                           dark:border-slate-800/80">
@@ -553,18 +575,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Bottom row: status tabs */}
+          {/* Status tabs */}
           <div className="flex items-center gap-1 px-3 py-2
                           overflow-x-auto scrollbar-none">
             {STATUS_TABS.map(tab => {
-              const count =
-                tab.value === 'all'         ? documents.length
-                : tab.value === 'in_progress'
-                  ? documents.filter(d =>
-                      d.status === 'in_progress' || d.status === 'sent'
-                    ).length
-                  : documents.filter(d => d.status === tab.value).length;
-
+              const count = tabCount(tab.value);
               return (
                 <button
                   key={tab.value}
@@ -580,8 +595,9 @@ export default function Dashboard() {
                 >
                   {tab.label}
                   {count > 0 && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5
-                                      rounded-full min-w-[18px] text-center
+                    <span className={`text-[10px] font-bold
+                                      px-1.5 py-0.5 rounded-full
+                                      min-w-[18px] text-center
                                       ${activeTab === tab.value
                                         ? 'bg-[#28ABDF] text-white'
                                         : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
@@ -595,9 +611,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── Results info ─────────────────────────────────────── */}
+        {/* Results info */}
         {!isLoading && documents.length > 0 && (
-          <div className="flex items-center justify-between mb-4 px-0.5">
+          <div className="flex items-center justify-between
+                          mb-4 px-0.5">
             <p className="text-xs text-slate-400 font-medium">
               {isFiltered
                 ? `${filtered.length} of ${documents.length} documents`
@@ -617,9 +634,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════════════
+        {/* ════════════════════════════════════════════════════
             DOCUMENT GRID / LIST
-        ══════════════════════════════════════════════════════ */}
+        ════════════════════════════════════════════════════ */}
         {isLoading ? (
           <div className={
             viewMode === 'grid'
@@ -632,7 +649,6 @@ export default function Dashboard() {
           </div>
 
         ) : fetchError && documents.length === 0 ? (
-          /* Full error — nothing to show */
           <div className="rounded-2xl bg-red-50 dark:bg-red-900/20
                           border border-red-100 dark:border-red-900
                           px-6 py-5 flex items-center
@@ -660,7 +676,12 @@ export default function Dashboard() {
               : 'flex flex-col gap-3'
           }>
             {filtered.length === 0
-              ? <EmptyState isFiltered={isFiltered} onClear={clearFilters} />
+              ? (
+                <EmptyState
+                  isFiltered={isFiltered}
+                  onClear={clearFilters}
+                />
+              )
               : filtered.map(doc => (
                   <DocumentCard
                     key={doc._id}
@@ -673,11 +694,10 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Soft error banner (has cached data) */}
+        {/* Soft error banner */}
         {fetchError && documents.length > 0 && (
           <SyncBanner onRetry={() => fetchDocuments(true)} />
         )}
-
       </div>
     </div>
   );
