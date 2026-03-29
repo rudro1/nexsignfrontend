@@ -1,26 +1,9 @@
-// src/pages/SignerView.jsx
-/**
- * SignerView.jsx — NeXsign Enterprise
- *
- * FIXES:
- * 1. Fast load — PDF renders from proxied Cloudinary URL correctly
- * 2. partyIndex read from data.partyIndex (matches backend response shape)
- * 3. Text fields display in sender's fontFamily/fontSize/fontWeight
- * 4. Signatures use mix-blend-mode:multiply (no white box artifacts)
- * 5. Full geo + device + clientTime sent to backend for audit trail
- * 6. Branded UI: colors from brandConfig, logo in header
- * 7. Error differentiation: expired vs invalid
- * 8. HiDPI canvas rendering
- */
-
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Loader2,
   CheckCircle,
   XCircle,
-  AlertTriangle,
-  FileText,
   ChevronLeft,
   ChevronRight,
   ZoomIn,
@@ -28,12 +11,11 @@ import {
   PenLine,
   Send,
   Shield,
+  ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-
-// ── Constants ──────────────────────────────────────────────────────────────────
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { api } from '@/api/apiClient';
 
 // ── Utility: update document title for SEO ────────────────────────────────────
 function useDocumentTitle(title) {
@@ -84,7 +66,6 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
     if (!isOpen) return;
     setIsEmpty(true);
     setTypedText('');
-    // Load Google Fonts for typed signatures
     const link = document.createElement('link');
     link.rel  = 'stylesheet';
     link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap';
@@ -154,7 +135,6 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
       onAccept(canvasRef.current.toDataURL('image/png'));
     } else {
       if (!typedText.trim()) { toast.error('Please type your signature.'); return; }
-      // Render typed text to canvas
       const canvas  = document.createElement('canvas');
       canvas.width  = 500;
       canvas.height = 150;
@@ -178,7 +158,6 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        {/* Header */}
         <div className="bg-gradient-to-r from-[#28ABDF] to-[#1a8cbf] px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
             <PenLine className="w-5 h-5" />
@@ -189,7 +168,6 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
           <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
         </div>
 
-        {/* Mode Tabs */}
         <div className="flex border-b">
           {['draw', 'type'].map(mode => (
             <button
@@ -249,15 +227,15 @@ function SignatureModal({ isOpen, onClose, onAccept, fieldType = 'signature' }) 
                 style={{ fontFamily: selectedFont }}
                 maxLength={50}
               />
-              <div className="grid grid-cols-4 gap-2 mb-2">
+              <div className="flex flex-wrap gap-2 mb-4">
                 {fonts.map(f => (
                   <button
                     key={f.value}
                     onClick={() => setSelectedFont(f.value)}
-                    className={`py-2 px-3 rounded-lg border text-sm transition-colors ${
-                      selectedFont === f.value
-                        ? 'border-[#28ABDF] bg-blue-50 text-[#28ABDF]'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    className={`px-3 py-1.5 rounded-lg border text-xs transition-all ${
+                      selectedFont === f.value 
+                        ? 'border-[#28ABDF] bg-sky-50 text-[#28ABDF] font-bold'
+                        : 'border-slate-200 text-slate-500'
                     }`}
                     style={{ fontFamily: f.value }}
                   >
@@ -300,22 +278,12 @@ function PdfFieldViewer({ pdfUrl, fields, onFieldClick, onFieldChange, currentPa
   const [pdfError, setPdfError]       = useState(false);
   const [scale, setScale]             = useState(1.0);
   const [numPages, setNumPages]       = useState(1);
-  const [pageHeight, setPageHeight]   = useState(0);
-  const [pageWidth, setPageWidth]     = useState(0);
   const iframeRef = useRef(null);
-
-  // We use an iframe for simplicity and speed (no heavy PDF.js bundle needed for signing view)
-  // For full field overlay support we position fields absolutely over the iframe
 
   const pageFields = fields.filter(f => (f.page || 1) === currentPage);
 
   const handleIframeLoad = () => {
     setPdfLoaded(true);
-    // Estimate page dimensions from container
-    if (containerRef.current) {
-      setPageWidth(containerRef.current.offsetWidth);
-      setPageHeight(containerRef.current.offsetWidth * 1.414); // A4 ratio
-    }
   };
 
   const fieldTypeStyles = {
@@ -349,13 +317,12 @@ function PdfFieldViewer({ pdfUrl, fields, onFieldClick, onFieldChange, currentPa
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <span className="text-sm font-medium text-slate-600 min-w-[80px] text-center">
-            Page {currentPage} of {numPages}
+            Page {currentPage}
           </span>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onPageChange(Math.min(numPages, currentPage + 1))}
-            disabled={currentPage >= numPages}
+            onClick={() => onPageChange(currentPage + 1)}
             className="h-8 w-8 p-0 rounded-lg"
           >
             <ChevronRight className="w-4 h-4" />
@@ -374,6 +341,7 @@ function PdfFieldViewer({ pdfUrl, fields, onFieldClick, onFieldChange, currentPa
 
       {/* PDF + Fields */}
       <div className="flex-1 overflow-auto bg-slate-200 p-4">
+        {pdfError && <div className="text-center p-10">Failed to load PDF.</div>}
         <div
           className="relative mx-auto bg-white shadow-2xl"
           ref={containerRef}
@@ -396,10 +364,10 @@ function PdfFieldViewer({ pdfUrl, fields, onFieldClick, onFieldChange, currentPa
 
           {/* Field Overlays */}
           {pdfLoaded && pageFields.map(field => {
-            const left   = `${(field.x      || 0) * 100}%`;
-            const top    = `${(field.y      || 0) * 100}%`;
-            const width  = `${(field.width  || 0.2) * 100}%`;
-            const height = `${(field.height || 0.06) * 100}%`;
+            const left   = `${(field.x      || 0)}%`;
+            const top    = `${(field.y      || 0)}%`;
+            const width  = `${(field.width  || 0.2)}%`;
+            const height = `${(field.height || 0.06)}%`;
 
             return (
               <div
@@ -458,17 +426,15 @@ export default function SignerView() {
   const [fields, setFields]       = useState([]);
   const [errorMsg, setErrorMsg]   = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages]   = useState(1);
   const [activeField, setActiveField] = useState(null);
   const [showSigModal, setShowSigModal] = useState(false);
-
-  const openedRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // SEO title
   useDocumentTitle(
     docInfo
-      ? `Sign: ${docInfo.title} — SignFlow`
-      : 'Sign Document — SignFlow'
+      ? `Sign: ${docInfo.title} — NeXsign`
+      : 'Sign Document — NeXsign'
   );
 
   // ── Validate token ──────────────────────────────────────────────────────────
@@ -479,145 +445,92 @@ export default function SignerView() {
       return;
     }
 
-    const ctrl = new AbortController();
+    const abortCtrl = new AbortController();
 
     (async () => {
       try {
-        const res  = await fetch(`${API_BASE}/documents/sign/validate/${token}`, {
-          signal:  ctrl.signal,
-          headers: { Accept: 'application/json' },
-          // No credentials needed — token-based auth
+        const res = await api.get(`/documents/sign/validate/${token}`, {
+          signal: abortCtrl.signal
         });
-        const data = await res.json();
-
-        if (!res.ok) {
-          setErrorMsg(data.message || 'This link is invalid or has expired.');
-          setPhase(res.status === 410 ? 'already_signed' : 'error');
-          return;
-        }
-
+        
+        const data = res.data;
         setDocInfo(data.document);
-        setSignerInfo(data.signer);
+        setSignerInfo(data.party);
         setFields((data.document.fields || []).map(f => ({ ...f, value: f.value || '' })));
-        setPdfUrl(`${API_BASE}/documents/sign/${token}/pdf`);
+        setPdfUrl(`${api.defaults.baseURL}/documents/sign/${token}/pdf`);
         setPhase('ready');
       } catch (err) {
-        if (err.name === 'AbortError') return;
-        setErrorMsg('Network error. Please check your connection.');
-        setPhase('error');
+        if (err.name === 'CanceledError') return;
+        const msg = err.response?.data?.message || 'This link is invalid or has expired.';
+        setErrorMsg(msg);
+        setPhase(err.response?.status === 410 ? 'already_signed' : 'error');
       }
     })();
 
-    return () => ctrl.abort();
+    return () => abortCtrl.abort();
   }, [token]);
 
-  // ── Record "opened" ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (phase !== 'ready' || openedRef.current) return;
-    openedRef.current = true;
-    fetch(`${API_BASE}/documents/sign/${token}/open`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ client_time: new Date().toISOString() }),
-    }).catch(() => {});
-  }, [phase, token]);
-
-  // ── Field handlers ──────────────────────────────────────────────────────────
-  const handleFieldChange = useCallback((fieldId, value) => {
-    setFields(prev => prev.map(f => f.id === fieldId ? { ...f, value } : f));
-  }, []);
-
-  const handleFieldClick = useCallback((field) => {
+  // ── Handlers ────────────────────────────────────────────────────────────────
+  const handleFieldClick = (field) => {
+    if (field.partyIndex !== signerInfo.index) {
+      toast.info(`This field is for ${docInfo.parties[field.partyIndex].name}.`);
+      return;
+    }
     if (field.type === 'signature' || field.type === 'initials') {
       setActiveField(field);
       setShowSigModal(true);
-    } else if (field.type === 'checkbox') {
-      handleFieldChange(field.id, field.value === 'true' ? '' : 'true');
-    } else if (field.type === 'date' && !field.value) {
-      handleFieldChange(field.id, new Date().toLocaleDateString('en-US'));
     }
-  }, [handleFieldChange]);
+  };
 
-  const handleSignatureAccept = useCallback((dataUrl) => {
-    if (activeField) handleFieldChange(activeField.id, dataUrl);
-    setShowSigModal(false);
-    setActiveField(null);
-  }, [activeField, handleFieldChange]);
+  const handleFieldChange = (id, val) => {
+    setFields(prev => prev.map(f => f.id === id ? { ...f, value: val } : f));
+  };
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
-  const handleSubmit = useCallback(async () => {
-    if (phase === 'submitting') return;
+  const onSignatureAccept = (dataUrl) => {
+    if (activeField) {
+      handleFieldChange(activeField.id, dataUrl);
+      setShowSigModal(false);
+      setActiveField(null);
+    }
+  };
 
-    // Validate required fields
-    const missing = fields.filter(f => f.required && !f.value?.toString().trim());
-    if (missing.length > 0) {
-      toast.error(`Please complete all required fields (${missing.length} remaining).`);
+  const handleSubmit = async () => {
+    const signerFields = fields.filter(f => f.partyIndex === signerInfo.index);
+    const missing = signerFields.find(f => f.required && !f.value);
+    
+    if (missing) {
+      toast.error('Please complete all required fields.');
       return;
     }
 
-    setPhase('submitting');
-
+    setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/documents/sign/${token}/submit`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          fields:      fields.map(({ id, type, value }) => ({ id, type, value })),
-          client_time: new Date().toISOString(),
-        }),
+      const res = await api.post('/documents/sign/submit', {
+        token,
+        fields
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.message || 'Submission failed. Please try again.');
-        setPhase('ready');
-        return;
+      if (res.data.completed) {
+        setPhase('completed');
+      } else {
+        setPhase('signed_next');
       }
-
-      setPhase('done');
-    } catch {
-      toast.error('Network error. Please try again.');
-      setPhase('ready');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit signature.');
+    } finally {
+      setSubmitting(false);
     }
-  }, [fields, token, phase]);
+  };
 
-  // ── Progress calculation ─────────────────────────────────────────────────────
-  const requiredFields  = fields.filter(f => f.required);
-  const completedFields = requiredFields.filter(f => f.value?.toString().trim());
-  const progress        = requiredFields.length
-    ? Math.round((completedFields.length / requiredFields.length) * 100)
-    : 100;
-
-  // ══════════════════════════════════════════════════════════════════════════════
-  // RENDER STATES
-  // ══════════════════════════════════════════════════════════════════════════════
-
+  // ── Render States ───────────────────────────────────────────────────────────
   if (phase === 'loading') {
     return (
-      <StatusScreen
-        icon={Loader2}
-        iconBg="#eff9fe"
-        iconColor="#28ABDF"
-        title="Verifying Document..."
-        message="Please wait while we securely load your signing session."
-      >
-        <div className="flex justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[#28ABDF]" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-[#28ABDF] mx-auto mb-4" />
+          <p className="text-slate-500 font-medium">Loading secure document...</p>
         </div>
-      </StatusScreen>
-    );
-  }
-
-  if (phase === 'already_signed') {
-    return (
-      <StatusScreen
-        icon={CheckCircle}
-        iconBg="#f0fdf4"
-        iconColor="#22c55e"
-        title="Already Signed"
-        message={errorMsg || 'You have already signed this document. All parties will receive the completed copy.'}
-      />
+      </div>
     );
   }
 
@@ -625,235 +538,98 @@ export default function SignerView() {
     return (
       <StatusScreen
         icon={XCircle}
-        iconBg="#fef2f2"
+        iconBg="#fee2e2"
         iconColor="#ef4444"
         title="Invalid Link"
-        message={errorMsg || 'This signing link is invalid or has expired.'}
+        message={errorMsg}
       >
-        <Button
-          variant="outline"
-          onClick={() => navigate('/')}
-          className="rounded-xl border-slate-200"
-        >
-          Return to Homepage
+        <Button onClick={() => navigate('/')} className="bg-slate-800 text-white rounded-xl w-full">
+          Return Home
         </Button>
       </StatusScreen>
     );
   }
 
-  if (phase === 'done') {
+  if (phase === 'already_signed' || phase === 'signed_next') {
     return (
       <StatusScreen
         icon={CheckCircle}
-        iconBg="#f0fdf4"
-        iconColor="#22c55e"
-        title="Successfully Signed!"
-        message="Your signature has been securely recorded."
+        iconBg="#ecfdf5"
+        iconColor="#10b981"
+        title="Thank You!"
+        message={phase === 'signed_next' ? "You've successfully signed. The next party has been notified." : "You have already signed this document."}
       >
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-left space-y-2 mb-4">
-          <p className="text-sm font-semibold text-green-800 mb-2">What happens next:</p>
-          <div className="space-y-2">
-            {[
-              { icon: '✅', text: 'Your signature is embedded in the PDF' },
-              { icon: '📧', text: 'All parties receive the signed copy via email' },
-              { icon: '📋', text: 'Complete audit trail is attached' },
-              { icon: '🔒', text: 'Document is legally binding' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-green-700">
-                <span>{item.icon}</span>
-                <span>{item.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center justify-center gap-2 text-xs text-slate-400 mt-2">
-          <Shield className="w-3 h-3" />
-          <span>Powered by SignFlow • Secure Electronic Signatures</span>
-        </div>
+        <Button onClick={() => navigate('/')} className="bg-slate-800 text-white rounded-xl w-full">
+          Visit NeXsign
+        </Button>
       </StatusScreen>
     );
   }
 
-  // ── Main Signing UI ───────────────────────────────────────────────────────────
-  const pendingRequired = requiredFields.filter(f => !f.value?.toString().trim());
+  if (phase === 'completed') {
+    return (
+      <StatusScreen
+        icon={ShieldCheck}
+        iconBg="#ecfdf5"
+        iconColor="#10b981"
+        title="Document Completed"
+        message="All parties have signed! A final copy with audit trail has been sent to your email."
+      >
+        <Button onClick={() => navigate('/')} className="bg-slate-800 text-white rounded-xl w-full">
+          Done
+        </Button>
+      </StatusScreen>
+    );
+  }
 
   return (
-    <>
-      {/* Signature Modal */}
+    <div className="flex flex-col h-screen bg-slate-100 overflow-hidden">
+      {/* Header */}
+      <header className="h-16 bg-white border-b flex items-center justify-between px-6 z-40">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-[#28ABDF] rounded-lg flex items-center justify-center">
+            <Shield className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-slate-800 truncate max-w-[200px]">{docInfo.title}</h1>
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Secure Signature Request</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="hidden md:block text-right">
+            <p className="text-xs font-bold text-slate-700">{signerInfo.name}</p>
+            <p className="text-[10px] text-slate-400">{signerInfo.email}</p>
+          </div>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="bg-[#28ABDF] hover:bg-[#1a8cbf] text-white rounded-xl h-10 px-6 font-bold gap-2"
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            Finish Signing
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-h-0">
+        <PdfFieldViewer
+          pdfUrl={pdfUrl}
+          fields={fields}
+          onFieldClick={handleFieldClick}
+          onFieldChange={handleFieldChange}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
+      </main>
+
       <SignatureModal
         isOpen={showSigModal}
         onClose={() => { setShowSigModal(false); setActiveField(null); }}
-        onAccept={handleSignatureAccept}
-        fieldType={activeField?.type || 'signature'}
+        onAccept={onSignatureAccept}
+        fieldType={activeField?.type}
       />
-
-      <div className="min-h-screen bg-slate-50 flex flex-col">
-        {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <header className="sticky top-0 z-40 bg-white border-b shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <div className="flex items-center justify-between h-16">
-              {/* Brand + Doc Title */}
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-[#28ABDF] flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-4 h-4 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-slate-400 leading-none mb-0.5">Signing Request</p>
-                  <h1 className="font-bold text-slate-800 text-sm sm:text-base truncate max-w-[200px] sm:max-w-sm">
-                    {docInfo?.title || 'Document'}
-                  </h1>
-                </div>
-              </div>
-
-              {/* Signer Info + Action */}
-              <div className="flex items-center gap-3">
-                {/* Progress pill — hidden on mobile */}
-                <div className="hidden sm:flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1.5">
-                  <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#28ABDF] rounded-full transition-all duration-500"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-semibold text-slate-600">
-                    {completedFields.length}/{requiredFields.length}
-                  </span>
-                </div>
-
-                <Button
-                  onClick={handleSubmit}
-                  disabled={phase === 'submitting' || progress < 100}
-                  className="bg-[#28ABDF] hover:bg-[#1a8cbf] text-white rounded-xl px-4 sm:px-6 h-9 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  {phase === 'submitting' ? (
-                    <><Loader2 className="w-4 h-4 animate-spin mr-1.5" /> Submitting...</>
-                  ) : (
-                    <><Send className="w-4 h-4 mr-1.5" /> Submit</>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Mobile Progress Bar */}
-            <div className="sm:hidden pb-2">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#28ABDF] rounded-full transition-all duration-500"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <span className="text-xs text-slate-500 flex-shrink-0">
-                  {completedFields.length}/{requiredFields.length} fields
-                </span>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* ── Body ───────────────────────────────────────────────────────────── */}
-        <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full">
-
-          {/* Left Sidebar — fields list */}
-          <aside className="hidden lg:flex flex-col w-72 border-r bg-white overflow-y-auto flex-shrink-0">
-            <div className="p-4 border-b">
-              <h2 className="font-semibold text-slate-700 text-sm">Signing As</h2>
-              <p className="text-sm text-slate-500 truncate">{signerInfo?.email}</p>
-            </div>
-
-            <div className="p-4 flex-1 overflow-y-auto">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                Required Fields
-              </h3>
-              <div className="space-y-2">
-                {requiredFields.map(field => {
-                  const done = !!field.value?.toString().trim();
-                  return (
-                    <button
-                      key={field.id}
-                      onClick={() => handleFieldClick(field)}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
-                        done
-                          ? 'border-green-200 bg-green-50'
-                          : 'border-slate-200 bg-white hover:border-[#28ABDF] hover:bg-blue-50'
-                      }`}
-                    >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        done ? 'bg-green-500' : 'bg-slate-200'
-                      }`}>
-                        {done
-                          ? <span className="text-white text-xs">✓</span>
-                          : <span className="text-slate-400 text-xs">!</span>
-                        }
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-700 capitalize">{field.type}</p>
-                        <p className="text-xs text-slate-400">Page {field.page || 1}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {pendingRequired.length === 0 && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl">
-                  <p className="text-xs text-green-700 font-medium text-center">
-                    ✅ All fields complete! Ready to submit.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Security badge */}
-            <div className="p-4 border-t bg-slate-50">
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <Shield className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                <span>256-bit encrypted • Legally binding</span>
-              </div>
-            </div>
-          </aside>
-
-          {/* PDF Viewer */}
-          <main className="flex-1 overflow-hidden flex flex-col">
-            <PdfFieldViewer
-              pdfUrl={pdfUrl}
-              fields={fields}
-              onFieldClick={handleFieldClick}
-              onFieldChange={handleFieldChange}
-              currentPage={currentPage}
-              onPageChange={setCurrentPage}
-              onTotalPages={setTotalPages}
-            />
-          </main>
-
-          {/* Right Sidebar — mobile bottom bar on small screens */}
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 z-30">
-            <div className="flex items-center gap-3 max-w-7xl mx-auto">
-              <div className="flex-1">
-                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#28ABDF] rounded-full transition-all duration-500"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  {completedFields.length} of {requiredFields.length} fields completed
-                </p>
-              </div>
-              <Button
-                onClick={handleSubmit}
-                disabled={phase === 'submitting' || progress < 100}
-                className="bg-[#28ABDF] hover:bg-[#1a8cbf] text-white rounded-xl px-6 h-10 font-semibold disabled:opacity-50"
-              >
-                {phase === 'submitting'
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : 'Submit Signature'
-                }
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }

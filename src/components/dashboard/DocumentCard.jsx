@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  FileText, Users, ArrowRight, Clock,
-  CheckCircle2, AlertCircle, Pencil, Layout, Eye, ShieldCheck,
+  FileText, ArrowRight, Clock,
+  CheckCircle2, AlertCircle, Pencil, Layout,
 } from 'lucide-react';
 
 const statusConfig = {
@@ -156,7 +156,7 @@ const DocumentCard = React.memo(({ doc }) => {
               className="h-8 rounded-lg px-3 bg-slate-50 hover:bg-sky-50 text-slate-600 hover:text-sky-600 dark:bg-slate-800 dark:hover:bg-sky-900/30 dark:text-slate-400 border-none transition-all duration-300"
             >
               <span className="text-xs font-bold mr-1.5">
-                {doc.isTemplate ? 'Use Template' : (doc.status === 'draft' ? 'Edit' : 'View')}
+                {doc.isTemplate ? 'Use Template' : (doc.status === 'draft' ? 'Edit' : 'Manage')}
               </span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Button>

@@ -7,7 +7,7 @@ import axios from 'axios';
 const BASE = (
   import.meta.env.VITE_API_BASE_URL ||
   'https://nextsignbackendfinal.vercel.app/api'
-).replace(/\/$/, '');
+).replace(/\/$/, '').replace('/api.', '/api');
 
 const TIMEOUT_NORMAL = 15000;  // 15s
 const TIMEOUT_UPLOAD = 60000;  // 60s
