@@ -17,7 +17,7 @@ import {
 import StatsCard    from '@/components/dashboard/StatsCard';
 import DocumentCard from '@/components/dashboard/DocumentCard';
 import { useAuth }   from '@/lib/AuthContext';
-import { useSocket } from '@/hooks/useSocket';
+import  useSocket  from '@/hooks/useSocket';
 
 // ─────────────────────────────────────────────────────────────────
 // Constants
