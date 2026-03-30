@@ -131,49 +131,61 @@ export default function Login({ toggle }) {
   }, [formData, login, navigate, validate]);
 
   // ── Google Login — FIXED ───────────────────────────────────
-  const handleGoogleLogin = useCallback(async () => {
-    setGoogleLoading(true);
-    try {
-      // googleLogin() returns Firebase UserCredential
-      const result = await googleLogin();
+const handleGoogleLogin = useCallback(async () => {
+  setGoogleLoading(true);
+  try {
+    const result = await googleLogin();
+    if (!result) return;
 
-      // User closed popup — silent exit
-      if (!result) return;
+    const firebaseUser = result?.user || result;
+    const email    = firebaseUser?.email;
+    const name     = firebaseUser?.displayName
+                     || email?.split('@')[0]
+                     || 'User';
+    const photoURL = firebaseUser?.photoURL || '';
 
-      // ✅ FIX: result is UserCredential, user is result.user
-      const firebaseUser = result.user || result;
-      const displayName  = firebaseUser?.displayName || '';
-      const email        = firebaseUser?.email || '';
-
-      if (!email) {
-        toast.error('Could not get email from Google. Try again.');
-        return;
-      }
-
-      // Backend call
-      const res = await api.post('/auth/google', {
-        name:  displayName,
-        email: email,
-      });
-
-      if (res.data?.token) {
-        login(res.data.user, res.data.token);
-        toast.success('Google login successful! 🎉');
-        navigate(
-          getRoleRedirect(res.data.user?.role),
-          { replace: true }
-        );
-      }
-    } catch (err) {
-      if (!err.__cancelled) {
-        console.error('Google login error:', err);
-        toast.error('Google login failed. Please try again.');
-      }
-    } finally {
-      setGoogleLoading(false);
+    if (!email) {
+      toast.error('Could not get email from Google.');
+      return;
     }
-  }, [googleLogin, login, navigate]);
 
+    // ✅ Debug — dev mode তে দেখো
+    console.log('[Google] Sending:', { name, email });
+
+    const res = await api.post('/auth/google', {
+      name,
+      email,
+      photoURL,
+    });
+
+    if (res.data?.token) {
+      login(res.data.user, res.data.token);
+      toast.success('Google login successful! 🎉');
+      navigate(
+        getRoleRedirect(res.data.user?.role),
+        { replace: true }
+      );
+    }
+  } catch (err) {
+    if (err?.__cancelled) return;
+
+    console.error('[Google] Error:', err);
+    console.error('[Google] Response:', err?.response?.data);
+
+    const status = err?.status || err?.response?.status;
+    const msg    = err?.response?.data?.message || err?.message;
+
+    if (status === 400) {
+      toast.error(`Login failed: ${msg}`);
+    } else if (err?.__network) {
+      toast.error('No internet connection.');
+    } else {
+      toast.error('Google login failed. Please try again.');
+    }
+  } finally {
+    setGoogleLoading(false);
+  }
+}, [googleLogin, login, navigate]);
   // ── Forgot Password ────────────────────────────────────────
   const handleForgotPassword = useCallback(async () => {
     if (!formData.email) {
