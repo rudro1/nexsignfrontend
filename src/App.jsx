@@ -13,6 +13,7 @@ import { queryClientInstance } from '@/lib/query-client';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { Toaster } from 'sonner';
 import { FileSignature } from 'lucide-react';
+import Layout from '@/Layout';
 
 const cn = (...c) => c.filter(Boolean).join(' ');
 
@@ -81,30 +82,44 @@ function ScrollToTop() {
 // ════════════════════════════════════════════════════════════════
 function AppLoader() {
   return (
-    <div className="h-screen flex flex-col items-center justify-center gap-5 bg-white dark:bg-slate-950">
+    <div className="h-screen flex flex-col items-center 
+                    justify-center gap-5 
+                    bg-white dark:bg-slate-950">
       <div className="flex items-center gap-2.5 mb-2">
-        <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-sky-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/30">
+        <div className={cn(
+          'w-10 h-10 bg-gradient-to-br from-sky-400 to-sky-600',
+          'rounded-xl flex items-center justify-center',
+          'shadow-lg shadow-sky-500/30',
+        )}>
           <FileSignature size={20} className="text-white" />
         </div>
-        <span className="font-extrabold text-2xl text-slate-900 dark:text-white tracking-tight">
+        <span className="font-extrabold text-2xl text-slate-900 
+                         dark:text-white tracking-tight">
           NeX<span className="text-sky-500">sign</span>
         </span>
       </div>
       <div className="relative w-10 h-10">
-        <div className="absolute inset-0 rounded-full border-4 border-slate-200 dark:border-slate-800" />
-        <div className="absolute inset-0 rounded-full border-4 border-t-sky-500 animate-spin" />
+        <div className="absolute inset-0 rounded-full border-4 
+                        border-slate-200 dark:border-slate-800" />
+        <div className="absolute inset-0 rounded-full border-4 
+                        border-t-sky-500 animate-spin" />
       </div>
-      <p className="text-sm text-slate-400 font-medium animate-pulse">Loading…</p>
+      <p className="text-sm text-slate-400 font-medium animate-pulse">
+        Loading…
+      </p>
     </div>
   );
 }
 
-function PageLoader() {
+export function PageLoader() {
   return (
-    <div className="h-screen flex items-center justify-center bg-white dark:bg-slate-950">
+    <div className="h-screen flex items-center justify-center 
+                    bg-white dark:bg-slate-950">
       <div className="relative w-8 h-8">
-        <div className="absolute inset-0 rounded-full border-4 border-slate-200 dark:border-slate-800" />
-        <div className="absolute inset-0 rounded-full border-4 border-t-sky-500 animate-spin" />
+        <div className="absolute inset-0 rounded-full border-4 
+                        border-slate-200 dark:border-slate-800" />
+        <div className="absolute inset-0 rounded-full border-4 
+                        border-t-sky-500 animate-spin" />
       </div>
     </div>
   );
@@ -116,17 +131,18 @@ function PageLoader() {
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user)   return <Navigate to="/login" replace />;
   if (adminOnly) {
-    const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+    const isAdmin =
+      user.role === 'admin' || user.role === 'super_admin';
     if (!isAdmin) return <Navigate to="/dashboard" replace />;
   }
   return children;
 }
 
 function GuestRoute({ children }) {
-  const { user, loading, isAuthenticated } = useAuth();
-  if (loading) return <PageLoader />;
+  const { isAuthenticated, loading } = useAuth();
+  if (loading)         return <PageLoader />;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return children;
 }
@@ -139,13 +155,13 @@ function AppRoutes() {
   if (loading) return <AppLoader />;
 
   return (
-    <>
+    <Layout>
       <ScrollToTop />
       <Routes>
 
         {/* ── Public ──────────────────────────────────────── */}
-        <Route path="/"        element={<Landing  />} />
-        <Route path="/pricing" element={<Pricing  />} />
+        <Route path="/"        element={<Landing />} />
+        <Route path="/pricing" element={<Pricing />} />
 
         {/* ── Auth (guest only) ────────────────────────────── */}
         <Route
@@ -166,8 +182,10 @@ function AppRoutes() {
         />
 
         {/* ── Public signing ───────────────────────────────── */}
-        <Route path="/sign/:token"          element={<SignerView     />} />
-        <Route path="/template-sign/:token" element={<TemplateSigner />} />
+        <Route path="/sign/:token"
+               element={<SignerView />} />
+        <Route path="/template-sign/:token"
+               element={<TemplateSigner />} />
 
         {/* ── Protected: Dashboard ─────────────────────────── */}
         <Route
@@ -180,12 +198,8 @@ function AppRoutes() {
         />
 
         {/* ── Protected: Documents ─────────────────────────── */}
-
         {/*
-          CRITICAL FIX:
-          /documents/new must come BEFORE /documents/:id
-          so React Router matches "new" as a literal path,
-          not as a dynamic :id parameter.
+          CRITICAL: /documents/new BEFORE /documents/:id
         */}
         <Route
           path="/documents/new"
@@ -195,8 +209,6 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
-        {/* Legacy editor routes */}
         <Route
           path="/document-editor"
           element={
@@ -217,8 +229,6 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
-        {/* Document detail — only valid MongoDB ObjectId 24-char hex */}
         <Route
           path="/documents/:id"
           element={
@@ -227,7 +237,6 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        {/* Legacy manage route */}
         <Route
           path="/manage/:id"
           element={
@@ -246,10 +255,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
         {/*
-          CRITICAL FIX:
-          /templates/new must come BEFORE /templates/:id
+          CRITICAL: /templates/new BEFORE /templates/:id
         */}
         <Route
           path="/templates/new"
@@ -259,7 +266,6 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        {/* Legacy */}
         <Route
           path="/new-template"
           element={<Navigate to="/templates/new" replace />}
@@ -297,7 +303,7 @@ function AppRoutes() {
         <Route path="*" element={<PageNotFound />} />
 
       </Routes>
-    </>
+    </Layout>
   );
 }
 
@@ -319,8 +325,8 @@ export default function App() {
                   duration: 3500,
                   style: { zIndex: 9999 },
                   classNames: {
-                    toast:       'rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl',
-                    title:       'font-bold text-sm',
+                    toast: 'rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl',
+                    title: 'font-bold text-sm',
                     description: 'text-xs text-slate-500',
                   },
                 }}
