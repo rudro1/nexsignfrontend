@@ -413,28 +413,56 @@ export default function NewTemplate() {
       // Step E: POST /templates
       toast.loading('Creating template...', { id: 'create' });
 
-      const payload = {
-        title:        title.trim(),
-        description:  '',
-        fileUrl:      uploadedFileUrl,
-        filePublicId: uploadedFilePublicId,
-        fileName:     uploadedFileName,
-        fileSize:     uploadedFileSize,
-        fields:       processedFields,
-        recipients,
-        ccList,       // ✅ CC list included
-        companyName:  companyName.trim(),
-        companyLogo:  logoUrl,
-        message:      '',
-        totalPages,
-        signingConfig: {
-          bossSignsFirst: true,
-          expiryDays:     30,
-          allowDecline:   true,
-          reminderDays:   3,
-        },
-      };
+      // const payload = {
+      //   title:        title.trim(),
+      //   description:  '',
+      //   fileUrl:      uploadedFileUrl,
+      //   filePublicId: uploadedFilePublicId,
+      //   fileName:     uploadedFileName,
+      //   fileSize:     uploadedFileSize,
+      //   fields:       processedFields,
+      //   recipients,
+      //   ccList,       // ✅ CC list included
+      //   companyName:  companyName.trim(),
+      //   companyLogo:  logoUrl,
+      //   message:      '',
+      //   totalPages,
+      //   signingConfig: {
+      //     bossSignsFirst: true,
+      //     expiryDays:     30,
+      //     allowDecline:   true,
+      //     reminderDays:   3,
+      //   },
+      // };
+const payload = {
+  title:        title.trim(),
+  description:  '',
+  fileUrl:      uploadedFileUrl,
+  filePublicId: uploadedFilePublicId,
+  fileName:     uploadedFileName,
+  fileSize:     uploadedFileSize,
+  fields:       processedFields,
+  recipients,
+  ccList,
 
+  // ✅ এটা ADD করুন
+  boss: {
+    name:        bossName.trim(),
+    email:       bossEmail.trim().toLowerCase(),
+    designation: bossDesignation.trim() || '',
+  },
+
+  companyName:  companyName.trim(),
+  companyLogo:  logoUrl,
+  message:      '',
+  totalPages,
+  signingConfig: {
+    bossSignsFirst: true,
+    expiryDays:     30,
+    allowDecline:   true,
+    reminderDays:   3,
+  },
+};
       const res = await templateApi.create(payload);
       toast.dismiss('create');
 
@@ -453,10 +481,12 @@ export default function NewTemplate() {
       if (mountedRef.current) setProcessing(false);
     }
   }, [
-    rawFile, title, fields, bossEmail, employees, ccList,
-    companyName, companyLogoFile, companyLogoUrl,
-    totalPages, uploadPdf, uploadLogo, navigate,
-  ]);
+  rawFile, title, fields,
+  bossName, bossEmail, bossDesignation, // ← এটা যোগ করুন
+  employees, ccList,
+  companyName, companyLogoFile, companyLogoUrl,
+  totalPages, uploadPdf, uploadLogo, navigate,
+]);
 
   const currentMeta = STEPS[step - 1];
 
