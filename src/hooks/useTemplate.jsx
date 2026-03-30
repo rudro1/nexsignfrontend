@@ -307,14 +307,54 @@ export function useTemplateMutations() {
   [run]);
 
   // Employee signs
-  const employeeSign = useCallback((token, data) =>
-    run(() => templateApi.submitEmployeeSignature(token, data)),
-  [run]);
+  const employeeSign = useCallback(async (token, data) => {
+  setLoading(true);
+  setError(null);
+  try {
+    const result  = await templateApi.submitEmployeeSignature(token, data);
+    const resData = result?.data;
+    return {
+      success:       resData?.success !== false,
+      message:       resData?.message || 'Signed!',
+      missingFields: resData?.missingFields || [],
+    };
+  } catch (err) {
+    const msg =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Submission failed.';
+    setError(msg);
+    return {
+      success:       false,
+      message:       msg,
+      missingFields: err?.response?.data?.missingFields || [],
+    };
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
-  // Employee declines
-  const employeeDecline = useCallback((token, reason = '') =>
-    run(() => templateApi.declineEmployee(token, { reason })),
-  [run]);
+const employeeDecline = useCallback(async (token, reason = '') => {
+  setLoading(true);
+  setError(null);
+  try {
+    const result  = await templateApi.declineEmployee(token, { reason });
+    const resData = result?.data;
+    return {
+      success: resData?.success !== false,
+      message: resData?.message || 'Declined.',
+    };
+  } catch (err) {
+    const msg =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Failed to decline.';
+    setError(msg);
+    return { success: false, message: msg };
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   // Resend email to specific employee
   const resendEmail = useCallback((templateId, sessionId) =>

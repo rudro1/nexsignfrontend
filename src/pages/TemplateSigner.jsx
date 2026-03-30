@@ -992,48 +992,55 @@ export default function TemplateSigner() {
     setFields(prev => prev.map(f => f.id === id ? { ...f, value: val } : f));
   }, []);
 
- const handleSubmit = useCallback(async () => {
+const handleSubmit = useCallback(async () => {
 
-  // ── Step 1: Required fields check ──────────────
-  const missing = fields.filter(f => f.required !== false && !f.value);
+  // ── Step 1: Required fields ──────────────────────────────
+  const required = fields.filter(f => f.required !== false);
+  const missing  = required.filter(f => {
+    if (!f.value) return true;
+    if (typeof f.value === 'string' && !f.value.trim()) return true;
+    return false;
+  });
+
   if (missing.length) {
-    toast.error(`Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`);
+    toast.error(
+      `${missing.length} required field${missing.length > 1 ? 's' : ''} incomplete.`
+    );
     if (missing[0]?.page) setCurrentPage(missing[0].page);
     return;
   }
 
-  // ── Step 2: Signature check ─────────────────────
-  // শুধু তখনই block করবে যখন signature field আছে কিন্তু fill করেনি
-  const hasSignatureField = fields.some(
+  // ── Step 2: Signature check ──────────────────────────────
+  const sigFieldDef = fields.find(
     f => f.type === 'signature' || f.type === 'initial'
   );
 
-  const sigField = fields.find(
-    f => (f.type === 'signature' || f.type === 'initial') && f.value
-  );
-
-  if (hasSignatureField && !sigField) {
-    toast.error('Please add your signature first.');
-    const sigPage = fields.find(
-      f => f.type === 'signature' || f.type === 'initial'
-    )?.page;
-    if (sigPage) setCurrentPage(sigPage);
+  if (sigFieldDef && !sigFieldDef.value) {
+    toast.error('Please draw your signature first.');
+    if (sigFieldDef.page) setCurrentPage(sigFieldDef.page);
     return;
   }
 
-  // ── Step 3: Submit ──────────────────────────────
+  // ── Step 3: Payload build ────────────────────────────────
+  const signatureDataUrl = sigFieldDef?.value || null;
+
+  const fieldValues = fields
+    .filter(f =>
+      f.value &&
+      f.type !== 'signature' &&
+      f.type !== 'initial'
+    )
+    .map(f => ({
+      fieldId: f.id,
+      type:    f.type,
+      value:   String(f.value),
+    }));
+
+  // ── Step 4: API call ─────────────────────────────────────
   setSubmitting(true);
   try {
-    const fieldValues = fields
-      .filter(f => f.value)
-      .map(f => ({
-        fieldId: f.id,
-        type:    f.type,
-        value:   f.value,
-      }));
-
     const res = await mutations.employeeSign(token, {
-      signatureDataUrl: sigField?.value || null, // null safe
+      signatureDataUrl,
       fieldValues,
       clientTime: new Date().toISOString(),
     });
@@ -1041,14 +1048,17 @@ export default function TemplateSigner() {
     if (res?.success) {
       setPhase('signed');
     } else {
-      toast.error(res?.error || 'Submission failed. Please try again.');
+      toast.error(res?.message || 'Submission failed.');
+      if (res?.missingFields?.[0]?.page) {
+        setCurrentPage(res.missingFields[0].page);
+      }
     }
   } catch (err) {
-    toast.error(err?.message || 'Submission failed. Please try again.');
+    toast.error(err?.message || 'Submission failed.');
   } finally {
     setSubmitting(false);
   }
-}, [fields, token, mutations]);
+}, [fields, token, mutations, setCurrentPage]);
 
   const handleDecline = useCallback(async (reason) => {
     setDeclining(true);
