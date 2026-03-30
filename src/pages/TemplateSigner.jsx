@@ -992,55 +992,120 @@ export default function TemplateSigner() {
     setFields(prev => prev.map(f => f.id === id ? { ...f, value: val } : f));
   }, []);
 
+//  const handleSubmit = useCallback(async () => {
+
+//   // ── Step 1: Required fields check ──────────────
+//   const missing = fields.filter(f => f.required !== false && !f.value);
+//   if (missing.length) {
+//     toast.error(`Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`);
+//     if (missing[0]?.page) setCurrentPage(missing[0].page);
+//     return;
+//   }
+
+//   // ── Step 2: Signature check ─────────────────────
+//   // শুধু তখনই block করবে যখন signature field আছে কিন্তু fill করেনি
+//   const hasSignatureField = fields.some(
+//     f => f.type === 'signature' || f.type === 'initial'
+//   );
+
+//   const sigField = fields.find(
+//     f => (f.type === 'signature' || f.type === 'initial') && f.value
+//   );
+
+//   if (hasSignatureField && !sigField) {
+//     toast.error('Please add your signature first.');
+//     const sigPage = fields.find(
+//       f => f.type === 'signature' || f.type === 'initial'
+//     )?.page;
+//     if (sigPage) setCurrentPage(sigPage);
+//     return;
+//   }
+
+//   // ── Step 3: Submit ──────────────────────────────
+//   setSubmitting(true);
+//   try {
+//     const fieldValues = fields
+//       .filter(f => f.value)
+//       .map(f => ({
+//         fieldId: f.id,
+//         type:    f.type,
+//         value:   f.value,
+//       }));
+
+//     const res = await mutations.employeeSign(token, {
+//       signatureDataUrl: sigField?.value || null, // null safe
+//       fieldValues,
+//       clientTime: new Date().toISOString(),
+//     });
+
+//     if (res?.success) {
+//       setPhase('signed');
+//     } else {
+//       toast.error(res?.error || 'Submission failed. Please try again.');
+//     }
+//   } catch (err) {
+//     toast.error(err?.message || 'Submission failed. Please try again.');
+//   } finally {
+//     setSubmitting(false);
+//   }
+// }, [fields, token, mutations]);
 const handleSubmit = useCallback(async () => {
 
-  // ── Step 1: Required fields ──────────────────────────────
+  // ── Step 1: সব required fields check ──────────────
   const required = fields.filter(f => f.required !== false);
-  const missing  = required.filter(f => {
-    if (!f.value) return true;
-    if (typeof f.value === 'string' && !f.value.trim()) return true;
-    return false;
-  });
+  const missing  = required.filter(f => !f.value || 
+    (typeof f.value === 'string' && !f.value.trim())
+  );
 
   if (missing.length) {
-    toast.error(
-      `${missing.length} required field${missing.length > 1 ? 's' : ''} incomplete.`
-    );
+    toast.error(`${missing.length} required field${missing.length > 1 ? 's' : ''} incomplete.`);
     if (missing[0]?.page) setCurrentPage(missing[0].page);
     return;
   }
 
-  // ── Step 2: Signature check ──────────────────────────────
-  const sigFieldDef = fields.find(
+  // ── Step 2: Signature field খোঁজো ─────────────────
+  const sigField = fields.find(
     f => f.type === 'signature' || f.type === 'initial'
   );
 
-  if (sigFieldDef && !sigFieldDef.value) {
+  if (sigField && !sigField.value) {
     toast.error('Please draw your signature first.');
-    if (sigFieldDef.page) setCurrentPage(sigFieldDef.page);
+    if (sigField.page) setCurrentPage(sigField.page);
     return;
   }
 
-  // ── Step 3: Payload build ────────────────────────────────
-  const signatureDataUrl = sigFieldDef?.value || null;
+  // ── Step 3: Payload build ──────────────────────────
+  // ✅ signatureDataUrl আলাদা পাঠাও
+  const signatureDataUrl = sigField?.value || null;
 
+  // ✅ বাকি সব fields — signature বাদে
   const fieldValues = fields
-    .filter(f =>
-      f.value &&
-      f.type !== 'signature' &&
+    .filter(f => 
+      f.value && 
+      f.type !== 'signature' && 
       f.type !== 'initial'
     )
     .map(f => ({
-      fieldId: f.id,
+      fieldId: f.id,        // ✅ f.id — DB তে যেটা store আছে
       type:    f.type,
       value:   String(f.value),
     }));
 
-  // ── Step 4: API call ─────────────────────────────────────
+  // ── Step 4: Console log করো — দেখো কী যাচ্ছে ─────
+  console.log('📤 Submit payload:', {
+    signatureDataUrl: signatureDataUrl 
+      ? `[DATA_URL: ${signatureDataUrl.length} chars]` 
+      : 'NULL ❌',
+    fieldValues,
+    fieldCount: fields.length,
+    sigFieldFound: !!sigField,
+  });
+
+  // ── Step 5: API call ───────────────────────────────
   setSubmitting(true);
   try {
     const res = await mutations.employeeSign(token, {
-      signatureDataUrl,
+      signatureDataUrl,   // ✅ এটা পাঠানো হচ্ছে
       fieldValues,
       clientTime: new Date().toISOString(),
     });
@@ -1054,12 +1119,13 @@ const handleSubmit = useCallback(async () => {
       }
     }
   } catch (err) {
+    console.error('Submit error:', err);
     toast.error(err?.message || 'Submission failed.');
   } finally {
     setSubmitting(false);
   }
-}, [fields, token, mutations, setCurrentPage]);
 
+}, [fields, token, mutations, setCurrentPage]);
   const handleDecline = useCallback(async (reason) => {
     setDeclining(true);
     try {
