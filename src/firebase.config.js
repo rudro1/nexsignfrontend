@@ -1,4 +1,3 @@
-// src/firebase.config.js
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -19,12 +18,10 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// ✅ Persistence — page reload এ login থাকবে
 setPersistence(auth, browserLocalPersistence).catch(console.warn);
 
 const googleProvider = new GoogleAuthProvider();
 
-// ✅ Scopes
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
 

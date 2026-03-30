@@ -13,17 +13,15 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signOut,
   onIdTokenChanged,
 } from 'firebase/auth';
+// ✅ signInWithRedirect এবং getRedirectResult IMPORT করা হয়নি
+// কারণ এটাই নতুন tab + reload loop এর কারণ
+
 import { toast } from 'sonner';
 import { api, apiCache } from '@/api/apiClient';
 
-// ════════════════════════════════════════════════════════════════
-// CONTEXT
-// ════════════════════════════════════════════════════════════════
 const AuthContext = createContext(null);
 
 // ════════════════════════════════════════════════════════════════
@@ -31,21 +29,22 @@ const AuthContext = createContext(null);
 // ════════════════════════════════════════════════════════════════
 const getFirebaseError = (code) => {
   const map = {
-    'auth/user-not-found':         'No account found with this email.',
-    'auth/wrong-password':         'Incorrect password.',
-    'auth/email-already-in-use':   'This email is already registered.',
-    'auth/weak-password':          'Password must be at least 6 characters.',
-    'auth/invalid-email':          'Please enter a valid email address.',
-    'auth/too-many-requests':      'Too many attempts. Try again later.',
-    'auth/user-disabled':          'This account has been disabled.',
-    'auth/popup-closed-by-user':   null, // Silent
-    'auth/popup-blocked':          'Popup blocked. Please allow popups.',
-    'auth/network-request-failed': 'Network error. Check your connection.',
-    'auth/invalid-credential':     'Invalid email or password.',
-    'auth/operation-not-allowed':  'This sign-in method is not enabled.',
-    'auth/cancelled-popup-request': null, // Silent
+    'auth/user-not-found':          'No account found with this email.',
+    'auth/wrong-password':          'Incorrect password.',
+    'auth/email-already-in-use':    'This email is already registered.',
+    'auth/weak-password':           'Password must be at least 6 characters.',
+    'auth/invalid-email':           'Please enter a valid email address.',
+    'auth/too-many-requests':       'Too many attempts. Try again later.',
+    'auth/user-disabled':           'This account has been disabled.',
+    'auth/popup-closed-by-user':    null,
+    'auth/popup-blocked':           'Popup was blocked by your browser.',
+    'auth/network-request-failed':  'Network error. Check your connection.',
+    'auth/invalid-credential':      'Invalid email or password.',
+    'auth/operation-not-allowed':   'This sign-in method is not enabled.',
+    'auth/cancelled-popup-request': null,
+    'auth/internal-error':          'An internal error occurred. Try again.',
   };
-  return map[code] !== undefined
+  return map.hasOwnProperty(code)
     ? map[code]
     : 'Something went wrong. Please try again.';
 };
@@ -73,15 +72,11 @@ const storage = {
     }
   },
   remove: (...keys) => {
-    keys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    keys.forEach(k => {
+      try { localStorage.removeItem(k); } catch {}
+    });
   },
 };
-
-// ════════════════════════════════════════════════════════════════
-// ROLE REDIRECT
-// ════════════════════════════════════════════════════════════════
-const getRoleRedirect = (role) =>
-  role === 'admin' || role === 'super_admin' ? '/admin' : '/dashboard';
 
 // ════════════════════════════════════════════════════════════════
 // AUTH PROVIDER
@@ -91,10 +86,9 @@ export const AuthProvider = ({ children }) => {
   const [token,   setToken]   = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const firebaseUserRef     = useRef(null);
-  const redirectHandledRef  = useRef(false);
+  const firebaseUserRef = useRef(null);
 
-  // ── Save auth ────────────────────────────────────────────
+  // ── Save auth ──────────────────────────────────────────────
   const saveAuth = useCallback((userData, userToken) => {
     setUser(userData);
     setToken(userToken);
@@ -103,7 +97,7 @@ export const AuthProvider = ({ children }) => {
     api.defaults.headers.common['Authorization'] = `Bearer ${userToken}`;
   }, []);
 
-  // ── Clear auth ───────────────────────────────────────────
+  // ── Clear auth ─────────────────────────────────────────────
   const clearAuth = useCallback(() => {
     setUser(null);
     setToken(null);
@@ -112,7 +106,7 @@ export const AuthProvider = ({ children }) => {
     apiCache.clear();
   }, []);
 
-  // ── Load saved auth on mount ─────────────────────────────
+  // ── Load saved session on mount ────────────────────────────
   useEffect(() => {
     const savedUser  = storage.get('nexsign_user');
     const savedToken = localStorage.getItem('token');
@@ -122,84 +116,41 @@ export const AuthProvider = ({ children }) => {
       setToken(savedToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
     }
+
     setLoading(false);
   }, []);
 
-  // ── Handle Google Redirect Result ────────────────────────
-  // signInWithRedirect fallback এর জন্য
+  // ── Firebase Auth State (token refresh only) ───────────────
   useEffect(() => {
-    if (redirectHandledRef.current) return;
-    redirectHandledRef.current = true;
+    const unsubscribe = onIdTokenChanged(auth, async (fbUser) => {
+      firebaseUserRef.current = fbUser;
 
-    const handleRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (!result?.user) return;
-
-        const firebaseUser = result.user;
-        const email = firebaseUser.email;
-        if (!email) return;
-
-        const name     = firebaseUser.displayName || email.split('@')[0] || 'User';
-        const photoURL = firebaseUser.photoURL    || '';
-
-        const res = await api.post('/auth/google', { name, email, photoURL });
-
-        if (res.data?.token && res.data?.user) {
-          saveAuth(res.data.user, res.data.token);
-          toast.success('Google login successful! 🎉');
-          window.location.href = getRoleRedirect(res.data.user?.role);
-        }
-      } catch (err) {
-        // No redirect result — perfectly normal, ignore
-        if (err?.code === 'auth/no-current-user' || !err?.code) return;
-        console.warn('[Redirect Result]:', err?.message);
+      if (fbUser) {
+        // Silent token refresh — Firebase এর নিজস্ব token
+        try { await fbUser.getIdToken(false); } catch {}
       }
-    };
-
-    handleRedirect();
-  }, [saveAuth]);
-
-  // ── Firebase Auth State Listener ─────────────────────────
-  useEffect(() => {
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
-      firebaseUserRef.current = firebaseUser;
-
-      if (!firebaseUser) {
-        setLoading(false);
-        return;
-      }
-
-      // Token refresh — silent
-      try {
-        await firebaseUser.getIdToken(false);
-      } catch (err) {
-        console.warn('[Token refresh]:', err.message);
-      }
-
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // ════════════════════════════════════════════════════════
-  // LOGIN
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
+  // LOGIN (called from Login.jsx after backend response)
+  // ════════════════════════════════════════════════════════════
   const login = useCallback((userData, userToken) => {
     saveAuth(userData, userToken);
   }, [saveAuth]);
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // LOGOUT
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   const logout = useCallback(async (options = {}) => {
     const { redirect = true, showToast = false } = options;
 
     try {
       if (auth.currentUser) await signOut(auth);
     } catch (err) {
-      console.warn('[Logout]:', err.message);
+      console.warn('[Logout Firebase]:', err.message);
     } finally {
       clearAuth();
       if (showToast) toast.success('Logged out successfully!');
@@ -209,59 +160,54 @@ export const AuthProvider = ({ children }) => {
     }
   }, [clearAuth]);
 
-  // ════════════════════════════════════════════════════════
-  // GOOGLE LOGIN — Popup + Redirect fallback
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
+  // GOOGLE LOGIN
+  // ✅ ONLY popup — redirect সম্পূর্ণ বাদ
+  // ✅ Popup blocked হলে user কে জানাও — redirect করো না
+  // ════════════════════════════════════════════════════════════
   const googleLogin = useCallback(async () => {
     try {
-      // ✅ Primary: popup
+      // ✅ শুধু popup — কোনো redirect নেই
       const result = await signInWithPopup(auth, googleProvider);
       return result;
 
     } catch (error) {
       const code = error?.code || '';
-      const msg  = error?.message || '';
 
-      // ── User cancelled — silent ────────────────────────
+      // ── User নিজে বন্ধ করেছে — silent ──────────────────
       if (
-        code === 'auth/popup-closed-by-user'    ||
+        code === 'auth/popup-closed-by-user' ||
         code === 'auth/cancelled-popup-request'
       ) {
-        return null;
+        const err = new Error('cancelled');
+        err.__cancelled = true;
+        throw err;
       }
 
-      // ── COOP / popup blocked → redirect fallback ───────
-      if (
-        code === 'auth/popup-blocked'               ||
-        msg.includes('Cross-Origin-Opener-Policy')  ||
-        msg.includes('window.closed')               ||
-        msg.includes('cross-origin')
-      ) {
-        try {
-          toast.info('Redirecting to Google sign-in...', { duration: 2000 });
-          await signInWithRedirect(auth, googleProvider);
-          return null; // Page will reload — handled in useEffect
-        } catch (redirectErr) {
-          const errMsg = getFirebaseError(redirectErr?.code);
-          if (errMsg) toast.error(errMsg);
-          throw redirectErr;
-        }
+      // ── Popup blocked ────────────────────────────────────
+      // ✅ redirect করো না! User কে জানাও popup allow করতে
+      if (code === 'auth/popup-blocked') {
+        toast.error(
+          'Popup blocked! Please allow popups for this site in your browser settings.',
+          { duration: 5000 }
+        );
+        const err = new Error('Popup blocked');
+        err.__cancelled = true;
+        throw err;
       }
 
-      // ── Other Firebase errors ──────────────────────────
+      // ── Other errors ─────────────────────────────────────
       const message = getFirebaseError(code);
       if (message) toast.error(message);
 
-      // ✅ Mark as cancelled so Login.jsx doesn't show duplicate error
       const err = new Error(message || 'Google sign-in failed');
-      err.__cancelled = !message; // silent errors
       throw err;
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // EMAIL REGISTER
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   const registerWithEmail = useCallback(async (email, password) => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -275,9 +221,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // EMAIL LOGIN
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   const loginWithEmail = useCallback(async (email, password) => {
     try {
       return await signInWithEmailAndPassword(auth, email, password);
@@ -286,9 +232,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // EMAIL VERIFICATION
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   const checkEmailVerified = useCallback(async (firebaseUser) => {
     const fbUser = firebaseUser || auth.currentUser;
     if (!fbUser) return false;
@@ -296,7 +242,7 @@ export const AuthProvider = ({ children }) => {
       await fbUser.reload();
       return fbUser.emailVerified;
     } catch (err) {
-      console.warn('[Email verify]:', err.message);
+      console.warn('[checkEmailVerified]:', err.message);
       return false;
     }
   }, []);
@@ -322,9 +268,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // RESET PASSWORD
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   const resetPassword = useCallback(async (email) => {
     try {
       await sendPasswordResetEmail(auth, email, {
@@ -338,9 +284,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // UPDATE USER
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   const updateUser = useCallback((updates) => {
     setUser(prev => {
       if (!prev) return prev;
@@ -355,9 +301,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // CHECK AUTH
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   const isTokenExpired = useCallback((jwtToken) => {
     if (!jwtToken) return true;
     try {
@@ -382,9 +328,9 @@ export const AuthProvider = ({ children }) => {
     return true;
   }, [isTokenExpired, clearAuth, user]);
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // COMPUTED
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   const isAdmin         = user?.role === 'admin' || user?.role === 'super_admin';
   const isSuperAdmin    = user?.role === 'super_admin';
   const isAuthenticated = !!user && !!token;
@@ -421,7 +367,7 @@ export const useAuth = () => {
   return ctx;
 };
 
-export const useUser      = () => { const { user, loading } = useAuth(); return { user, loading }; };
-export const useIsAdmin   = () => { const { isAdmin, isSuperAdmin } = useAuth(); return { isAdmin, isSuperAdmin }; };
+export const useUser    = () => { const { user, loading } = useAuth(); return { user, loading }; };
+export const useIsAdmin = () => { const { isAdmin, isSuperAdmin } = useAuth(); return { isAdmin, isSuperAdmin }; };
 
 export default AuthContext;
