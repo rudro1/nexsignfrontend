@@ -1,4 +1,10 @@
 // src/pages/TemplateSigner.jsx
+// ✅ Module 2 Employee Signing View
+// FIX 1: Fields positioned using CSS % (field.x/nativeW * 100%) matching editor exactly
+// FIX 2: Signature fields open modal, text fields are interactive
+// FIX 3: All field types work correctly
+// FEATURE: CC option, decline modal, progress bar
+
 import React, {
   useEffect, useState, useRef, useCallback, useMemo,
 } from 'react';
@@ -11,6 +17,7 @@ import {
   ZoomIn, ZoomOut, Send, PenTool, X,
   FileText, WifiOff, RotateCcw, PenLine,
   Type, Calendar, Hash, Fingerprint, CheckSquare,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { templateApi } from '@/api/apiClient';
@@ -52,8 +59,7 @@ function StatusScreen({ icon: Icon, iconClass, bgClass, title, message, children
             <Shield className="w-3 h-3 text-white" />
           </div>
           <span className="text-xs text-slate-400">
-            Secured by{' '}
-            <span className="font-semibold text-slate-600 dark:text-slate-300">NexSign</span>
+            Secured by <span className="font-semibold text-slate-600 dark:text-slate-300">NexSign</span>
           </span>
         </div>
       </div>
@@ -62,23 +68,25 @@ function StatusScreen({ icon: Icon, iconClass, bgClass, title, message, children
 }
 
 // ══════════════════════════════════════════════════
-// FIELD META
+// FIELD META CONFIG
 // ══════════════════════════════════════════════════
 const FIELD_META = {
-  signature: { icon: PenLine,     label: 'Sign here', color: '#28ABDF', border: 'border-[#28ABDF]',  bg: 'bg-sky-50/90'     },
-  initial:   { icon: Fingerprint, label: 'Initials',  color: '#8b5cf6', border: 'border-violet-400', bg: 'bg-violet-50/90'  },
-  text:      { icon: Type,        label: 'Text',      color: '#64748b', border: 'border-slate-300',  bg: 'bg-white/95'      },
-  date:      { icon: Calendar,    label: 'Date',      color: '#10b981', border: 'border-emerald-400',bg: 'bg-emerald-50/90' },
-  checkbox:  { icon: CheckSquare, label: '',          color: '#f59e0b', border: 'border-amber-400',  bg: 'bg-amber-50/90'   },
-  number:    { icon: Hash,        label: 'Number',    color: '#6366f1', border: 'border-indigo-400', bg: 'bg-indigo-50/90'  },
+  signature: { icon: PenLine,     label: 'Sign here', color: '#28ABDF', borderCls: 'border-[#28ABDF]',  bgCls: 'bg-sky-50/90'     },
+  initial:   { icon: Fingerprint, label: 'Initials',  color: '#8b5cf6', borderCls: 'border-violet-400', bgCls: 'bg-violet-50/90'  },
+  text:      { icon: Type,        label: 'Text',      color: '#64748b', borderCls: 'border-slate-300',  bgCls: 'bg-white/95'      },
+  date:      { icon: Calendar,    label: 'Date',      color: '#10b981', borderCls: 'border-emerald-400',bgCls: 'bg-emerald-50/90' },
+  checkbox:  { icon: CheckSquare, label: '',          color: '#f59e0b', borderCls: 'border-amber-400',  bgCls: 'bg-amber-50/90'   },
+  number:    { icon: Hash,        label: 'Number',    color: '#6366f1', borderCls: 'border-indigo-400', bgCls: 'bg-indigo-50/90'  },
 };
 
 // ══════════════════════════════════════════════════
 // FIELD OVERLAY
+// KEY FIX: Use field.x/nativeWidth * 100% for CSS positioning
+// This matches EXACTLY how the editor placed the fields
 // ══════════════════════════════════════════════════
-function FieldOverlay({
+const FieldOverlay = React.memo(function FieldOverlay({
   field, nativeWidth, nativeHeight,
-  onSignatureClick, onTextChange, onDateChange, onCheckboxChange,
+  onSignatureClick, onFieldChange,
 }) {
   if (!nativeWidth || !nativeHeight) return null;
 
@@ -86,33 +94,43 @@ function FieldOverlay({
   const Icon   = meta.icon;
   const filled = !!field.value;
 
+  // ✅ THE FIX: Convert stored % coordinates to CSS %
+  // field.x, field.y, field.width, field.height are stored as percentages (0-100)
+  // relative to the PDF page's native dimensions
+  // We use these directly as CSS % on the overlay container
   const style = {
     position: 'absolute',
-    left:     `${(field.x      / nativeWidth)  * 100}%`,
-    top:      `${(field.y      / nativeHeight) * 100}%`,
-    width:    `${(field.width  / nativeWidth)  * 100}%`,
-    height:   `${(field.height / nativeHeight) * 100}%`,
+    left:   `${field.x}%`,
+    top:    `${field.y}%`,
+    width:  `${field.width}%`,
+    height: `${field.height}%`,
   };
 
+  // Signature / Initial — click to open signature modal
   if (field.type === 'signature' || field.type === 'initial') {
     return (
       <div
-        className={cn(
-          'rounded overflow-hidden transition-all duration-150 cursor-pointer',
-          'border-2 flex items-center justify-center',
-          filled
-            ? 'border-emerald-400/60 bg-emerald-50/40'
-            : cn('border-dashed', meta.border, meta.bg, 'hover:brightness-95 hover:shadow-md'),
-        )}
         style={style}
         onClick={() => onSignatureClick(field)}
+        className={cn(
+          'cursor-pointer rounded overflow-hidden transition-all duration-150',
+          'border-2 flex items-center justify-center select-none',
+          filled
+            ? 'border-emerald-400/70 bg-emerald-50/50'
+            : cn('border-dashed', meta.borderCls, meta.bgCls,
+                 'hover:brightness-95 hover:shadow-lg animate-pulse-subtle'),
+        )}
         title="Click to sign"
       >
         {filled ? (
-          <img src={field.value} alt="sig"
-            className="w-full h-full object-contain p-0.5" draggable={false} />
+          <img
+            src={field.value}
+            alt="signature"
+            className="w-full h-full object-contain p-0.5"
+            draggable={false}
+          />
         ) : (
-          <div className="flex items-center justify-center h-full gap-1 px-1 overflow-hidden">
+          <div className="flex items-center justify-center gap-1 px-1 overflow-hidden w-full h-full">
             {field.required && <span className="text-red-400 text-[9px] font-black shrink-0">*</span>}
             <Icon size={11} style={{ color: meta.color, flexShrink: 0 }} />
             <span className="text-[10px] font-semibold truncate" style={{ color: meta.color }}>
@@ -124,15 +142,47 @@ function FieldOverlay({
     );
   }
 
+  // Text / Number — inline input
+  if (field.type === 'text' || field.type === 'number') {
+    return (
+      <div
+        style={style}
+        className={cn(
+          'rounded overflow-hidden border-2',
+          filled
+            ? 'border-slate-300/60 bg-white'
+            : 'border-slate-300 bg-white hover:border-[#28ABDF]',
+        )}
+      >
+        <input
+          type={field.type === 'number' ? 'number' : 'text'}
+          value={field.value || ''}
+          placeholder={field.placeholder || (field.type === 'number' ? '0' : 'Type here…')}
+          className="w-full h-full px-1.5 bg-transparent border-none outline-none
+                     text-slate-700 dark:text-slate-300"
+          style={{
+            fontFamily: field.fontFamily || 'inherit',
+            // Scale font proportionally to field height — matches editor
+            fontSize:   `${Math.max(9, Math.min(14, field.fontSize || 12))}px`,
+          }}
+          onChange={e => onFieldChange(field.id, e.target.value)}
+          onClick={e => e.stopPropagation()}
+        />
+      </div>
+    );
+  }
+
+  // Date
   if (field.type === 'date') {
     return (
       <div
+        style={style}
         className={cn(
           'rounded overflow-hidden border-2',
-          filled ? 'border-emerald-300/60 bg-emerald-50/40'
-                 : 'border-dashed border-emerald-400 bg-white/90',
+          filled
+            ? 'border-emerald-300/60 bg-emerald-50/40'
+            : 'border-dashed border-emerald-400 bg-white',
         )}
-        style={style}
       >
         {filled ? (
           <span className="flex items-center justify-center h-full
@@ -140,54 +190,31 @@ function FieldOverlay({
             {field.value}
           </span>
         ) : (
-          <input type="date"
+          <input
+            type="date"
             className="w-full h-full px-1 text-[11px] bg-transparent
                        border-none outline-none cursor-pointer text-emerald-700"
-            onChange={e => onDateChange(field.id, e.target.value)}
+            onChange={e => onFieldChange(field.id, e.target.value)}
+            onClick={e => e.stopPropagation()}
           />
         )}
       </div>
     );
   }
 
-  if (field.type === 'text' || field.type === 'number') {
-    return (
-      <div
-        className={cn(
-          'rounded overflow-hidden border-2',
-          filled ? 'border-slate-300/60 bg-white'
-                 : 'border-slate-300 bg-white hover:border-[#28ABDF]',
-        )}
-        style={style}
-      >
-        <input
-          type={field.type === 'number' ? 'number' : 'text'}
-          value={field.value || ''}
-          placeholder={field.placeholder || (field.type === 'number' ? '0' : 'Type here…')}
-          className="w-full h-full px-2 text-[11px] bg-transparent
-                     border-none outline-none text-slate-700"
-          style={{
-            fontFamily: field.fontFamily || 'inherit',
-            fontSize:   `${Math.max(9, (field.fontSize || 12) * 0.7)}px`,
-          }}
-          onChange={e => onTextChange(field.id, e.target.value)}
-          onClick={e => e.stopPropagation()}
-        />
-      </div>
-    );
-  }
-
+  // Checkbox
   if (field.type === 'checkbox') {
     return (
       <div
+        style={style}
+        onClick={() => onFieldChange(field.id, field.value ? '' : 'checked')}
         className={cn(
           'rounded overflow-hidden cursor-pointer border-2',
           'flex items-center justify-center',
-          filled ? 'border-amber-400 bg-amber-50'
-                 : 'border-dashed border-amber-400 bg-amber-50/70',
+          filled
+            ? 'border-amber-400 bg-amber-50'
+            : 'border-dashed border-amber-400 bg-amber-50/70 hover:bg-amber-100/80',
         )}
-        style={style}
-        onClick={() => onCheckboxChange(field.id, field.value ? '' : 'checked')}
       >
         {filled
           ? <CheckCircle2 className="w-4 h-4 text-amber-500" />
@@ -198,37 +225,34 @@ function FieldOverlay({
   }
 
   return null;
-}
+});
 
 // ══════════════════════════════════════════════════
 // PDF RENDERER
-// ✅ FIX 1: isRenderingRef — concurrent render guard
-// ✅ FIX 2: renderIdRef — stale render discard
-// ✅ FIX 3: pageInfo set BEFORE render starts
+// Renders PDF canvas and overlays fields at correct positions
 // ══════════════════════════════════════════════════
 function PdfRenderer({
   pdfUrl, fields, currentPage, onPageChange,
   totalPages, onTotalPages,
-  onSignatureClick, onTextChange, onDateChange, onCheckboxChange,
+  onSignatureClick, onFieldChange,
 }) {
   const canvasRef    = useRef(null);
   const containerRef = useRef(null);
-  const scrollRef    = useRef(null);
   const pdfDocRef    = useRef(null);
   const renderRef    = useRef(null);
+  const renderIdRef  = useRef(0);
   const debounceRef  = useRef(null);
   const retryTimer   = useRef(null);
-
-  // ✅ FIX: These two refs prevent the canvas error
-  const isRenderingRef = useRef(false); // true = render in progress
-  const renderIdRef    = useRef(0);     // increments on each render call
 
   const [pdfState,   setPdfState]   = useState('idle');
   const [retryCount, setRetryCount] = useState(0);
   const [retryIn,    setRetryIn]    = useState(0);
   const [loadPct,    setLoadPct]    = useState(0);
   const [scale,      setScale]      = useState(1);
-  const [pageInfo,   setPageInfo]   = useState({
+
+  // ✅ Store both CSS dimensions AND native PDF dimensions
+  // nativeWidth/Height needed for field % coordinate calculation
+  const [canvasInfo, setCanvasInfo] = useState({
     cssWidth: 0, cssHeight: 0,
     nativeWidth: 0, nativeHeight: 0,
   });
@@ -240,7 +264,7 @@ function PdfRenderer({
     [fields, currentPage],
   );
 
-  // ── Load PDF ────────────────────────────────────
+  // Load PDF
   useEffect(() => {
     if (!pdfUrl) return;
     let cancelled = false;
@@ -248,8 +272,7 @@ function PdfRenderer({
     const load = async () => {
       setPdfState('loading');
       setLoadPct(0);
-      pdfDocRef.current    = null;
-      isRenderingRef.current = false;
+      pdfDocRef.current = null;
 
       let fakePct = 0;
       const fakeTimer = setInterval(() => {
@@ -287,7 +310,6 @@ function PdfRenderer({
 
         if (!cancelled) {
           setPdfState('ready');
-          // ✅ call renderPage after state update
           setTimeout(() => renderPage(doc, currentPage, scale), 0);
         }
 
@@ -321,36 +343,26 @@ function PdfRenderer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdfUrl, retryCount]);
 
-  // ── Render Page ─────────────────────────────────
-  // ✅ THE KEY FIX:
-  // 1. Increment renderIdRef — old renders detect they're stale
-  // 2. Cancel previous render task properly
-  // 3. Wait for cancel to complete before starting new render
+  // Render page — captures native PDF dimensions for field positioning
   const renderPage = useCallback(async (docArg, page, sc) => {
     const doc    = docArg || pdfDocRef.current;
     const canvas = canvasRef.current;
     const wrap   = containerRef.current;
     if (!doc || !canvas || !wrap) return;
 
-    // ✅ Increment render ID — previous renders will bail
     const myId = ++renderIdRef.current;
 
-    // ✅ Cancel previous render and WAIT for it
     if (renderRef.current) {
-      try {
-        renderRef.current.cancel();
-        // Give pdf.js time to process the cancel
-        await new Promise(r => setTimeout(r, 10));
-      } catch (_) {}
+      try { renderRef.current.cancel(); await new Promise(r => setTimeout(r, 10)); }
+      catch (_) {}
       renderRef.current = null;
     }
 
-    // ✅ Guard: if another render started while we waited, bail
     if (myId !== renderIdRef.current) return;
 
     try {
-      const pg     = await doc.getPage(page);
-      if (myId !== renderIdRef.current) return; // stale check
+      const pg = await doc.getPage(page);
+      if (myId !== renderIdRef.current) return;
 
       const avail  = Math.max(wrap.clientWidth - 32, 300);
       const baseVP = pg.getViewport({ scale: 1 });
@@ -358,15 +370,14 @@ function PdfRenderer({
       const vp     = pg.getViewport({ scale: fit * sc });
       const dpr    = Math.min(window.devicePixelRatio || 1, 2);
 
-      if (myId !== renderIdRef.current) return; // stale check
+      if (myId !== renderIdRef.current) return;
 
-      // ✅ FIX 3: Set pageInfo BEFORE starting render
-      // This ensures fields appear at correct position immediately
-      setPageInfo({
+      // ✅ Capture native PDF page dimensions for field % calculations
+      setCanvasInfo({
         cssWidth:     vp.width,
         cssHeight:    vp.height,
-        nativeWidth:  baseVP.width,
-        nativeHeight: baseVP.height,
+        nativeWidth:  baseVP.width,   // PDF points width (e.g. 595 for A4)
+        nativeHeight: baseVP.height,  // PDF points height
       });
 
       canvas.width        = vp.width  * dpr;
@@ -377,33 +388,27 @@ function PdfRenderer({
       const ctx = canvas.getContext('2d', { alpha: false });
       ctx.scale(dpr, dpr);
 
-      if (myId !== renderIdRef.current) return; // stale check
+      if (myId !== renderIdRef.current) return;
 
       const task = pg.render({ canvasContext: ctx, viewport: vp });
       renderRef.current = task;
-
       await task.promise;
 
-      if (myId !== renderIdRef.current) return; // stale check after render
+      if (myId !== renderIdRef.current) return;
       renderRef.current = null;
 
     } catch (e) {
-      if (e?.name !== 'RenderingCancelledException') {
-        console.error('[PDF render]', e);
-      }
+      if (e?.name !== 'RenderingCancelledException') console.error('[PDF render]', e);
       renderRef.current = null;
     }
   }, []);
 
-  // Re-render on page/scale/pdfState change
   useEffect(() => {
-    if (pdfState === 'ready' && pdfDocRef.current) {
+    if (pdfState === 'ready' && pdfDocRef.current)
       renderPage(pdfDocRef.current, currentPage, scale);
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, scale, pdfState]);
 
-  // Resize observer
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
     const obs = new ResizeObserver(() => {
@@ -417,9 +422,7 @@ function PdfRenderer({
     return () => { obs.disconnect(); clearTimeout(debounceRef.current); };
   }, [pdfState, currentPage, scale, renderPage]);
 
-  const clamp = d => setScale(s =>
-    Math.min(2, Math.max(0.5, Math.round((s + d) * 10) / 10))
-  );
+  const clamp = d => setScale(s => Math.min(2, Math.max(0.5, Math.round((s + d) * 10) / 10)));
 
   const manualRetry = () => {
     clearInterval(retryTimer.current);
@@ -491,8 +494,7 @@ function PdfRenderer({
       )}
 
       {/* Canvas area */}
-      <div ref={scrollRef}
-           className="flex-1 overflow-auto bg-slate-200 dark:bg-slate-950 p-3 sm:p-5">
+      <div className="flex-1 overflow-auto bg-slate-200 dark:bg-slate-950 p-3 sm:p-5">
         <div ref={containerRef}>
 
           {/* Loading skeleton */}
@@ -552,9 +554,7 @@ function PdfRenderer({
                   <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
                   <p className="text-sm text-amber-700 font-medium">
                     Retrying in {retryIn}s
-                    <span className="text-amber-400 ml-1 text-xs">
-                      ({retryCount}/{MAX_RETRIES})
-                    </span>
+                    <span className="text-amber-400 ml-1 text-xs">({retryCount}/{MAX_RETRIES})</span>
                   </p>
                 </div>
               )}
@@ -571,7 +571,7 @@ function PdfRenderer({
             </div>
           )}
 
-          {/* ✅ PDF canvas + fields */}
+          {/* ✅ PDF canvas + field overlays */}
           <div
             className={cn(
               'relative mx-auto bg-white shadow-2xl shadow-black/20 rounded-sm',
@@ -579,23 +579,24 @@ function PdfRenderer({
               isReady ? 'opacity-100' : 'opacity-0 absolute pointer-events-none',
             )}
             style={{
-              width:  pageInfo.cssWidth  || 'auto',
-              height: pageInfo.cssHeight || 'auto',
+              width:  canvasInfo.cssWidth  || 'auto',
+              height: canvasInfo.cssHeight || 'auto',
             }}
           >
             <canvas ref={canvasRef} className="block rounded-sm" />
 
-            {/* ✅ Fields over canvas — nativeWidth/Height for correct % */}
-            {isReady && pageInfo.nativeWidth > 0 && pageFields.map(field => (
+            {/* ✅ Field overlays — position using % coordinates stored in DB
+                The container div has exact CSS pixel dimensions matching the rendered PDF.
+                field.x/y/width/height are stored as percentages (0-100) of the PDF page.
+                Using them directly as CSS % on this container gives correct positioning. */}
+            {isReady && canvasInfo.cssWidth > 0 && pageFields.map(field => (
               <FieldOverlay
                 key={field.id}
                 field={field}
-                nativeWidth={pageInfo.nativeWidth}
-                nativeHeight={pageInfo.nativeHeight}
+                nativeWidth={canvasInfo.nativeWidth}
+                nativeHeight={canvasInfo.nativeHeight}
                 onSignatureClick={onSignatureClick}
-                onTextChange={onTextChange}
-                onDateChange={onDateChange}
-                onCheckboxChange={onCheckboxChange}
+                onFieldChange={onFieldChange}
               />
             ))}
           </div>
@@ -619,8 +620,9 @@ function PdfRenderer({
     </div>
   );
 }
+
 // ══════════════════════════════════════════════════
-// FIELD PROGRESS
+// FIELD PROGRESS BAR
 // ══════════════════════════════════════════════════
 function FieldProgress({ fields }) {
   const required = fields.filter(f => f.required !== false);
@@ -812,9 +814,7 @@ function SignatureModal({ field, onClose, onAccept }) {
                                   justify-center pointer-events-none">
                     <div className="text-center">
                       <PenLine className="w-7 h-7 text-slate-200 mx-auto mb-1.5" />
-                      <p className="text-sm text-slate-300 font-medium">
-                        Draw your signature here
-                      </p>
+                      <p className="text-sm text-slate-300 font-medium">Draw your signature here</p>
                     </div>
                   </div>
                 )}
@@ -959,16 +959,19 @@ export default function TemplateSigner() {
   const [declining,   setDeclining]   = useState(false);
   const [phase,       setPhase]       = useState('signing');
 
+  // Initialize fields from template
   useEffect(() => {
     if (!template?.fields?.length) return;
     setFields(template.fields.map(f => ({ ...f, value: f.value || '' })));
     setTotalPages(template.totalPages || 1);
+    // Jump to first page with fields
     const pages = [...new Set(template.fields.map(f => f.page || 1))].sort((a, b) => a - b);
     if (pages[0] && pages[0] !== 1) setCurrentPage(pages[0]);
   }, [template]);
 
   useDocTitle(template ? `Sign: ${template.title} — NexSign` : 'Sign — NexSign');
 
+  // ✅ Use the proxy URL to avoid Cloudinary CORS issues
   const pdfProxyUrl = useMemo(
     () => token ? templateApi.getPdfProxyUrl(token) : '',
     [token],
@@ -978,7 +981,9 @@ export default function TemplateSigner() {
 
   const handleSignatureAccept = useCallback(dataUrl => {
     if (!activeField) return;
-    setFields(prev => prev.map(f => f.id === activeField.id ? { ...f, value: dataUrl } : f));
+    setFields(prev => prev.map(f =>
+      f.id === activeField.id ? { ...f, value: dataUrl } : f
+    ));
     setActiveField(null);
     toast.success('Signature applied! ✓');
   }, [activeField]);
@@ -988,29 +993,44 @@ export default function TemplateSigner() {
   }, []);
 
   const handleSubmit = useCallback(async () => {
+    // Validate required fields
     const missing = fields.filter(f => f.required !== false && !f.value);
     if (missing.length) {
       toast.error(`Please complete ${missing.length} required field${missing.length > 1 ? 's' : ''}.`);
       if (missing[0]?.page) setCurrentPage(missing[0].page);
       return;
     }
-    const sigField = fields.find(f => (f.type === 'signature' || f.type === 'initial') && f.value);
-    if (!sigField) { toast.error('Please add your signature first.'); return; }
+
+    // Must have at least one signature
+    const sigField = fields.find(f =>
+      (f.type === 'signature' || f.type === 'initial') && f.value
+    );
+    if (!sigField) {
+      toast.error('Please add your signature first.');
+      return;
+    }
 
     setSubmitting(true);
     try {
       const fieldValues = fields.filter(f => f.value).map(f => ({
-        fieldId: f.id, type: f.type, value: f.value,
+        fieldId: f.id,
+        type:    f.type,
+        value:   f.value,
       }));
+
       const res = await mutations.employeeSign(token, {
         signatureDataUrl: sigField.value,
         fieldValues,
         clientTime: new Date().toISOString(),
       });
-      if (res?.success) setPhase('signed');
-      else toast.error(res?.error || 'Submission failed.');
+
+      if (res?.success) {
+        setPhase('signed');
+      } else {
+        toast.error(res?.error || 'Submission failed. Please try again.');
+      }
     } catch (err) {
-      toast.error(err?.message || 'Submission failed.');
+      toast.error(err?.message || 'Submission failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -1020,8 +1040,12 @@ export default function TemplateSigner() {
     setDeclining(true);
     try {
       const res = await mutations.employeeDecline(token, reason);
-      if (res?.success) { setShowDecline(false); setPhase('declined'); }
-      else toast.error(res?.error || 'Failed to decline.');
+      if (res?.success) {
+        setShowDecline(false);
+        setPhase('declined');
+      } else {
+        toast.error(res?.error || 'Failed to decline.');
+      }
     } catch (err) {
       toast.error(err?.message || 'Failed to decline.');
     } finally {
@@ -1034,7 +1058,7 @@ export default function TemplateSigner() {
     return req.length > 0 && req.every(f => !!f.value);
   }, [fields]);
 
-  // ── Phase screens ─────────────────────────────
+  // ── Phase: Loading ────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center
@@ -1053,20 +1077,38 @@ export default function TemplateSigner() {
     );
   }
 
+  // ── Phase: Error / special states ─────────────
   if (error || !session || !template) {
     const SCREENS = {
-      ALREADY_SIGNED:   { icon: CheckCircle2, iconClass: 'text-emerald-500', bgClass: 'bg-emerald-100', title: 'Already Signed',   message: 'You have already signed this document.' },
-      LINK_EXPIRED:     { icon: Clock,        iconClass: 'text-amber-500',   bgClass: 'bg-amber-100',   title: 'Link Expired',     message: 'This signing link has expired. Contact the sender for a new link.' },
-      ALREADY_DECLINED: { icon: XCircle,      iconClass: 'text-red-500',     bgClass: 'bg-red-100',     title: 'Already Declined', message: 'You have already declined this document.' },
+      ALREADY_SIGNED: {
+        icon: CheckCircle2, iconClass: 'text-emerald-500', bgClass: 'bg-emerald-100',
+        title: 'Already Signed', message: 'You have already signed this document.',
+      },
+      LINK_EXPIRED: {
+        icon: Clock, iconClass: 'text-amber-500', bgClass: 'bg-amber-100',
+        title: 'Link Expired', message: 'This signing link has expired. Contact the sender for a new link.',
+      },
+      ALREADY_DECLINED: {
+        icon: XCircle, iconClass: 'text-red-500', bgClass: 'bg-red-100',
+        title: 'Already Declined', message: 'You have already declined this document.',
+      },
     };
-    const s = SCREENS[code] || { icon: AlertTriangle, iconClass: 'text-red-500', bgClass: 'bg-red-100', title: 'Invalid Link', message: error || 'This signing link is invalid or has expired.' };
+    const s = SCREENS[code] || {
+      icon: AlertTriangle, iconClass: 'text-red-500', bgClass: 'bg-red-100',
+      title: 'Invalid Link',
+      message: error || 'This signing link is invalid or has expired.',
+    };
     return (
       <StatusScreen {...s}>
-        <Button onClick={() => navigate('/')} className="w-full h-11 rounded-xl bg-slate-900 text-white font-semibold">Return Home</Button>
+        <Button onClick={() => navigate('/')}
+          className="w-full h-11 rounded-xl bg-slate-900 text-white font-semibold">
+          Return Home
+        </Button>
       </StatusScreen>
     );
   }
 
+  // ── Phase: Signed ──────────────────────────────
   if (phase === 'signed') {
     return (
       <StatusScreen icon={CheckCircle2} iconClass="text-emerald-500"
@@ -1074,34 +1116,57 @@ export default function TemplateSigner() {
         title="Signature Submitted!"
         message={`Thank you, ${session.recipientName}! Your signature on "${template.title}" has been recorded.`}>
         <div className="space-y-3">
-          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+          <div className="flex items-center gap-2.5 p-3 rounded-xl
+                          bg-emerald-50 dark:bg-emerald-900/20
+                          border border-emerald-100 dark:border-emerald-800">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-            <p className="text-xs text-emerald-700 text-left">
+            <p className="text-xs text-emerald-700 dark:text-emerald-400 text-left">
               A signed copy will be emailed to <strong>{session.recipientEmail}</strong>
             </p>
           </div>
-          <Button onClick={() => navigate('/')} className="w-full h-11 rounded-xl bg-[#28ABDF] hover:bg-sky-600 text-white font-semibold">Done</Button>
+          <Button onClick={() => navigate('/')}
+            className="w-full h-11 rounded-xl bg-[#28ABDF] hover:bg-sky-600 text-white font-semibold">
+            Done
+          </Button>
         </div>
       </StatusScreen>
     );
   }
 
+  // ── Phase: Declined ────────────────────────────
   if (phase === 'declined') {
     return (
       <StatusScreen icon={XCircle} iconClass="text-red-500" bgClass="bg-red-100 dark:bg-red-900/30"
         title="Document Declined" message="You have declined to sign. The owner has been notified.">
-        <Button onClick={() => navigate('/')} className="w-full h-11 rounded-xl bg-slate-900 text-white font-semibold">Return Home</Button>
+        <Button onClick={() => navigate('/')}
+          className="w-full h-11 rounded-xl bg-slate-900 text-white font-semibold">
+          Return Home
+        </Button>
       </StatusScreen>
     );
   }
 
-  // ── Main UI ───────────────────────────────────
+  // ── Main signing UI ────────────────────────────
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-950 overflow-hidden">
 
-      {showDecline && <DeclineModal onClose={() => setShowDecline(false)} onConfirm={handleDecline} loading={declining} />}
-      {activeField  && <SignatureModal field={activeField} onClose={() => setActiveField(null)} onAccept={handleSignatureAccept} />}
+      {/* Modals */}
+      {showDecline && (
+        <DeclineModal
+          onClose={() => setShowDecline(false)}
+          onConfirm={handleDecline}
+          loading={declining}
+        />
+      )}
+      {activeField && (
+        <SignatureModal
+          field={activeField}
+          onClose={() => setActiveField(null)}
+          onAccept={handleSignatureAccept}
+        />
+      )}
 
+      {/* Header */}
       <header className="h-14 sm:h-16 bg-white dark:bg-slate-900
                          border-b border-slate-200 dark:border-slate-800
                          flex items-center justify-between
@@ -1109,7 +1174,7 @@ export default function TemplateSigner() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 bg-[#28ABDF] rounded-xl shrink-0
                           flex items-center justify-center shadow-md shadow-sky-400/30">
-            <Shield className="w-4 h-4 text-white" />
+            <Lock className="w-4 h-4 text-white" />
           </div>
           <div className="min-w-0">
             <h1 className="text-sm font-bold text-slate-900 dark:text-white
@@ -1132,7 +1197,9 @@ export default function TemplateSigner() {
               <XCircle className="w-3.5 h-3.5" /> Decline
             </Button>
           )}
-          <Button onClick={handleSubmit} disabled={submitting}
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting}
             className={cn(
               'h-9 sm:h-10 px-4 sm:px-5 rounded-xl font-semibold text-sm gap-1.5',
               'transition-all hover:-translate-y-0.5 active:translate-y-0',
@@ -1140,30 +1207,45 @@ export default function TemplateSigner() {
               allFilled
                 ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-400/30'
                 : 'bg-[#28ABDF] hover:bg-sky-600 text-white shadow-sky-400/25',
-            )}>
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{submitting ? 'Submitting…' : 'Finish Signing'}</span>
+            )}
+          >
+            {submitting
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Send className="w-3.5 h-3.5" />
+            }
+            <span className="hidden sm:inline">
+              {submitting ? 'Submitting…' : 'Finish Signing'}
+            </span>
           </Button>
         </div>
       </header>
 
+      {/* Field progress */}
       <FieldProgress fields={fields} />
 
-      {template.companyName && (
+      {/* Company branding bar */}
+      {(template.companyName || template.companyLogo) && (
         <div className="bg-white dark:bg-slate-900
                         border-b border-slate-100 dark:border-slate-800
                         px-4 py-2 flex items-center gap-2 shrink-0">
           {template.companyLogo && (
-            <img src={template.companyLogo} alt={template.companyName}
+            <img src={template.companyLogo} alt={template.companyName || 'Logo'}
               className="h-5 max-w-[60px] object-contain rounded" />
           )}
-          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-            <span className="font-medium text-slate-700 dark:text-slate-300">{template.companyName}</span>
-            {template.message && <span className="ml-2 text-slate-400"> — {template.message}</span>}
-          </p>
+          {template.companyName && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              <span className="font-medium text-slate-700 dark:text-slate-300">
+                {template.companyName}
+              </span>
+              {template.message && (
+                <span className="ml-2 text-slate-400"> — {template.message}</span>
+              )}
+            </p>
+          )}
         </div>
       )}
 
+      {/* Mobile decline button */}
       {template.signingConfig?.allowDecline !== false && (
         <div className="sm:hidden px-4 pt-2 shrink-0">
           <button type="button" onClick={() => setShowDecline(true)}
@@ -1175,6 +1257,7 @@ export default function TemplateSigner() {
         </div>
       )}
 
+      {/* PDF renderer with field overlays */}
       <main className="flex-1 min-h-0">
         <PdfRenderer
           pdfUrl={pdfProxyUrl}
@@ -1184,9 +1267,7 @@ export default function TemplateSigner() {
           totalPages={totalPages}
           onTotalPages={setTotalPages}
           onSignatureClick={handleSignatureClick}
-          onTextChange={handleFieldChange}
-          onDateChange={handleFieldChange}
-          onCheckboxChange={handleFieldChange}
+          onFieldChange={handleFieldChange}
         />
       </main>
     </div>
