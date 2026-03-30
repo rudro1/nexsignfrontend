@@ -48,7 +48,6 @@ const COLOR_MAP = {
   },
 };
 
-// ── Animated counter ──────────────────────────────────────────────
 function useCountUp(target, duration = 800, enabled = true) {
   const [display, setDisplay] = useState(0);
   const rafRef  = useRef(null);
@@ -59,10 +58,8 @@ function useCountUp(target, duration = 800, enabled = true) {
       setDisplay(target);
       return;
     }
-
     const startVal = prevRef.current;
     const startTs  = performance.now();
-
     const tick = (now) => {
       const p     = Math.min((now - startTs) / duration, 1);
       const eased = 1 - Math.pow(1 - p, 3);
@@ -71,7 +68,6 @@ function useCountUp(target, duration = 800, enabled = true) {
       if (p < 1) rafRef.current = requestAnimationFrame(tick);
       else prevRef.current = target;
     };
-
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
@@ -80,50 +76,38 @@ function useCountUp(target, duration = 800, enabled = true) {
   return display;
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────
-const Skeleton = () => (
-  <div className="bg-white dark:bg-slate-800/50
-                  border border-slate-200 dark:border-slate-700/50
-                  rounded-2xl p-5 overflow-hidden">
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex-1 space-y-3">
-        <div className="h-3 w-20 bg-slate-200 dark:bg-slate-700
-                        rounded-full animate-pulse" />
-        <div className="h-8 w-16 bg-slate-200 dark:bg-slate-700
-                        rounded-lg animate-pulse" />
-        <div className="h-3 w-28 bg-slate-100 dark:bg-slate-700/60
-                        rounded-full animate-pulse" />
-      </div>
-      <div className="w-11 h-11 rounded-2xl bg-slate-200
-                      dark:bg-slate-700 animate-pulse shrink-0" />
-    </div>
-  </div>
-);
-
-// ════════════════════════════════════════════════════════════════
-// MAIN
-// ════════════════════════════════════════════════════════════════
 const StatsCard = React.memo(({
-  label,
-  value,
-  icon: Icon,
-  color    = 'sky',
-  loading  = false,
-  trend,
-  trendUp,
-  subtitle,
-  onClick,
+  label, value, icon: Icon,
+  color = 'sky', loading = false,
+  trend, trendUp, subtitle, badge, onClick,
 }) => {
-  const animated     = useCountUp(
+  const animated = useCountUp(
     typeof value === 'number' ? value : 0,
     800,
     typeof value === 'number' && !loading,
   );
   const displayValue = typeof value === 'number' ? animated : value;
 
-  if (loading) return <Skeleton />;
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-slate-800/50
+                      border border-slate-200 dark:border-slate-700/50
+                      rounded-xl p-3 sm:p-4 overflow-hidden w-full">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 space-y-2 min-w-0">
+            <div className="h-2.5 w-14 bg-slate-200 dark:bg-slate-700
+                            rounded-full animate-pulse" />
+            <div className="h-6 w-10 bg-slate-200 dark:bg-slate-700
+                            rounded-lg animate-pulse" />
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-slate-200
+                          dark:bg-slate-700 animate-pulse shrink-0" />
+        </div>
+      </div>
+    );
+  }
 
-  const c           = COLOR_MAP[color] || COLOR_MAP.sky;
+  const c = COLOR_MAP[color] || COLOR_MAP.sky;
   const isClickable = typeof onClick === 'function';
 
   return (
@@ -132,67 +116,82 @@ const StatsCard = React.memo(({
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
       className={cn(
-        'group relative bg-white dark:bg-slate-800/50 overflow-hidden',
+        // ✅ overflow-hidden + w-full — iPhone fix
+        'group relative bg-white dark:bg-slate-800/50',
+        'overflow-hidden w-full',
         'border border-slate-200 dark:border-slate-700/50',
-        'rounded-2xl p-5',
+        'rounded-xl',
+        // ✅ smaller padding on mobile
+        'p-3 sm:p-4',
         'transition-all duration-200',
         'hover:shadow-lg hover:-translate-y-0.5',
+        'active:scale-[0.98]',
         c.border, c.glow,
         isClickable && 'cursor-pointer',
       )}
     >
-      {/* Decorative bg circle */}
+      {/* Decorative circle */}
       <div className={cn(
-        'absolute -right-5 -top-5 w-24 h-24 rounded-full',
-        'opacity-40 group-hover:opacity-60 group-hover:scale-110',
+        'absolute -right-4 -top-4 w-20 h-20 rounded-full',
+        'opacity-30 group-hover:opacity-50',
         'transition-all duration-300 pointer-events-none',
         c.bg,
       )} />
 
-      {/* Left accent bar */}
+      {/* Left accent */}
       <div className={cn(
-        'absolute top-0 left-0 w-1 h-8 rounded-br-full opacity-60',
-        'group-hover:h-12 transition-all duration-300',
+        'absolute top-0 left-0 w-0.5 h-6 rounded-br-full opacity-70',
+        'group-hover:h-10 transition-all duration-300',
         c.dot,
       )} />
 
-      <div className="relative flex items-start justify-between gap-3">
+      <div className="relative flex items-start justify-between gap-2">
 
         {/* Left */}
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-black uppercase
-                        tracking-[0.15em] text-slate-400
-                        dark:text-slate-500 mb-2 leading-none">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <p className="text-[9px] sm:text-[10px] font-black uppercase
+                        tracking-[0.12em] text-slate-400
+                        dark:text-slate-500 mb-1.5 leading-none truncate">
             {label}
           </p>
 
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-2xl sm:text-3xl font-black
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-xl sm:text-2xl font-black
                              text-slate-900 dark:text-white
                              leading-none tabular-nums">
               {displayValue ?? '—'}
             </span>
 
+            {/* badge prop (e.g. "72%") */}
+            {badge && (
+              <span className={cn(
+                'text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none',
+                'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+              )}>
+                {badge}
+              </span>
+            )}
+
             {trend && (
               <span className={cn(
-                'inline-flex items-center gap-0.5 text-[10px]',
-                'font-black px-2 py-0.5 rounded-full leading-none',
+                'inline-flex items-center gap-0.5 text-[9px]',
+                'font-black px-1.5 py-0.5 rounded-full leading-none',
                 trendUp === true
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
                   : trendUp === false
                     ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
                     : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
               )}>
-                {trendUp === true  && <TrendingUp   size={9} strokeWidth={2.5} />}
-                {trendUp === false && <TrendingDown size={9} strokeWidth={2.5} />}
+                {trendUp === true  && <TrendingUp   size={8} strokeWidth={2.5} />}
+                {trendUp === false && <TrendingDown size={8} strokeWidth={2.5} />}
                 {trend}
               </span>
             )}
           </div>
 
           {subtitle && (
-            <p className="text-[11px] text-slate-400 dark:text-slate-500
-                          mt-1.5 leading-snug font-medium">
+            <p className="text-[10px] text-slate-400 dark:text-slate-500
+                          mt-1 leading-snug font-medium truncate">
               {subtitle}
             </p>
           )}
@@ -200,29 +199,15 @@ const StatsCard = React.memo(({
 
         {/* Icon */}
         <div className={cn(
-          'w-11 h-11 rounded-2xl flex items-center justify-center',
-          'shrink-0 shadow-sm',
+          'w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center',
+          'justify-center shrink-0 shadow-sm',
           'transition-transform duration-300',
           'group-hover:scale-110 group-hover:rotate-3',
           c.bg, c.icon,
         )}>
-          {Icon && <Icon size={20} strokeWidth={2} />}
+          {Icon && <Icon size={16} strokeWidth={2} />}
         </div>
       </div>
-
-      {/* Click arrow hint */}
-      {isClickable && (
-        <div className="absolute bottom-4 right-4 opacity-0
-                        group-hover:opacity-100 transition-opacity">
-          <svg width="14" height="14" viewBox="0 0 14 14"
-               className={cn('rotate-45', c.icon)}>
-            <path d="M2 12L12 2M12 2H5M12 2V9"
-                  stroke="currentColor" strokeWidth="2"
-                  strokeLinecap="round" strokeLinejoin="round"
-                  fill="none" />
-          </svg>
-        </div>
-      )}
     </div>
   );
 });
