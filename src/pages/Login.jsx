@@ -1,4 +1,3 @@
-// src/pages/Login.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { api } from '@/api/apiClient';
@@ -13,54 +12,49 @@ import {
 } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 
-// ── Validation ──────────────────────────────────────────────────
+// ── Validation ───────────────────────────────────────────────────
 const validateEmail    = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 const validatePassword = (p) => p.length >= 6;
 
-// ── Navigate helper ─────────────────────────────────────────────
+// ── Role redirect ────────────────────────────────────────────────
 const getRoleRedirect = (role) =>
   role === 'admin' || role === 'super_admin' ? '/admin' : '/dashboard';
 
 export default function Login({ toggle }) {
   const navigate       = useNavigate();
   const [searchParams] = useSearchParams();
-  const {
-    login, googleLogin,
-    resetPassword, user,
-  } = useAuth();
+  const { login, googleLogin, resetPassword, user } = useAuth();
 
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [errors,   setErrors]   = useState({});
-  const [showPw,   setShowPw]   = useState(false);
-  const [loading,        setLoading]        = useState(false);
-  const [googleLoading,  setGoogleLoading]  = useState(false);
-  const [resetSent,      setResetSent]      = useState(false);
+  const [formData,      setFormData]      = useState({ email: '', password: '' });
+  const [errors,        setErrors]        = useState({});
+  const [showPw,        setShowPw]        = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [resetSent,     setResetSent]     = useState(false);
 
-  // ── Redirect if already logged in ─────────────────────────
+  // ── Redirect if already logged in ────────────────────────────
   useEffect(() => {
-    if (user) {
-      navigate(getRoleRedirect(user.role), { replace: true });
-    }
+    if (user) navigate(getRoleRedirect(user.role), { replace: true });
   }, [user, navigate]);
 
-  // ── URL param messages ─────────────────────────────────────
+  // ── URL param messages ────────────────────────────────────────
   useEffect(() => {
     if (searchParams.get('expired')  === 'true')
       toast.error('Session expired. Please sign in again.');
     if (searchParams.get('verified') === 'true')
       toast.success('Email verified! You can now sign in.');
     if (searchParams.get('reset')    === 'true')
-      toast.success('Password reset! Please sign in with new password.');
+      toast.success('Password reset! Please sign in with your new password.');
   }, [searchParams]);
 
-  // ── Input handler ──────────────────────────────────────────
+  // ── Input handler ─────────────────────────────────────────────
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   }, [errors]);
 
-  // ── Validate ───────────────────────────────────────────────
+  // ── Validate ──────────────────────────────────────────────────
   const validate = useCallback(() => {
     const errs = {};
     if (!validateEmail(formData.email))
@@ -71,7 +65,7 @@ export default function Login({ toggle }) {
     return Object.keys(errs).length === 0;
   }, [formData]);
 
-  // ── Email/Password Login ───────────────────────────────────
+  // ── Email/Password Login ──────────────────────────────────────
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -82,44 +76,52 @@ export default function Login({ toggle }) {
 
     try {
       const res = await api.post('/auth/login', { email, password });
-      if (res.data?.token) {
-        login(res.data.user, res.data.token);
+
+      // ✅ Handle both response shapes
+      const token    = res.data?.token;
+      const userData = res.data?.user;
+
+      if (token && userData) {
+        login(userData, token);
         toast.success('Welcome back! 👋');
-        navigate(getRoleRedirect(res.data.user?.role), { replace: true });
+        navigate(getRoleRedirect(userData?.role), { replace: true });
       }
     } catch (err) {
       const status = err.status || err.response?.status;
+      const code   = err.data?.code || err.response?.data?.code;
 
-      // 401 → try Firebase fallback
+      // ── 401 → try Firebase fallback ────────────────────────
       if (status === 401) {
         try {
           const { signInWithEmailAndPassword } = await import('firebase/auth');
           const { auth } = await import('@/firebase.config.js');
 
-          const fbResult = await signInWithEmailAndPassword(
-            auth, email, password
-          );
+          const fbResult = await signInWithEmailAndPassword(auth, email, password);
 
           if (fbResult?.user) {
-            const syncRes = await api.post('/auth/sync-password', {
-              email, password,
-            });
-            if (syncRes.data?.token) {
-              login(syncRes.data.user, syncRes.data.token);
+            const syncRes = await api.post('/auth/sync-password', { email, password });
+            const token    = syncRes.data?.token;
+            const userData = syncRes.data?.user;
+
+            if (token && userData) {
+              login(userData, token);
               toast.success('Signed in successfully!');
-              navigate(
-                getRoleRedirect(syncRes.data.user?.role),
-                { replace: true }
-              );
+              navigate(getRoleRedirect(userData?.role), { replace: true });
               return;
             }
           }
         } catch {
-          // Firebase also failed
+          // Firebase also failed — fall through
         }
-        toast.error('Invalid email or password.');
+
+        if (code === 'GOOGLE_ONLY') {
+          toast.error('This account uses Google sign-in. Please use Google login.');
+        } else {
+          toast.error('Invalid email or password.');
+        }
+
       } else if (status === 403) {
-        toast.error('Account suspended. Contact support.');
+        toast.error('Account disabled. Contact support.');
       } else if (err.__network || err.__offline) {
         toast.error('No internet connection.');
       } else {
@@ -130,63 +132,77 @@ export default function Login({ toggle }) {
     }
   }, [formData, login, navigate, validate]);
 
-  // ── Google Login — FIXED ───────────────────────────────────
-const handleGoogleLogin = useCallback(async () => {
-  setGoogleLoading(true);
-  try {
-    const result = await googleLogin();
-    if (!result) return;
+  // ── Google Login — FIXED ──────────────────────────────────────
+  const handleGoogleLogin = useCallback(async () => {
+    setGoogleLoading(true);
+    try {
+      // ✅ Step 1: Firebase popup
+      const result = await googleLogin();
+      if (!result) return; // cancelled or redirect mode
 
-    const firebaseUser = result?.user || result;
-    const email    = firebaseUser?.email;
-    const name     = firebaseUser?.displayName
-                     || email?.split('@')[0]
-                     || 'User';
-    const photoURL = firebaseUser?.photoURL || '';
+      // ✅ Step 2: Extract user info safely
+      const firebaseUser = result?.user ?? result;
 
-    if (!email) {
-      toast.error('Could not get email from Google.');
-      return;
+      const email    = firebaseUser?.email;
+      const name     = firebaseUser?.displayName
+                       || email?.split('@')[0]
+                       || 'User';
+      const photoURL = firebaseUser?.photoURL || '';
+
+      if (!email) {
+        toast.error('Could not get email from Google. Please try again.');
+        return;
+      }
+
+      console.log('[Google Login] Sending to backend:', { name, email });
+
+      // ✅ Step 3: Backend call
+      const res = await api.post('/auth/google', {
+        name,
+        email,
+        photoURL,
+      });
+
+      // ✅ Step 4: Handle response
+      const token    = res.data?.token;
+      const userData = res.data?.user;
+
+      if (token && userData) {
+        login(userData, token);
+        toast.success('Google login successful! 🎉');
+        navigate(getRoleRedirect(userData?.role), { replace: true });
+      } else {
+        toast.error('Login failed. Invalid server response.');
+      }
+
+    } catch (err) {
+      // ── Silently ignore user-cancelled popup ───────────────
+      if (err?.__cancelled) return;
+
+      console.error('[Google Login] Error:', err);
+      console.error('[Google Login] Response data:', err?.response?.data);
+
+      const status = err?.status || err?.response?.status;
+      const msg    = err?.response?.data?.message || err?.message || '';
+      const code   = err?.response?.data?.code;
+
+      if (status === 400) {
+        toast.error(`Google login failed: ${msg}`);
+      } else if (status === 403) {
+        toast.error('Account disabled. Contact support.');
+      } else if (err?.__network || err?.__offline) {
+        toast.error('No internet connection.');
+      } else if (code === 'RATE_LIMITED') {
+        toast.error('Too many attempts. Please wait a moment.');
+      } else {
+        toast.error('Google login failed. Please try again.');
+      }
+    } finally {
+      setGoogleLoading(false);
     }
+  }, [googleLogin, login, navigate]);
 
-    // ✅ Debug — dev mode তে দেখো
-    console.log('[Google] Sending:', { name, email });
-
-    const res = await api.post('/auth/google', {
-      name,
-      email,
-      photoURL,
-    });
-
-    if (res.data?.token) {
-      login(res.data.user, res.data.token);
-      toast.success('Google login successful! 🎉');
-      navigate(
-        getRoleRedirect(res.data.user?.role),
-        { replace: true }
-      );
-    }
-  } catch (err) {
-    if (err?.__cancelled) return;
-
-    console.error('[Google] Error:', err);
-    console.error('[Google] Response:', err?.response?.data);
-
-    const status = err?.status || err?.response?.status;
-    const msg    = err?.response?.data?.message || err?.message;
-
-    if (status === 400) {
-      toast.error(`Login failed: ${msg}`);
-    } else if (err?.__network) {
-      toast.error('No internet connection.');
-    } else {
-      toast.error('Google login failed. Please try again.');
-    }
-  } finally {
-    setGoogleLoading(false);
-  }
-}, [googleLogin, login, navigate]);
-  // ── Forgot Password ────────────────────────────────────────
+  // ── Forgot Password ───────────────────────────────────────────
   const handleForgotPassword = useCallback(async () => {
     if (!formData.email) {
       setErrors(prev => ({ ...prev, email: 'Enter your email first.' }));
@@ -209,7 +225,7 @@ const handleGoogleLogin = useCallback(async () => {
 
   const isFormLoading = loading || googleLoading;
 
-  // ── Reset Sent Screen ──────────────────────────────────────
+  // ── Reset Sent Screen ─────────────────────────────────────────
   if (resetSent) {
     return (
       <div className="w-full h-full p-8 flex flex-col
@@ -227,8 +243,7 @@ const handleGoogleLogin = useCallback(async () => {
           </h2>
           <p className="text-slate-500 text-sm mb-6">
             Reset link sent to{' '}
-            <span className="font-semibold text-slate-700
-                             dark:text-slate-300">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
               {formData.email}
             </span>
           </p>
@@ -244,7 +259,7 @@ const handleGoogleLogin = useCallback(async () => {
     );
   }
 
-  // ── Main Form ──────────────────────────────────────────────
+  // ── Main Form ─────────────────────────────────────────────────
   return (
     <div className="w-full h-full p-6 sm:p-8 flex flex-col
                     justify-center bg-white dark:bg-slate-900">
@@ -263,7 +278,7 @@ const handleGoogleLogin = useCallback(async () => {
           Welcome Back
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          Sign in to your NeXsign account
+          Sign in to your NexSign account
         </p>
       </div>
 
@@ -275,9 +290,10 @@ const handleGoogleLogin = useCallback(async () => {
       >
         {/* Email */}
         <div className="space-y-1.5">
-          <Label htmlFor="login-email"
-                 className="text-sm font-medium
-                            text-slate-700 dark:text-slate-300">
+          <Label
+            htmlFor="login-email"
+            className="text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
             Email Address
           </Label>
           <div className="relative">
@@ -292,12 +308,11 @@ const handleGoogleLogin = useCallback(async () => {
               placeholder="name@example.com"
               autoComplete="email"
               disabled={isFormLoading}
-              className={`h-11 pl-10 rounded-xl border
-                          transition-colors
-                          ${errors.email
-                            ? 'border-red-400 focus:ring-red-400'
-                            : 'border-slate-200 dark:border-slate-700'
-                          }`}
+              className={`h-11 pl-10 rounded-xl border transition-colors
+                ${errors.email
+                  ? 'border-red-400 focus:ring-red-400'
+                  : 'border-slate-200 dark:border-slate-700'
+                }`}
             />
           </div>
           {errors.email && (
@@ -311,9 +326,10 @@ const handleGoogleLogin = useCallback(async () => {
         {/* Password */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
-            <Label htmlFor="login-password"
-                   className="text-sm font-medium
-                              text-slate-700 dark:text-slate-300">
+            <Label
+              htmlFor="login-password"
+              className="text-sm font-medium text-slate-700 dark:text-slate-300"
+            >
               Password
             </Label>
             <button
@@ -339,20 +355,18 @@ const handleGoogleLogin = useCallback(async () => {
               placeholder="••••••••"
               autoComplete="current-password"
               disabled={isFormLoading}
-              className={`h-11 pl-10 pr-10 rounded-xl border
-                          transition-colors
-                          ${errors.password
-                            ? 'border-red-400 focus:ring-red-400'
-                            : 'border-slate-200 dark:border-slate-700'
-                          }`}
+              className={`h-11 pl-10 pr-10 rounded-xl border transition-colors
+                ${errors.password
+                  ? 'border-red-400 focus:ring-red-400'
+                  : 'border-slate-200 dark:border-slate-700'
+                }`}
             />
             <button
               type="button"
               tabIndex={-1}
               onClick={() => setShowPw(p => !p)}
               className="absolute right-3 top-1/2 -translate-y-1/2
-                         text-slate-400 hover:text-slate-600
-                         transition-colors"
+                         text-slate-400 hover:text-slate-600 transition-colors"
             >
               {showPw
                 ? <EyeOff className="w-4 h-4" />
@@ -375,8 +389,7 @@ const handleGoogleLogin = useCallback(async () => {
           className="w-full h-11 bg-sky-500 hover:bg-sky-600
                      active:bg-sky-700 text-white rounded-xl
                      font-semibold shadow-lg shadow-sky-500/25
-                     transition-all active:scale-[0.98]
-                     disabled:opacity-70"
+                     transition-all active:scale-[0.98] disabled:opacity-70"
         >
           {loading
             ? <Loader2 className="w-5 h-5 animate-spin" />
@@ -416,8 +429,8 @@ const handleGoogleLogin = useCallback(async () => {
 
         {/* Mobile toggle */}
         {toggle && (
-          <p className="text-center text-slate-500
-                        dark:text-slate-400 text-sm md:hidden">
+          <p className="text-center text-slate-500 dark:text-slate-400
+                        text-sm md:hidden">
             New here?{' '}
             <button
               type="button"
@@ -430,8 +443,8 @@ const handleGoogleLogin = useCallback(async () => {
         )}
 
         {/* Desktop link */}
-        <p className="text-center text-slate-500
-                      dark:text-slate-400 text-sm hidden md:block">
+        <p className="text-center text-slate-500 dark:text-slate-400
+                      text-sm hidden md:block">
           Don&apos;t have an account?{' '}
           <Link to="/register"
                 className="text-sky-500 font-semibold hover:underline">

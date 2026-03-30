@@ -1,4 +1,3 @@
-// src/lib/AuthContext.jsx
 import React, {
   createContext,
   useContext,
@@ -7,10 +6,7 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
-import {
-  auth,
-  googleProvider,
-} from '../firebase.config.js';
+import { auth, googleProvider } from '../firebase.config.js';
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -34,23 +30,24 @@ const AuthContext = createContext(null);
 // FIREBASE ERROR MESSAGES
 // ════════════════════════════════════════════════════════════════
 const getFirebaseError = (code) => {
-  const errors = {
+  const map = {
     'auth/user-not-found':         'No account found with this email.',
-    'auth/wrong-password':         'Incorrect password. Please try again.',
+    'auth/wrong-password':         'Incorrect password.',
     'auth/email-already-in-use':   'This email is already registered.',
     'auth/weak-password':          'Password must be at least 6 characters.',
     'auth/invalid-email':          'Please enter a valid email address.',
-    'auth/too-many-requests':      'Too many attempts. Please try again later.',
+    'auth/too-many-requests':      'Too many attempts. Try again later.',
     'auth/user-disabled':          'This account has been disabled.',
-    'auth/popup-closed-by-user':   'Login popup was closed. Please try again.',
+    'auth/popup-closed-by-user':   null, // Silent
     'auth/popup-blocked':          'Popup blocked. Please allow popups.',
     'auth/network-request-failed': 'Network error. Check your connection.',
     'auth/invalid-credential':     'Invalid email or password.',
     'auth/operation-not-allowed':  'This sign-in method is not enabled.',
-    'auth/expired-action-code':    'This link has expired. Request a new one.',
-    'auth/invalid-action-code':    'Invalid link. Request a new one.',
+    'auth/cancelled-popup-request': null, // Silent
   };
-  return errors[code] || 'Something went wrong. Please try again.';
+  return map[code] !== undefined
+    ? map[code]
+    : 'Something went wrong. Please try again.';
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -76,19 +73,15 @@ const storage = {
     }
   },
   remove: (...keys) => {
-    keys.forEach(k => {
-      try { localStorage.removeItem(k); } catch {}
-    });
+    keys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
   },
 };
 
 // ════════════════════════════════════════════════════════════════
-// ROLE REDIRECT HELPER
+// ROLE REDIRECT
 // ════════════════════════════════════════════════════════════════
 const getRoleRedirect = (role) =>
-  role === 'admin' || role === 'super_admin'
-    ? '/admin'
-    : '/dashboard';
+  role === 'admin' || role === 'super_admin' ? '/admin' : '/dashboard';
 
 // ════════════════════════════════════════════════════════════════
 // AUTH PROVIDER
@@ -98,20 +91,19 @@ export const AuthProvider = ({ children }) => {
   const [token,   setToken]   = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const firebaseUserRef = useRef(null);
-  const tokenRefreshRef = useRef(null);
+  const firebaseUserRef     = useRef(null);
+  const redirectHandledRef  = useRef(false);
 
-  // ── Core: save auth ──────────────────────────────────────
+  // ── Save auth ────────────────────────────────────────────
   const saveAuth = useCallback((userData, userToken) => {
     setUser(userData);
     setToken(userToken);
     storage.set('nexsign_user', userData);
     localStorage.setItem('token', userToken);
-    api.defaults.headers.common['Authorization'] =
-      `Bearer ${userToken}`;
+    api.defaults.headers.common['Authorization'] = `Bearer ${userToken}`;
   }, []);
 
-  // ── Core: clear auth ─────────────────────────────────────
+  // ── Clear auth ───────────────────────────────────────────
   const clearAuth = useCallback(() => {
     setUser(null);
     setToken(null);
@@ -128,48 +120,40 @@ export const AuthProvider = ({ children }) => {
     if (savedUser && savedToken) {
       setUser(savedUser);
       setToken(savedToken);
-      api.defaults.headers.common['Authorization'] =
-        `Bearer ${savedToken}`;
-      setLoading(false);
+      api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
     }
+    setLoading(false);
   }, []);
 
   // ── Handle Google Redirect Result ────────────────────────
-  // signInWithRedirect এর পর page reload হলে এখানে result আসে
+  // signInWithRedirect fallback এর জন্য
   useEffect(() => {
+    if (redirectHandledRef.current) return;
+    redirectHandledRef.current = true;
+
     const handleRedirect = async () => {
       try {
         const result = await getRedirectResult(auth);
-
-        if (!result?.user) return; // No redirect result
+        if (!result?.user) return;
 
         const firebaseUser = result.user;
-        const name  = firebaseUser.displayName
-                      || firebaseUser.email?.split('@')[0]
-                      || 'User';
         const email = firebaseUser.email;
-
         if (!email) return;
 
-        // Backend call
-        const res = await api.post('/auth/google', {
-          name,
-          email,
-          photoURL: firebaseUser.photoURL || '',
-        });
+        const name     = firebaseUser.displayName || email.split('@')[0] || 'User';
+        const photoURL = firebaseUser.photoURL    || '';
 
-        if (res.data?.token) {
+        const res = await api.post('/auth/google', { name, email, photoURL });
+
+        if (res.data?.token && res.data?.user) {
           saveAuth(res.data.user, res.data.token);
           toast.success('Google login successful! 🎉');
-          // Redirect
-          window.location.href =
-            getRoleRedirect(res.data.user?.role);
+          window.location.href = getRoleRedirect(res.data.user?.role);
         }
       } catch (err) {
-        // No redirect result — normal, ignore
-        if (err?.code !== 'auth/no-current-user') {
-          console.warn('Redirect result:', err?.message);
-        }
+        // No redirect result — perfectly normal, ignore
+        if (err?.code === 'auth/no-current-user' || !err?.code) return;
+        console.warn('[Redirect Result]:', err?.message);
       }
     };
 
@@ -178,43 +162,25 @@ export const AuthProvider = ({ children }) => {
 
   // ── Firebase Auth State Listener ─────────────────────────
   useEffect(() => {
-    const unsubscribe = onIdTokenChanged(
-      auth,
-      async (firebaseUser) => {
-        firebaseUserRef.current = firebaseUser;
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+      firebaseUserRef.current = firebaseUser;
 
-        if (!firebaseUser) {
-          setLoading(false);
-          return;
-        }
-
-        try {
-          await firebaseUser.getIdToken(false);
-        } catch (err) {
-          console.warn('Token refresh error:', err.message);
-        }
-
+      if (!firebaseUser) {
         setLoading(false);
-      },
-    );
-
-    return () => {
-      unsubscribe();
-      if (tokenRefreshRef.current) {
-        clearTimeout(tokenRefreshRef.current);
+        return;
       }
-    };
-  }, []);
 
-  // ── Token expiry ─────────────────────────────────────────
-  const isTokenExpired = useCallback((jwtToken) => {
-    if (!jwtToken) return true;
-    try {
-      const payload = JSON.parse(atob(jwtToken.split('.')[1]));
-      return payload.exp * 1000 < Date.now() + 30_000;
-    } catch {
-      return true;
-    }
+      // Token refresh — silent
+      try {
+        await firebaseUser.getIdToken(false);
+      } catch (err) {
+        console.warn('[Token refresh]:', err.message);
+      }
+
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // ════════════════════════════════════════════════════════
@@ -231,63 +197,65 @@ export const AuthProvider = ({ children }) => {
     const { redirect = true, showToast = false } = options;
 
     try {
-      if (auth.currentUser) {
-        await signOut(auth);
-      }
+      if (auth.currentUser) await signOut(auth);
     } catch (err) {
-      console.warn('Firebase logout warning:', err.message);
+      console.warn('[Logout]:', err.message);
     } finally {
       clearAuth();
-
-      if (showToast) {
-        toast.success('Logged out successfully!');
-      }
-
-      if (redirect && window.location.pathname !== '/login') {
+      if (showToast) toast.success('Logged out successfully!');
+      if (redirect && !window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
     }
   }, [clearAuth]);
 
   // ════════════════════════════════════════════════════════
-  // GOOGLE LOGIN — Popup with Redirect fallback
+  // GOOGLE LOGIN — Popup + Redirect fallback
   // ════════════════════════════════════════════════════════
   const googleLogin = useCallback(async () => {
     try {
-      // ✅ Try popup first
+      // ✅ Primary: popup
       const result = await signInWithPopup(auth, googleProvider);
       return result;
 
     } catch (error) {
-      const code = error.code || '';
-      const msg  = error.message || '';
+      const code = error?.code || '';
+      const msg  = error?.message || '';
 
-      // ✅ Silent exit — user closed popup intentionally
-      if (code === 'auth/popup-closed-by-user') {
+      // ── User cancelled — silent ────────────────────────
+      if (
+        code === 'auth/popup-closed-by-user'    ||
+        code === 'auth/cancelled-popup-request'
+      ) {
         return null;
       }
 
-      // ✅ COOP / popup blocked → use redirect
+      // ── COOP / popup blocked → redirect fallback ───────
       if (
-        code === 'auth/popup-blocked'         ||
-        msg.includes('Cross-Origin-Opener-Policy') ||
-        msg.includes('window.closed')
+        code === 'auth/popup-blocked'               ||
+        msg.includes('Cross-Origin-Opener-Policy')  ||
+        msg.includes('window.closed')               ||
+        msg.includes('cross-origin')
       ) {
         try {
-          toast.info('Redirecting to Google sign-in...');
+          toast.info('Redirecting to Google sign-in...', { duration: 2000 });
           await signInWithRedirect(auth, googleProvider);
-          // Page will reload — result handled in useEffect above
-          return null;
+          return null; // Page will reload — handled in useEffect
         } catch (redirectErr) {
-          toast.error('Google login failed. Please try again.');
+          const errMsg = getFirebaseError(redirectErr?.code);
+          if (errMsg) toast.error(errMsg);
           throw redirectErr;
         }
       }
 
-      // Other errors
+      // ── Other Firebase errors ──────────────────────────
       const message = getFirebaseError(code);
-      toast.error(message);
-      throw new Error(message);
+      if (message) toast.error(message);
+
+      // ✅ Mark as cancelled so Login.jsx doesn't show duplicate error
+      const err = new Error(message || 'Google sign-in failed');
+      err.__cancelled = !message; // silent errors
+      throw err;
     }
   }, []);
 
@@ -296,9 +264,7 @@ export const AuthProvider = ({ children }) => {
   // ════════════════════════════════════════════════════════
   const registerWithEmail = useCallback(async (email, password) => {
     try {
-      const result = await createUserWithEmailAndPassword(
-        auth, email, password,
-      );
+      const result = await createUserWithEmailAndPassword(auth, email, password);
       await sendEmailVerification(result.user, {
         url: `${window.location.origin}/login?verified=true`,
       });
@@ -330,7 +296,7 @@ export const AuthProvider = ({ children }) => {
       await fbUser.reload();
       return fbUser.emailVerified;
     } catch (err) {
-      console.warn('Email verify check error:', err.message);
+      console.warn('[Email verify]:', err.message);
       return false;
     }
   }, []);
@@ -385,14 +351,23 @@ export const AuthProvider = ({ children }) => {
     if (updates.token) {
       localStorage.setItem('token', updates.token);
       setToken(updates.token);
-      api.defaults.headers.common['Authorization'] =
-        `Bearer ${updates.token}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${updates.token}`;
     }
   }, []);
 
   // ════════════════════════════════════════════════════════
   // CHECK AUTH
   // ════════════════════════════════════════════════════════
+  const isTokenExpired = useCallback((jwtToken) => {
+    if (!jwtToken) return true;
+    try {
+      const payload = JSON.parse(atob(jwtToken.split('.')[1]));
+      return payload.exp * 1000 < Date.now() + 30_000;
+    } catch {
+      return true;
+    }
+  }, []);
+
   const checkAuth = useCallback(() => {
     const savedToken = localStorage.getItem('token');
     if (!savedToken || isTokenExpired(savedToken)) {
@@ -410,9 +385,8 @@ export const AuthProvider = ({ children }) => {
   // ════════════════════════════════════════════════════════
   // COMPUTED
   // ════════════════════════════════════════════════════════
-  const isAdmin       = user?.role === 'admin' ||
-                        user?.role === 'super_admin';
-  const isSuperAdmin  = user?.role === 'super_admin';
+  const isAdmin         = user?.role === 'admin' || user?.role === 'super_admin';
+  const isSuperAdmin    = user?.role === 'super_admin';
   const isAuthenticated = !!user && !!token;
 
   const value = {
@@ -443,20 +417,11 @@ export const AuthProvider = ({ children }) => {
 // ════════════════════════════════════════════════════════════════
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used inside <AuthProvider>');
-  }
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
   return ctx;
 };
 
-export const useUser = () => {
-  const { user, loading } = useAuth();
-  return { user, loading };
-};
-
-export const useIsAdmin = () => {
-  const { isAdmin, isSuperAdmin } = useAuth();
-  return { isAdmin, isSuperAdmin };
-};
+export const useUser      = () => { const { user, loading } = useAuth(); return { user, loading }; };
+export const useIsAdmin   = () => { const { isAdmin, isSuperAdmin } = useAuth(); return { isAdmin, isSuperAdmin }; };
 
 export default AuthContext;
