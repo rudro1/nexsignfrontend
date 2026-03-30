@@ -390,8 +390,15 @@ export const templateApi = {
       { noCache: true },
     ),
 
-  submitEmployeeSignature: (data) =>
-    api.post('/templates/sign/submit', data),
+submitEmployeeSignature: (token, data) =>
+  api.post(`/templates/sign/submit/${token}`, data),
+
+  declineEmployee: (token, data) =>
+  api.post(`/templates/sign/decline/${token}`, data),
+
+resendEmail: (templateId, sessionId) =>
+  api.post(`/templates/${templateId}/sessions/${sessionId}/resend`),
+
 };
 
 // ── Admin ─────────────────────────────────────────────────────

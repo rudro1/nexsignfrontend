@@ -1,14 +1,13 @@
 // src/pages/NewTemplate.jsx
-
 import React, {
   useState, useCallback, useMemo, useRef, useEffect,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api }        from '@/api/apiClient';
-import { useAuth }    from '@/lib/AuthContext';
-import { Button }     from '@/components/ui/button';
-import { Input }      from '@/components/ui/input';
-import { Label }      from '@/components/ui/label';
+import { useNavigate }      from 'react-router-dom';
+import { templateApi, api } from '@/api/apiClient';
+import { useAuth }          from '@/lib/AuthContext';
+import { Button }           from '@/components/ui/button';
+import { Input }            from '@/components/ui/input';
+import { Label }            from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
@@ -18,15 +17,15 @@ import {
   Upload, Send, ArrowLeft, FileText, Loader2,
   ImagePlus, ChevronRight, CheckCircle2, Users,
   Trash2, PenTool, Plus, RotateCcw, AlertCircle,
-  Building2, Crown, UserCheck, Eye, EyeOff,
+  Building2, Crown, UserCheck, Eye,
   FileSpreadsheet, X,
 } from 'lucide-react';
 import FieldToolbar from '@/components/editor/FieldToolbar';
 import PdfViewer    from '@/components/editor/PdfViewer';
 
-// ─────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
 const FONT_FAMILIES = [
   { label: 'Helvetica',       value: 'Helvetica'       },
   { label: 'Times New Roman', value: 'Times New Roman' },
@@ -34,17 +33,18 @@ const FONT_FAMILIES = [
 ];
 const FONT_SIZES = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
 
+// ✅ partyIndex 0 = boss, partyIndex 1 = employee
 const TEMPLATE_PARTIES = [
-  { name: 'Authoriser (Boss)', color: '#0ea5e9', order: 0 },
-  { name: 'Signer (Employee)', color: '#8b5cf6', order: 1 },
+  { name: 'Authoriser (Boss)', color: '#0ea5e9', order: 0, assignedTo: 'boss'     },
+  { name: 'Signer (Employee)', color: '#8b5cf6', order: 1, assignedTo: 'employee' },
 ];
 
 const STEPS = [
-  { id: 1, label: 'Upload',    desc: 'PDF & Branding',     icon: Upload        },
-  { id: 2, label: 'Fields',   desc: 'Place Fields',        icon: PenTool       },
-  { id: 3, label: 'Boss',     desc: 'Authoriser Info',     icon: Crown         },
-  { id: 4, label: 'Employees', desc: 'Employee List',      icon: Users         },
-  { id: 5, label: 'Review',   desc: 'Finalize & Send',     icon: CheckCircle2  },
+  { id: 1, label: 'Upload',    desc: 'PDF & Branding',  icon: Upload       },
+  { id: 2, label: 'Fields',    desc: 'Place Fields',    icon: PenTool      },
+  { id: 3, label: 'Boss',      desc: 'Authoriser Info', icon: Crown        },
+  { id: 4, label: 'Employees', desc: 'Employee List',   icon: Users        },
+  { id: 5, label: 'Review',    desc: 'Finalize & Send', icon: CheckCircle2 },
 ];
 
 const isValidEmail = (v) =>
@@ -54,9 +54,9 @@ function revokeBlob(url) {
   if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Step Progress
-// ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// STEP PROGRESS
+// ═══════════════════════════════════════════════════════════════
 function StepProgress({ current, maxReached, onStepClick }) {
   return (
     <div className="hidden lg:flex items-center gap-0">
@@ -65,7 +65,6 @@ function StepProgress({ current, maxReached, onStepClick }) {
         const active = current === s.id;
         const canGo  = s.id <= maxReached;
         const Icon   = s.icon;
-
         return (
           <React.Fragment key={s.id}>
             <button
@@ -77,35 +76,29 @@ function StepProgress({ current, maxReached, onStepClick }) {
                           ${canGo ? 'cursor-pointer' : 'cursor-default opacity-40'}`}
             >
               <div className={`w-8 h-8 rounded-xl flex items-center
-                              justify-center transition-all duration-200
-                ${done
-                  ? 'bg-emerald-500 text-white'
-                  : active
-                    ? 'bg-[#28ABDF] text-white shadow-md shadow-sky-400/40'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                }`}>
+                               justify-center transition-all duration-200
+                ${done   ? 'bg-emerald-500 text-white'
+                : active ? 'bg-[#28ABDF] text-white shadow-md shadow-sky-400/40'
+                         : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                 {done
                   ? <CheckCircle2 className="w-3.5 h-3.5" />
-                  : <Icon className="w-3.5 h-3.5" />
+                  : <Icon         className="w-3.5 h-3.5" />
                 }
               </div>
               <span className={`text-[9px] font-semibold tracking-wide
-                whitespace-nowrap transition-colors
-                ${active  ? 'text-[#28ABDF]'
-                : done    ? 'text-emerald-500'
-                           : 'text-slate-400'
-                }`}>
+                               whitespace-nowrap transition-colors
+                ${active ? 'text-[#28ABDF]'
+                : done   ? 'text-emerald-500'
+                         : 'text-slate-400'}`}>
                 {s.label}
               </span>
             </button>
-
             {idx < STEPS.length - 1 && (
               <div className={`w-10 h-px mx-1 mb-5 rounded-full
                                transition-all duration-500
                 ${current > s.id
                   ? 'bg-emerald-400'
-                  : 'bg-slate-200 dark:bg-slate-700'
-                }`}
+                  : 'bg-slate-200 dark:bg-slate-700'}`}
               />
             )}
           </React.Fragment>
@@ -115,14 +108,14 @@ function StepProgress({ current, maxReached, onStepClick }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Section Header
-// ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// SECTION HEADER
+// ═══════════════════════════════════════════════════════════════
 function SectionHeader({ icon: Icon, iconBg, iconColor, title, subtitle }) {
   return (
     <div className="flex items-start gap-3">
       <div className={`w-9 h-9 rounded-xl flex items-center
-                      justify-center shrink-0 ${iconBg}`}>
+                       justify-center shrink-0 ${iconBg}`}>
         <Icon className={`w-4 h-4 ${iconColor}`} />
       </div>
       <div>
@@ -138,9 +131,9 @@ function SectionHeader({ icon: Icon, iconBg, iconColor, title, subtitle }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Review Row
-// ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// REVIEW ROW
+// ═══════════════════════════════════════════════════════════════
 function ReviewRow({ label, value, valueClass = '' }) {
   return (
     <div className="flex items-center justify-between py-3
@@ -156,39 +149,41 @@ function ReviewRow({ label, value, valueClass = '' }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 export default function NewTemplate() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // ── Wizard ────────────────────────────────────────────────────
+  // ── Wizard ────────────────────────────────────────────────
   const [step,       setStep]       = useState(1);
   const [maxReached, setMaxReached] = useState(1);
 
-  // ── Core ──────────────────────────────────────────────────────
-  const [rawFile,             setRawFile]             = useState(null);
-  const [title,               setTitle]               = useState('');
-  const [fileUrl,             setFileUrl]             = useState('');
-  const [fileReady,           setFileReady]           = useState(false);
-  const [fields,              setFields]              = useState([]);
-  const [companyLogoFile,     setCompanyLogoFile]     = useState(null);
-  const [companyLogoPreview,  setCompanyLogoPreview]  = useState('');
-  const [companyName,         setCompanyName]         = useState('');
+  // ── Core ──────────────────────────────────────────────────
+  const [rawFile,            setRawFile]            = useState(null);
+  const [title,              setTitle]              = useState('');
+  const [fileUrl,            setFileUrl]            = useState('');
+  const [fileReady,          setFileReady]          = useState(false);
+  const [fields,             setFields]             = useState([]);
+  const [companyLogoFile,    setCompanyLogoFile]    = useState(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState('');
+  const [companyLogoUrl,     setCompanyLogoUrl]     = useState('');
+  const [companyName,        setCompanyName]        = useState('');
 
-  // ── Boss ──────────────────────────────────────────────────────
-  const [bossName,  setBossName]  = useState(user?.full_name || '');
-  const [bossEmail, setBossEmail] = useState(user?.email     || '');
-  const [bossError, setBossError] = useState({});
+  // ── Boss ──────────────────────────────────────────────────
+  const [bossName,        setBossName]        = useState(user?.full_name  || '');
+  const [bossEmail,       setBossEmail]       = useState(user?.email      || '');
+  const [bossDesignation, setBossDesignation] = useState(user?.designation || '');
+  const [bossError,       setBossError]       = useState({});
 
-  // ── Employees ─────────────────────────────────────────────────
+  // ── Employees ─────────────────────────────────────────────
   const [employees, setEmployees] = useState([]);
-  const [empForm,   setEmpForm]   = useState({ name: '', email: '' });
+  const [empForm,   setEmpForm]   = useState({ name: '', email: '', designation: '' });
   const [empError,  setEmpError]  = useState({});
   const [csvError,  setCsvError]  = useState('');
 
-  // ── Editor ────────────────────────────────────────────────────
+  // ── Editor ────────────────────────────────────────────────
   const [currentPage,        setCurrentPage]        = useState(1);
   const [totalPages,         setTotalPages]          = useState(1);
   const [selectedPartyIndex, setSelectedPartyIndex] = useState(0);
@@ -197,12 +192,12 @@ export default function NewTemplate() {
   const [selectedFieldId,    setSelectedFieldId]    = useState(null);
   const [mobilePanelView,    setMobilePanelView]    = useState('sidebar');
 
-  const fileUrlRef      = useRef(fileUrl);
-  const logoPreviewRef  = useRef(companyLogoPreview);
-  const mountedRef      = useRef(true);
+  const fileUrlRef     = useRef(fileUrl);
+  const logoPreviewRef = useRef(companyLogoPreview);
+  const mountedRef     = useRef(true);
 
-  useEffect(() => { fileUrlRef.current     = fileUrl;             }, [fileUrl]);
-  useEffect(() => { logoPreviewRef.current = companyLogoPreview;  }, [companyLogoPreview]);
+  useEffect(() => { fileUrlRef.current     = fileUrl;            }, [fileUrl]);
+  useEffect(() => { logoPreviewRef.current = companyLogoPreview; }, [companyLogoPreview]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -215,10 +210,10 @@ export default function NewTemplate() {
 
   const selectedField = useMemo(
     () => fields.find(f => f.id === selectedFieldId),
-    [fields, selectedFieldId]
+    [fields, selectedFieldId],
   );
 
-  // ── File select ───────────────────────────────────────────────
+  // ── File select ───────────────────────────────────────────
   const handleFileSelect = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -247,26 +242,27 @@ export default function NewTemplate() {
     revokeBlob(logoPreviewRef.current);
     setCompanyLogoFile(file);
     setCompanyLogoPreview(URL.createObjectURL(file));
+    setCompanyLogoUrl('');
     e.target.value = '';
   }, []);
 
-  // ── Employee helpers ──────────────────────────────────────────
+  // ── Employee helpers ──────────────────────────────────────
   const addEmployee = useCallback(() => {
     const errs = {};
-    if (!empForm.name.trim())        errs.name  = 'Name is required.';
+    if (!empForm.name.trim())         errs.name  = 'Name is required.';
     if (!isValidEmail(empForm.email)) errs.email = 'Valid email required.';
-    if (employees.some(e => e.email === empForm.email.trim().toLowerCase()))
-      errs.email = 'This email is already added.';
+    if (employees.some(e =>
+      e.email === empForm.email.trim().toLowerCase()
+    )) errs.email = 'This email is already added.';
 
-    if (Object.keys(errs).length) {
-      setEmpError(errs);
-      return;
-    }
-    setEmployees(prev => [
-      ...prev,
-      { name: empForm.name.trim(), email: empForm.email.trim().toLowerCase() },
-    ]);
-    setEmpForm({ name: '', email: '' });
+    if (Object.keys(errs).length) { setEmpError(errs); return; }
+
+    setEmployees(prev => [...prev, {
+      name:        empForm.name.trim(),
+      email:       empForm.email.trim().toLowerCase(),
+      designation: empForm.designation.trim() || '',
+    }]);
+    setEmpForm({ name: '', email: '', designation: '' });
     setEmpError({});
   }, [empForm, employees]);
 
@@ -274,39 +270,43 @@ export default function NewTemplate() {
     setEmployees(prev => prev.filter((_, idx) => idx !== i));
   }, []);
 
-  // ── CSV parse ─────────────────────────────────────────────────
+  // ── CSV parse ─────────────────────────────────────────────
   const handleCsvUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setCsvError('');
     try {
-      const text    = await file.text();
-      const lines   = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const text  = await file.text();
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       if (lines.length < 2) throw new Error('CSV is empty.');
+
       const [hdr, ...rows] = lines;
       const headers = hdr.split(',').map(h => h.trim().toLowerCase());
       const ni = headers.indexOf('name');
       const ei = headers.indexOf('email');
+      const di = headers.indexOf('designation');
       if (ni === -1 || ei === -1)
         throw new Error('CSV must have "name" and "email" columns.');
 
       const newEmps = rows
         .map(r => {
           const c = r.split(',').map(x => x.trim());
-          return { name: c[ni] || '', email: (c[ei] || '').toLowerCase() };
+          return {
+            name:        c[ni] || '',
+            email:       (c[ei] || '').toLowerCase(),
+            designation: di !== -1 ? (c[di] || '') : '',
+          };
         })
         .filter(emp => emp.name && isValidEmail(emp.email));
 
       if (!newEmps.length) throw new Error('No valid rows found in CSV.');
 
-      // Deduplicate
       const existing = new Set(employees.map(e => e.email));
-      const fresh = newEmps.filter(e => !existing.has(e.email));
+      const fresh    = newEmps.filter(e => !existing.has(e.email));
       setEmployees(prev => [...prev, ...fresh]);
       toast.success(`${fresh.length} employees added from CSV`);
-      if (fresh.length < newEmps.length) {
+      if (fresh.length < newEmps.length)
         toast.info(`${newEmps.length - fresh.length} duplicates skipped`);
-      }
     } catch (err) {
       setCsvError(err.message || 'Invalid CSV file.');
     } finally {
@@ -314,11 +314,11 @@ export default function NewTemplate() {
     }
   }, [employees]);
 
-  // ── Typography ─────────────────────────────────────────────────
+  // ── Field helpers ─────────────────────────────────────────
   const updateFieldTypography = useCallback((key, value) => {
     if (!selectedFieldId) return;
     setFields(prev =>
-      prev.map(f => f.id === selectedFieldId ? { ...f, [key]: value } : f)
+      prev.map(f => f.id === selectedFieldId ? { ...f, [key]: value } : f),
     );
   }, [selectedFieldId]);
 
@@ -327,7 +327,7 @@ export default function NewTemplate() {
     if (selectedFieldId === id) setSelectedFieldId(null);
   }, [selectedFieldId]);
 
-  // ── Step navigation ────────────────────────────────────────────
+  // ── Step navigation ───────────────────────────────────────
   const goToStep = useCallback((target) => {
     setStep(target);
     setMaxReached(prev => Math.max(prev, target));
@@ -343,12 +343,9 @@ export default function NewTemplate() {
     }
     if (step === 3) {
       const errs = {};
-      if (!bossName.trim())      errs.name  = 'Boss name is required.';
+      if (!bossName.trim())         errs.name  = 'Boss name is required.';
       if (!isValidEmail(bossEmail)) errs.email = 'Valid boss email required.';
-      if (Object.keys(errs).length) {
-        setBossError(errs);
-        return;
-      }
+      if (Object.keys(errs).length) { setBossError(errs); return; }
       setBossError({});
     }
     if (step === 4) {
@@ -361,61 +358,127 @@ export default function NewTemplate() {
     if (step > 1) setStep(s => s - 1);
   }, [step]);
 
-  // ── Submit ────────────────────────────────────────────────────
+  // ── Upload PDF ────────────────────────────────────────────
+  const uploadPdf = useCallback(async () => {
+    const fd = new FormData();
+    fd.append('file', rawFile);
+    const res = await api.post('/documents/upload', fd);
+    return res.data?.document || res.data;
+  }, [rawFile]);
+
+  // ── Upload logo ───────────────────────────────────────────
+  const uploadLogo = useCallback(async () => {
+    if (!companyLogoFile) return companyLogoUrl || '';
+    const fd = new FormData();
+    fd.append('logo', companyLogoFile);
+    const res = await api.post('/documents/upload-logo', fd);
+    return res.data?.logoUrl || '';
+  }, [companyLogoFile, companyLogoUrl]);
+
+  // ── Submit ────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    if (!fileUrl)          { toast.error('No PDF uploaded.');              return; }
-    if (!title.trim())     { toast.error('Template name is required.');    return; }
-    if (!fields.length)    { toast.error('Place at least one field.');     return; }
-    if (!isValidEmail(bossEmail)) { toast.error('Valid boss email required.'); return; }
-    if (!employees.length) { toast.error('Add at least one employee.');    return; }
+    if (!rawFile)                 { toast.error('No PDF uploaded.');              return; }
+    if (!title.trim())            { toast.error('Template name is required.');    return; }
+    if (!fields.length)           { toast.error('Place at least one field.');     return; }
+    if (!isValidEmail(bossEmail)) { toast.error('Valid boss email required.');    return; }
+    if (!employees.length)        { toast.error('Add at least one employee.');    return; }
 
     setProcessing(true);
     try {
-      const formData = new FormData();
-      formData.append('file',        rawFile);
-      formData.append('title',       title.trim());
-      formData.append('companyName', companyName.trim());
-      formData.append('fields',      JSON.stringify(fields));
-      formData.append('boss',        JSON.stringify({
-        name:  bossName.trim(),
-        email: bossEmail.trim().toLowerCase(),
-      }));
-      formData.append('employees',   JSON.stringify(employees));
-      formData.append('totalPages',  String(totalPages));
+      // Step A: Upload PDF
+      toast.loading('Uploading PDF…', { id: 'upload' });
+      const docUpload = await uploadPdf();
+      toast.dismiss('upload');
 
+      const uploadedFileUrl      = docUpload?.fileUrl  || '';
+      const uploadedFilePublicId = docUpload?.fileId   || '';
+      const uploadedFileName     = docUpload?.fileName || rawFile.name;
+      const uploadedFileSize     = docUpload?.fileSize || rawFile.size;
+
+      if (!uploadedFileUrl)
+        throw new Error('PDF upload failed. Please try again.');
+
+      // Step B: Upload logo (optional)
+      let logoUrl = '';
       if (companyLogoFile) {
-        const lf = new FormData();
-        lf.append('logo', companyLogoFile);
-        const lr = await api.post('/documents/upload-logo', lf);
-        if (lr.data?.logoUrl) formData.append('companyLogo', lr.data.logoUrl);
+        toast.loading('Uploading logo…', { id: 'logo' });
+        logoUrl = await uploadLogo();
+        toast.dismiss('logo');
       }
 
-      await api.post('/templates/create-and-send', formData);
-      toast.success('Template created! Boss has been notified. ✉️');
+      // Step C: fields — add assignedTo from partyIndex
+      const processedFields = fields.map(f => ({
+        ...f,
+        assignedTo: TEMPLATE_PARTIES[f.partyIndex]?.assignedTo || 'employee',
+      }));
+
+      // Step D: recipients = employees only (boss = owner/req.user)
+      const recipients = employees.map(emp => ({
+        name:        emp.name,
+        email:       emp.email,
+        designation: emp.designation || '',
+      }));
+
+      // Step E: POST /templates — JSON body
+      toast.loading('Creating template…', { id: 'create' });
+
+      const payload = {
+        title:        title.trim(),
+        description:  '',
+        fileUrl:      uploadedFileUrl,
+        filePublicId: uploadedFilePublicId,
+        fileName:     uploadedFileName,
+        fileSize:     uploadedFileSize,
+        fields:       processedFields,
+        recipients,
+        ccList:       [],
+        companyName:  companyName.trim(),
+        companyLogo:  logoUrl,
+        message:      '',
+        totalPages,
+        signingConfig: {
+          bossSignsFirst: true,
+          expiryDays:     30,
+          allowDecline:   true,
+          reminderDays:   3,
+        },
+      };
+
+      const res = await templateApi.create(payload);
+      toast.dismiss('create');
+
+      if (!res.data?.success)
+        throw new Error(res.data?.message || 'Failed to create template.');
+
+      toast.success('Template created! 🎉 Go to Template Detail to sign as Boss.');
       navigate('/templates');
+
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create template.');
+      toast.dismiss('upload');
+      toast.dismiss('logo');
+      toast.dismiss('create');
+      toast.error(err?.message || 'Failed to create template.');
+      console.error('[NewTemplate] handleSend:', err);
     } finally {
       if (mountedRef.current) setProcessing(false);
     }
   }, [
-    fileUrl, title, fields, bossName, bossEmail,
-    employees, rawFile, companyName, companyLogoFile,
-    totalPages, navigate,
+    rawFile, title, fields, bossEmail, employees,
+    companyName, companyLogoFile, companyLogoUrl,
+    totalPages, uploadPdf, uploadLogo, navigate,
   ]);
 
   const currentMeta = STEPS[step - 1];
-
-  // ─────────────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════
   // RENDER
-  // ─────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
   return (
     <div className="flex flex-col h-screen bg-slate-50
                     dark:bg-slate-950 overflow-hidden">
 
-      {/* ══════════════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════════════
           HEADER
-      ══════════════════════════════════════════════════════════ */}
+      ══════════════════════════════════════════════════════ */}
       <header className="h-16 bg-white dark:bg-slate-900
                          border-b border-slate-200 dark:border-slate-800
                          px-4 sm:px-6 flex items-center justify-between
@@ -458,14 +521,13 @@ export default function NewTemplate() {
         />
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Mobile PDF toggle on step 2 */}
           {step === 2 && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setMobilePanelView(
-                v => v === 'sidebar' ? 'viewer' : 'sidebar'
-              )}
+              onClick={() =>
+                setMobilePanelView(v => v === 'sidebar' ? 'viewer' : 'sidebar')
+              }
               className="lg:hidden h-9 px-3 rounded-xl
                          border-slate-200 dark:border-slate-700
                          text-slate-600 dark:text-slate-300
@@ -522,20 +584,20 @@ export default function NewTemplate() {
             >
               {processing
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Send className="w-3.5 h-3.5" />
+                : <Send    className="w-3.5 h-3.5" />
               }
-              {processing ? 'Sending…' : 'Send to Boss'}
+              {processing ? 'Creating…' : 'Create Template'}
             </Button>
           )}
         </div>
       </header>
 
-      {/* ══════════════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════════════
           BODY
-      ══════════════════════════════════════════════════════════ */}
+      ══════════════════════════════════════════════════════ */}
       <main className="flex-1 flex overflow-hidden">
 
-        {/* ── SIDEBAR ─────────────────────────────────────────── */}
+        {/* ── SIDEBAR ─────────────────────────────────────── */}
         <aside className={`
           w-full lg:w-[360px] xl:w-[400px]
           border-r border-slate-200 dark:border-slate-800
@@ -546,25 +608,21 @@ export default function NewTemplate() {
             : 'block'
           }
         `}>
-
           {/* Mobile step pill */}
           <div className="lg:hidden px-4 pt-4 pb-0">
-            <div className="inline-flex items-center gap-1.5
-                            px-3 py-1.5 rounded-full
-                            bg-[#28ABDF]/10 text-[#28ABDF]
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5
+                            rounded-full bg-[#28ABDF]/10 text-[#28ABDF]
                             text-xs font-semibold">
               <currentMeta.icon className="w-3 h-3" />
               {currentMeta.desc}
             </div>
           </div>
 
-          {/* ╔════════════════════════════════════════════════════╗
+          {/* ════════════════════════════════════════════════
               STEP 1 — Upload & Branding
-          ╚════════════════════════════════════════════════════╝ */}
+          ════════════════════════════════════════════════ */}
           {step === 1 && (
             <div className="p-5 sm:p-6 space-y-7">
-
-              {/* PDF upload */}
               <div className="space-y-4">
                 <SectionHeader
                   icon={FileText}
@@ -592,13 +650,10 @@ export default function NewTemplate() {
                                          transition-colors" />
                     </div>
                     <p className="text-sm font-semibold text-slate-600
-                                  dark:text-slate-400
-                                  group-hover:text-slate-800">
+                                  dark:text-slate-400">
                       Click to upload PDF
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Max 20 MB
-                    </p>
+                    <p className="text-xs text-slate-400 mt-1">Max 20 MB</p>
                     <input
                       type="file"
                       className="hidden"
@@ -644,7 +699,6 @@ export default function NewTemplate() {
                   </div>
                 )}
 
-                {/* Title */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-slate-500
                                     dark:text-slate-400">
@@ -664,7 +718,6 @@ export default function NewTemplate() {
 
               <div className="border-t border-slate-100 dark:border-slate-800" />
 
-              {/* Brand */}
               <div className="space-y-4">
                 <SectionHeader
                   icon={Building2}
@@ -673,7 +726,6 @@ export default function NewTemplate() {
                   title="Company Info"
                   subtitle="Optional — appears in emails"
                 />
-
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-500
@@ -736,6 +788,7 @@ export default function NewTemplate() {
                               revokeBlob(companyLogoPreview);
                               setCompanyLogoPreview('');
                               setCompanyLogoFile(null);
+                              setCompanyLogoUrl('');
                             }}
                             className="text-xs text-red-400
                                        hover:text-red-500 font-medium"
@@ -751,9 +804,9 @@ export default function NewTemplate() {
             </div>
           )}
 
-          {/* ╔════════════════════════════════════════════════════╗
-              STEP 2 — Define Fields
-          ╚════════════════════════════════════════════════════╝ */}
+          {/* ════════════════════════════════════════════════
+              STEP 2 — Fields
+          ════════════════════════════════════════════════ */}
           {step === 2 && (
             <div className="p-5 sm:p-6 space-y-5">
               <SectionHeader
@@ -764,24 +817,33 @@ export default function NewTemplate() {
                 subtitle="Boss fields (blue) · Employee fields (purple)"
               />
 
-              {/* Party legend */}
+              {/* Party selector buttons */}
               <div className="flex gap-2">
                 {TEMPLATE_PARTIES.map((p, i) => (
-                  <div
+                  <button
                     key={i}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5
-                               rounded-lg text-xs font-medium
-                               bg-slate-50 dark:bg-slate-800
-                               border border-slate-100 dark:border-slate-700"
+                    type="button"
+                    onClick={() => setSelectedPartyIndex(i)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5
+                                rounded-lg text-xs font-medium transition-all
+                                border
+                      ${selectedPartyIndex === i
+                        ? 'text-white border-transparent shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                      }`}
+                    style={selectedPartyIndex === i
+                      ? { backgroundColor: p.color }
+                      : {}
+                    }
                   >
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: p.color }}
+                      style={{
+                        backgroundColor: selectedPartyIndex === i ? '#fff' : p.color,
+                      }}
                     />
-                    <span className="text-slate-600 dark:text-slate-400">
-                      {p.name}
-                    </span>
-                  </div>
+                    {p.name}
+                  </button>
                 ))}
               </div>
 
@@ -807,6 +869,10 @@ export default function NewTemplate() {
                       Click PDF to place{' '}
                       <span className="font-bold capitalize">
                         {pendingFieldType}
+                      </span>{' '}
+                      for{' '}
+                      <span className="font-bold">
+                        {TEMPLATE_PARTIES[selectedPartyIndex]?.name}
                       </span>
                     </p>
                   </div>
@@ -822,12 +888,20 @@ export default function NewTemplate() {
 
               {/* Selected field config */}
               {selectedField && (
-                <div className="space-y-3 pt-4 border-t border-slate-100
-                                dark:border-slate-800">
+                <div className="space-y-3 pt-4 border-t
+                                border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-slate-600
                                   dark:text-slate-300 capitalize">
-                      {selectedField.type} settings
+                      {selectedField.type} —{' '}
+                      <span
+                        className="font-bold"
+                        style={{
+                          color: TEMPLATE_PARTIES[selectedField.partyIndex]?.color,
+                        }}
+                      >
+                        {TEMPLATE_PARTIES[selectedField.partyIndex]?.name}
+                      </span>
                     </p>
                     <button
                       type="button"
@@ -847,9 +921,7 @@ export default function NewTemplate() {
                         </Label>
                         <Select
                           value={selectedField.fontFamily || 'Helvetica'}
-                          onValueChange={v =>
-                            updateFieldTypography('fontFamily', v)
-                          }
+                          onValueChange={v => updateFieldTypography('fontFamily', v)}
                         >
                           <SelectTrigger className="h-9 rounded-xl text-sm
                                                      border-slate-200
@@ -901,7 +973,7 @@ export default function NewTemplate() {
                   <p className="text-xs font-medium text-slate-400 mb-2">
                     {fields.length} field{fields.length !== 1 ? 's' : ''} placed
                   </p>
-                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
                     {fields.map(f => {
                       const party = TEMPLATE_PARTIES[f.partyIndex]
                                  || TEMPLATE_PARTIES[0];
@@ -924,6 +996,11 @@ export default function NewTemplate() {
                           <span className="capitalize font-medium flex-1">
                             {f.type}
                           </span>
+                          <span className="text-[10px] bg-slate-100
+                                           dark:bg-slate-700 text-slate-400
+                                           px-1.5 py-0.5 rounded-md">
+                            {party.assignedTo}
+                          </span>
                           <span className="text-slate-400 text-[11px]">
                             p.{f.page}
                           </span>
@@ -936,9 +1013,9 @@ export default function NewTemplate() {
             </div>
           )}
 
-          {/* ╔════════════════════════════════════════════════════╗
+          {/* ════════════════════════════════════════════════
               STEP 3 — Boss Info
-          ╚════════════════════════════════════════════════════╝ */}
+          ════════════════════════════════════════════════ */}
           {step === 3 && (
             <div className="p-5 sm:p-6 space-y-5">
               <SectionHeader
@@ -946,36 +1023,47 @@ export default function NewTemplate() {
                 iconBg="bg-purple-50 dark:bg-purple-900/30"
                 iconColor="text-purple-500"
                 title="Authoriser (Boss)"
-                subtitle="Signs the template first before employees"
+                subtitle="You are the boss — signs first"
               />
 
               {/* Flow diagram */}
               <div className="p-4 rounded-2xl bg-gradient-to-r
                               from-purple-50 to-sky-50
                               dark:from-purple-900/20 dark:to-sky-900/20
-                              border border-purple-100 dark:border-purple-800/40">
-                <div className="flex items-center gap-2 justify-center
-                                text-xs font-semibold text-slate-600
-                                dark:text-slate-400">
+                              border border-purple-100
+                              dark:border-purple-800/40">
+                <div className="flex items-center gap-2 justify-center">
                   <div className="flex items-center gap-1.5 px-2.5 py-1.5
-                                  bg-purple-500 text-white rounded-lg text-xs">
+                                  bg-purple-500 text-white rounded-lg text-xs
+                                  font-semibold">
                     <Crown className="w-3 h-3" />
                     Boss signs
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
                   <div className="flex items-center gap-1.5 px-2.5 py-1.5
-                                  bg-[#28ABDF] text-white rounded-lg text-xs">
+                                  bg-[#28ABDF] text-white rounded-lg text-xs
+                                  font-semibold">
                     <Users className="w-3 h-3" />
                     Employees sign
                   </div>
                 </div>
               </div>
 
+              {/* Note */}
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20
+                              border border-amber-100 dark:border-amber-800/40">
+                <p className="text-xs text-amber-700 dark:text-amber-400
+                              leading-relaxed">
+                  💡 As the template creator, <strong>you are the Authoriser</strong>.
+                  After creating, go to Template Detail to sign as Boss.
+                </p>
+              </div>
+
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-slate-500
                                     dark:text-slate-400">
-                    Boss Full Name
+                    Your Full Name
                   </Label>
                   <Input
                     value={bossName}
@@ -991,8 +1079,7 @@ export default function NewTemplate() {
                       }`}
                   />
                   {bossError.name && (
-                    <p className="flex items-center gap-1 text-xs
-                                  text-red-500">
+                    <p className="flex items-center gap-1 text-xs text-red-500">
                       <AlertCircle className="w-3 h-3 shrink-0" />
                       {bossError.name}
                     </p>
@@ -1002,7 +1089,7 @@ export default function NewTemplate() {
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-slate-500
                                     dark:text-slate-400">
-                    Boss Email
+                    Your Email
                   </Label>
                   <Input
                     value={bossEmail}
@@ -1019,20 +1106,36 @@ export default function NewTemplate() {
                       }`}
                   />
                   {bossError.email && (
-                    <p className="flex items-center gap-1 text-xs
-                                  text-red-500">
+                    <p className="flex items-center gap-1 text-xs text-red-500">
                       <AlertCircle className="w-3 h-3 shrink-0" />
                       {bossError.email}
                     </p>
                   )}
                 </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-500
+                                    dark:text-slate-400">
+                    Designation
+                    <span className="text-slate-300 ml-1">(optional)</span>
+                  </Label>
+                  <Input
+                    value={bossDesignation}
+                    onChange={e => setBossDesignation(e.target.value)}
+                    placeholder="e.g. Managing Director"
+                    className="h-10 rounded-xl text-sm border-slate-200
+                               dark:border-slate-700
+                               focus-visible:ring-[#28ABDF]/30
+                               focus-visible:border-[#28ABDF]"
+                  />
+                </div>
               </div>
             </div>
           )}
 
-          {/* ╔════════════════════════════════════════════════════╗
+          {/* ════════════════════════════════════════════════
               STEP 4 — Employee List
-          ╚════════════════════════════════════════════════════╝ */}
+          ════════════════════════════════════════════════ */}
           {step === 4 && (
             <div className="p-5 sm:p-6 space-y-5">
               <SectionHeader
@@ -1068,9 +1171,7 @@ export default function NewTemplate() {
                         }`}
                     />
                     {empError.name && (
-                      <p className="text-[10px] text-red-500">
-                        {empError.name}
-                      </p>
+                      <p className="text-[10px] text-red-500">{empError.name}</p>
                     )}
                   </div>
                   <div className="space-y-1">
@@ -1094,12 +1195,29 @@ export default function NewTemplate() {
                         }`}
                     />
                     {empError.email && (
-                      <p className="text-[10px] text-red-500">
-                        {empError.email}
-                      </p>
+                      <p className="text-[10px] text-red-500">{empError.email}</p>
                     )}
                   </div>
                 </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-slate-500
+                                    dark:text-slate-400">
+                    Designation
+                    <span className="text-slate-300 ml-1">(optional)</span>
+                  </Label>
+                  <Input
+                    value={empForm.designation}
+                    onChange={e =>
+                      setEmpForm(p => ({ ...p, designation: e.target.value }))
+                    }
+                    onKeyDown={e => e.key === 'Enter' && addEmployee()}
+                    placeholder="e.g. Software Engineer"
+                    className="h-9 rounded-xl text-xs border-slate-200
+                               dark:border-slate-700"
+                  />
+                </div>
+
                 <Button
                   type="button"
                   variant="outline"
@@ -1117,13 +1235,11 @@ export default function NewTemplate() {
               {/* Divider */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
-                <span className="text-xs text-slate-400 font-medium">
-                  or
-                </span>
+                <span className="text-xs text-slate-400 font-medium">or</span>
                 <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
               </div>
 
-              {/* CSV upload */}
+              {/* CSV */}
               <label className={`flex items-center gap-3 p-4 rounded-xl
                                  border-2 border-dashed cursor-pointer
                                  transition-all group
@@ -1135,17 +1251,14 @@ export default function NewTemplate() {
                                 dark:bg-slate-800 flex items-center
                                 justify-center shrink-0
                                 group-hover:bg-sky-100
-                                dark:group-hover:bg-sky-900/30
-                                transition-colors">
+                                dark:group-hover:bg-sky-900/30 transition-colors">
                   <FileSpreadsheet className="w-4 h-4 text-slate-400
                                                group-hover:text-[#28ABDF]
                                                transition-colors" />
                 </div>
                 <div className="flex-1 min-w-0">
                   {csvError ? (
-                    <p className="text-xs font-medium text-red-600">
-                      {csvError}
-                    </p>
+                    <p className="text-xs font-medium text-red-600">{csvError}</p>
                   ) : (
                     <>
                       <p className="text-xs font-medium text-slate-600
@@ -1153,7 +1266,7 @@ export default function NewTemplate() {
                         Upload CSV
                       </p>
                       <p className="text-[11px] text-slate-400">
-                        name, email columns required
+                        name, email, designation columns
                       </p>
                     </>
                   )}
@@ -1193,8 +1306,7 @@ export default function NewTemplate() {
                       >
                         <div className="w-6 h-6 rounded-lg bg-[#28ABDF]/10
                                         text-[#28ABDF] text-[10px] font-bold
-                                        flex items-center justify-center
-                                        shrink-0">
+                                        flex items-center justify-center shrink-0">
                           {i + 1}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1204,6 +1316,11 @@ export default function NewTemplate() {
                           </p>
                           <p className="text-[11px] text-slate-400 truncate">
                             {emp.email}
+                            {emp.designation && (
+                              <span className="ml-1 text-slate-300">
+                                · {emp.designation}
+                              </span>
+                            )}
                           </p>
                         </div>
                         <button
@@ -1224,15 +1341,17 @@ export default function NewTemplate() {
                 <div className="text-center py-8 text-slate-400">
                   <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
                   <p className="text-xs">No employees yet</p>
-                  <p className="text-xs opacity-70">Add manually or upload CSV</p>
+                  <p className="text-xs opacity-70">
+                    Add manually or upload CSV
+                  </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* ╔════════════════════════════════════════════════════╗
+          {/* ════════════════════════════════════════════════
               STEP 5 — Review
-          ╚════════════════════════════════════════════════════╝ */}
+          ════════════════════════════════════════════════ */}
           {step === 5 && (
             <div className="p-5 sm:p-6 space-y-5">
               <SectionHeader
@@ -1243,7 +1362,7 @@ export default function NewTemplate() {
                 subtitle="Confirm before creating template"
               />
 
-              {/* Summary */}
+              {/* Summary card */}
               <div className="bg-white dark:bg-slate-800 rounded-2xl
                               border border-slate-100 dark:border-slate-700
                               overflow-hidden">
@@ -1257,9 +1376,26 @@ export default function NewTemplate() {
                 <div className="px-4 py-1">
                   <ReviewRow label="Template"  value={title || '—'} />
                   <ReviewRow label="Company"   value={companyName || '—'} />
-                  <ReviewRow label="Fields"    value={`${fields.length} placed`} valueClass="text-[#28ABDF]" />
-                  <ReviewRow label="Boss"      value={bossName || '—'} />
-                  <ReviewRow label="Employees" value={`${employees.length} added`} valueClass="text-purple-600" />
+                  <ReviewRow
+                    label="Boss Fields"
+                    value={`${fields.filter(f =>
+                      TEMPLATE_PARTIES[f.partyIndex]?.assignedTo === 'boss'
+                    ).length} placed`}
+                    valueClass="text-purple-600"
+                  />
+                  <ReviewRow
+                    label="Employee Fields"
+                    value={`${fields.filter(f =>
+                      TEMPLATE_PARTIES[f.partyIndex]?.assignedTo === 'employee'
+                    ).length} placed`}
+                    valueClass="text-[#28ABDF]"
+                  />
+                  <ReviewRow
+                    label="Employees"
+                    value={`${employees.length} added`}
+                    valueClass="text-emerald-600"
+                  />
+                  <ReviewRow label="Expiry" value="30 days per link" />
                 </div>
               </div>
 
@@ -1269,65 +1405,68 @@ export default function NewTemplate() {
                               uppercase tracking-wide">
                   Signing Workflow
                 </p>
-                <div className="space-y-2">
-                  {[
-                    {
-                      icon: Crown,
-                      color: 'bg-purple-500',
-                      label: 'Step 1',
-                      name: bossName || 'Boss',
-                      sub: bossEmail,
-                    },
-                    {
-                      icon: Users,
-                      color: 'bg-[#28ABDF]',
-                      label: `Step 2 (${employees.length})`,
-                      name: 'All Employees',
-                      sub: 'Simultaneously',
-                    },
-                  ].map((s, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3
-                                            rounded-xl bg-white dark:bg-slate-800
-                                            border border-slate-100 dark:border-slate-700">
-                      <div className={`w-7 h-7 rounded-lg flex items-center
-                                       justify-center text-white shrink-0
-                                       ${s.color}`}>
-                        <s.icon className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-800
-                                      dark:text-white truncate">
-                          {s.name}
-                        </p>
-                        <p className="text-[11px] text-slate-400 truncate">
-                          {s.sub}
-                        </p>
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-400
-                                       bg-slate-50 dark:bg-slate-700
-                                       px-2 py-0.5 rounded-full shrink-0">
-                        {s.label}
-                      </span>
+                {[
+                  {
+                    Icon:  Crown,
+                    color: 'bg-purple-500',
+                    label: 'Step 1',
+                    name:  bossName  || 'You (Boss)',
+                    sub:   bossEmail || '—',
+                  },
+                  {
+                    Icon:  Users,
+                    color: 'bg-[#28ABDF]',
+                    label: `Step 2 (${employees.length})`,
+                    name:  'All Employees',
+                    sub:   'Simultaneously after boss signs',
+                  },
+                ].map((s, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 p-3 rounded-xl
+                               bg-white dark:bg-slate-800
+                               border border-slate-100 dark:border-slate-700"
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center
+                                     justify-center text-white shrink-0
+                                     ${s.color}`}>
+                      <s.Icon className="w-3.5 h-3.5" />
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-800
+                                    dark:text-white truncate">
+                        {s.name}
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {s.sub}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400
+                                     bg-slate-50 dark:bg-slate-700
+                                     px-2 py-0.5 rounded-full shrink-0">
+                      {s.label}
+                    </span>
+                  </div>
+                ))}
               </div>
 
-              {/* Info */}
+              {/* Info box */}
               <div className="p-4 rounded-2xl bg-sky-50 dark:bg-sky-900/20
                               border border-sky-100 dark:border-sky-800">
                 <div className="flex gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-sky-500
+                                           shrink-0 mt-0.5" />
                   <p className="text-xs text-sky-700 dark:text-sky-400
                                 leading-relaxed">
-                    Boss receives the template first. After signing,
-                    all {employees.length} employees receive their copy
-                    simultaneously.
+                    After creation, go to <strong>Template Detail</strong> to
+                    sign as Boss. Once you sign, all{' '}
+                    <strong>{employees.length} employees</strong> receive
+                    their copy simultaneously.
                   </p>
                 </div>
               </div>
 
-              {/* Send */}
+              {/* Send button */}
               <Button
                 onClick={handleSend}
                 disabled={processing || !fileReady}
@@ -1340,15 +1479,15 @@ export default function NewTemplate() {
               >
                 {processing
                   ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Send className="w-4 h-4" />
+                  : <Send    className="w-4 h-4" />
                 }
-                {processing ? 'Creating…' : 'Create & Send to Boss'}
+                {processing ? 'Creating…' : 'Create Template'}
               </Button>
             </div>
           )}
         </aside>
 
-        {/* ── PDF VIEWER ───────────────────────────────────────── */}
+        {/* ── PDF VIEWER ───────────────────────────────────── */}
         <section className={`
           flex-1 flex flex-col min-w-0 overflow-hidden
           bg-slate-100 dark:bg-slate-950
