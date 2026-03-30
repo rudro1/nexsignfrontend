@@ -227,11 +227,13 @@ export default function Dashboard() {
       const docs       = res.data?.documents     ?? [];
       const pagination = res.data?.pagination    ?? {};
       const newStats   = res.data?.stats         ?? null;
+const serverTotal = pagination.total ?? 0;
+const hasMoreDocs = pagination.hasMore ?? (serverTotal > docs.length);
 
       setDocuments(docs);
       setPage(1);
-      setTotalPages(pagination.totalPages || 1);
-      setHasMore(pagination.hasMore       || false);
+    setTotalPages(pagination.totalPages || 1);
+setHasMore(hasMoreDocs);
       if (newStats) setStats(newStats);
 
       // Cache only page 1
@@ -275,14 +277,16 @@ export default function Dashboard() {
 
       const newDocs    = res.data?.documents  ?? [];
       const pagination = res.data?.pagination ?? {};
-
-      setDocuments(prev => {
-        // Deduplicate
-        const ids  = new Set(prev.map(d => d._id));
-        const next = [...prev, ...newDocs.filter(d => !ids.has(d._id))];
-        return next;
-      });
-      setPage(nextPage);
+const serverTotal = pagination.total ?? 0;
+    setDocuments(prev => {
+  const ids  = new Set(prev.map(d => d._id));
+  const next = [...prev, ...newDocs.filter(d => !ids.has(d._id))];
+  // ✅ hasMore recalculate
+  setHasMore(pagination.hasMore ?? (next.length < serverTotal));
+  return next;
+});
+setPage(nextPage);
+     
       setHasMore(pagination.hasMore || false);
 
     } catch (err) {
