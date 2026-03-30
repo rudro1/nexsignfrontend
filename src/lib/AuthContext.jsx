@@ -17,8 +17,9 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
-  onAuthStateChanged,
   onIdTokenChanged,
 } from 'firebase/auth';
 import { toast } from 'sonner';
@@ -30,29 +31,30 @@ import { api, apiCache } from '@/api/apiClient';
 const AuthContext = createContext(null);
 
 // ════════════════════════════════════════════════════════════════
-// FIREBASE ERROR → Human readable message
+// FIREBASE ERROR MESSAGES
 // ════════════════════════════════════════════════════════════════
 const getFirebaseError = (code) => {
   const errors = {
-    'auth/user-not-found':       'No account found with this email.',
-    'auth/wrong-password':       'Incorrect password. Please try again.',
-    'auth/email-already-in-use': 'This email is already registered.',
-    'auth/weak-password':        'Password must be at least 6 characters.',
-    'auth/invalid-email':        'Please enter a valid email address.',
-    'auth/too-many-requests':    'Too many attempts. Please try again later.',
-    'auth/user-disabled':        'This account has been disabled.',
-    'auth/popup-closed-by-user': 'Login popup was closed. Please try again.',
+    'auth/user-not-found':         'No account found with this email.',
+    'auth/wrong-password':         'Incorrect password. Please try again.',
+    'auth/email-already-in-use':   'This email is already registered.',
+    'auth/weak-password':          'Password must be at least 6 characters.',
+    'auth/invalid-email':          'Please enter a valid email address.',
+    'auth/too-many-requests':      'Too many attempts. Please try again later.',
+    'auth/user-disabled':          'This account has been disabled.',
+    'auth/popup-closed-by-user':   'Login popup was closed. Please try again.',
+    'auth/popup-blocked':          'Popup blocked. Please allow popups.',
     'auth/network-request-failed': 'Network error. Check your connection.',
-    'auth/invalid-credential':   'Invalid email or password.',
-    'auth/operation-not-allowed':'This sign-in method is not enabled.',
-    'auth/expired-action-code':  'This link has expired. Please request a new one.',
-    'auth/invalid-action-code':  'Invalid link. Please request a new one.',
+    'auth/invalid-credential':     'Invalid email or password.',
+    'auth/operation-not-allowed':  'This sign-in method is not enabled.',
+    'auth/expired-action-code':    'This link has expired. Request a new one.',
+    'auth/invalid-action-code':    'Invalid link. Request a new one.',
   };
   return errors[code] || 'Something went wrong. Please try again.';
 };
 
 // ════════════════════════════════════════════════════════════════
-// STORAGE HELPERS — safe JSON parse
+// STORAGE HELPERS
 // ════════════════════════════════════════════════════════════════
 const storage = {
   get: (key, fallback = null) => {
@@ -65,10 +67,9 @@ const storage = {
   },
   set: (key, value) => {
     try {
-      localStorage.setItem(key, 
-        typeof value === 'string' 
-          ? value 
-          : JSON.stringify(value)
+      localStorage.setItem(
+        key,
+        typeof value === 'string' ? value : JSON.stringify(value),
       );
     } catch (e) {
       console.warn('Storage write failed:', e.message);
@@ -82,6 +83,14 @@ const storage = {
 };
 
 // ════════════════════════════════════════════════════════════════
+// ROLE REDIRECT HELPER
+// ════════════════════════════════════════════════════════════════
+const getRoleRedirect = (role) =>
+  role === 'admin' || role === 'super_admin'
+    ? '/admin'
+    : '/dashboard';
+
+// ════════════════════════════════════════════════════════════════
 // AUTH PROVIDER
 // ════════════════════════════════════════════════════════════════
 export const AuthProvider = ({ children }) => {
@@ -89,56 +98,105 @@ export const AuthProvider = ({ children }) => {
   const [token,   setToken]   = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Firebase user ref — Firebase state সবসময় track করার জন্য
   const firebaseUserRef = useRef(null);
-  // Token refresh timer
   const tokenRefreshRef = useRef(null);
 
-  // ── Load saved auth on mount ───────────────────────────────
- useEffect(() => {
-  const savedUser  = storage.get('nexsign_user');
-  const savedToken = localStorage.getItem('token');
+  // ── Core: save auth ──────────────────────────────────────
+  const saveAuth = useCallback((userData, userToken) => {
+    setUser(userData);
+    setToken(userToken);
+    storage.set('nexsign_user', userData);
+    localStorage.setItem('token', userToken);
+    api.defaults.headers.common['Authorization'] =
+      `Bearer ${userToken}`;
+  }, []);
 
-  if (savedUser && savedToken) {
-    setUser(savedUser);
-    setToken(savedToken);
-    api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
-    setLoading(false); // ← এটা ADD করো (flash prevent)
-  }
-}, []);
+  // ── Core: clear auth ─────────────────────────────────────
+  const clearAuth = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    storage.remove('nexsign_user', 'token');
+    delete api.defaults.headers.common['Authorization'];
+    apiCache.clear();
+  }, []);
 
-
-  // ── Firebase Auth State Listener ──────────────────────────
-  // Token expire / logout সব এখানে catch হবে
+  // ── Load saved auth on mount ─────────────────────────────
   useEffect(() => {
-    // onIdTokenChanged — token refresh হলেও trigger হয়
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
-      firebaseUserRef.current = firebaseUser;
+    const savedUser  = storage.get('nexsign_user');
+    const savedToken = localStorage.getItem('token');
 
-      if (!firebaseUser) {
-        // Firebase logout হয়ে গেছে
-        // কিন্তু আমাদের backend token এ logged in থাকলে চলবে
-        setLoading(false);
-        return;
-      }
+    if (savedUser && savedToken) {
+      setUser(savedUser);
+      setToken(savedToken);
+      api.defaults.headers.common['Authorization'] =
+        `Bearer ${savedToken}`;
+      setLoading(false);
+    }
+  }, []);
 
+  // ── Handle Google Redirect Result ────────────────────────
+  // signInWithRedirect এর পর page reload হলে এখানে result আসে
+  useEffect(() => {
+    const handleRedirect = async () => {
       try {
-        // Firebase token refresh (auto)
-        const freshToken = await firebaseUser.getIdToken(false);
+        const result = await getRedirectResult(auth);
 
-        // Token পরিবর্তন হলে update করো
-        const currentToken = localStorage.getItem('token');
-        if (freshToken && freshToken !== currentToken) {
-          // এটা শুধু Firebase token —
-          // আমাদের backend JWT আলাদা
-          // তাই শুধু Firebase user info update করো
+        if (!result?.user) return; // No redirect result
+
+        const firebaseUser = result.user;
+        const name  = firebaseUser.displayName
+                      || firebaseUser.email?.split('@')[0]
+                      || 'User';
+        const email = firebaseUser.email;
+
+        if (!email) return;
+
+        // Backend call
+        const res = await api.post('/auth/google', {
+          name,
+          email,
+          photoURL: firebaseUser.photoURL || '',
+        });
+
+        if (res.data?.token) {
+          saveAuth(res.data.user, res.data.token);
+          toast.success('Google login successful! 🎉');
+          // Redirect
+          window.location.href =
+            getRoleRedirect(res.data.user?.role);
         }
       } catch (err) {
-        console.warn('Token refresh error:', err.message);
+        // No redirect result — normal, ignore
+        if (err?.code !== 'auth/no-current-user') {
+          console.warn('Redirect result:', err?.message);
+        }
       }
+    };
 
-      setLoading(false);
-    });
+    handleRedirect();
+  }, [saveAuth]);
+
+  // ── Firebase Auth State Listener ─────────────────────────
+  useEffect(() => {
+    const unsubscribe = onIdTokenChanged(
+      auth,
+      async (firebaseUser) => {
+        firebaseUserRef.current = firebaseUser;
+
+        if (!firebaseUser) {
+          setLoading(false);
+          return;
+        }
+
+        try {
+          await firebaseUser.getIdToken(false);
+        } catch (err) {
+          console.warn('Token refresh error:', err.message);
+        }
+
+        setLoading(false);
+      },
+    );
 
     return () => {
       unsubscribe();
@@ -148,61 +206,35 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // ── Token expiry check ────────────────────────────────────
-  // JWT decode করে expiry চেক করো
+  // ── Token expiry ─────────────────────────────────────────
   const isTokenExpired = useCallback((jwtToken) => {
     if (!jwtToken) return true;
     try {
-      const payload = JSON.parse(
-        atob(jwtToken.split('.')[1])
-      );
-      // 30s buffer দাও
+      const payload = JSON.parse(atob(jwtToken.split('.')[1]));
       return payload.exp * 1000 < Date.now() + 30_000;
     } catch {
       return true;
     }
   }, []);
 
-  // ── Core: save auth state ─────────────────────────────────
-  const saveAuth = useCallback((userData, userToken) => {
-    setUser(userData);
-    setToken(userToken);
-    storage.set('nexsign_user', userData);
-    localStorage.setItem('token', userToken);
-    // axios default header
-    api.defaults.headers.common['Authorization'] =
-      `Bearer ${userToken}`;
-  }, []);
-
-  // ── Clear auth state ──────────────────────────────────────
-  const clearAuth = useCallback(() => {
-    setUser(null);
-    setToken(null);
-    storage.remove('nexsign_user', 'token');
-    delete api.defaults.headers.common['Authorization'];
-    apiCache.clear(); // Cache clear — stale data দেখাবে না
-  }, []);
-
-  // ════════════════════════════════════════════════════════════
-  // LOGIN — Backend JWT
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
+  // LOGIN
+  // ════════════════════════════════════════════════════════
   const login = useCallback((userData, userToken) => {
     saveAuth(userData, userToken);
   }, [saveAuth]);
 
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   // LOGOUT
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   const logout = useCallback(async (options = {}) => {
     const { redirect = true, showToast = false } = options;
 
     try {
-      // Firebase sign out (if Firebase user exists)
       if (auth.currentUser) {
         await signOut(auth);
       }
     } catch (err) {
-      // Firebase logout fail হলেও app logout করো
       console.warn('Firebase logout warning:', err.message);
     } finally {
       clearAuth();
@@ -217,41 +249,59 @@ export const AuthProvider = ({ children }) => {
     }
   }, [clearAuth]);
 
-  // ════════════════════════════════════════════════════════════
-  // GOOGLE LOGIN
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
+  // GOOGLE LOGIN — Popup with Redirect fallback
+  // ════════════════════════════════════════════════════════
   const googleLogin = useCallback(async () => {
     try {
+      // ✅ Try popup first
       const result = await signInWithPopup(auth, googleProvider);
       return result;
-    } catch (error) {
-      const message = getFirebaseError(error.code);
 
-      // Popup closed — silent fail (user intentionally closed)
-      if (error.code === 'auth/popup-closed-by-user') {
+    } catch (error) {
+      const code = error.code || '';
+      const msg  = error.message || '';
+
+      // ✅ Silent exit — user closed popup intentionally
+      if (code === 'auth/popup-closed-by-user') {
         return null;
       }
 
+      // ✅ COOP / popup blocked → use redirect
+      if (
+        code === 'auth/popup-blocked'         ||
+        msg.includes('Cross-Origin-Opener-Policy') ||
+        msg.includes('window.closed')
+      ) {
+        try {
+          toast.info('Redirecting to Google sign-in...');
+          await signInWithRedirect(auth, googleProvider);
+          // Page will reload — result handled in useEffect above
+          return null;
+        } catch (redirectErr) {
+          toast.error('Google login failed. Please try again.');
+          throw redirectErr;
+        }
+      }
+
+      // Other errors
+      const message = getFirebaseError(code);
       toast.error(message);
       throw new Error(message);
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   // EMAIL REGISTER
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   const registerWithEmail = useCallback(async (email, password) => {
     try {
       const result = await createUserWithEmailAndPassword(
-        auth, email, password
+        auth, email, password,
       );
-
-      // Verification email পাঠাও
       await sendEmailVerification(result.user, {
-        // Verification এর পর redirect করো
         url: `${window.location.origin}/login?verified=true`,
       });
-
       return result;
     } catch (error) {
       const message = getFirebaseError(error.code);
@@ -259,28 +309,23 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   // EMAIL LOGIN
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   const loginWithEmail = useCallback(async (email, password) => {
     try {
-      const result = await signInWithEmailAndPassword(
-        auth, email, password
-      );
-      return result;
+      return await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
-      const message = getFirebaseError(error.code);
-      throw new Error(message);
+      throw new Error(getFirebaseError(error.code));
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════════
-  // EMAIL VERIFICATION CHECK
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
+  // EMAIL VERIFICATION
+  // ════════════════════════════════════════════════════════
   const checkEmailVerified = useCallback(async (firebaseUser) => {
     const fbUser = firebaseUser || auth.currentUser;
     if (!fbUser) return false;
-
     try {
       await fbUser.reload();
       return fbUser.emailVerified;
@@ -290,16 +335,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════════
-  // RESEND VERIFICATION EMAIL
-  // ════════════════════════════════════════════════════════════
   const resendVerificationEmail = useCallback(async () => {
     const fbUser = auth.currentUser;
     if (!fbUser) {
       toast.error('No user found. Please register again.');
       return;
     }
-
     try {
       await sendEmailVerification(fbUser, {
         url: `${window.location.origin}/login?verified=true`,
@@ -307,17 +348,17 @@ export const AuthProvider = ({ children }) => {
       toast.success('Verification email sent! Check your inbox.');
     } catch (error) {
       if (error.code === 'auth/too-many-requests') {
-        toast.error('Too many requests. Wait a moment and try again.');
+        toast.error('Too many requests. Wait a moment.');
       } else {
-        toast.error('Failed to send email. Please try again.');
+        toast.error('Failed to send email. Try again.');
       }
       throw error;
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   // RESET PASSWORD
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
   const resetPassword = useCallback(async (email) => {
     try {
       await sendPasswordResetEmail(auth, email, {
@@ -331,62 +372,52 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ════════════════════════════════════════════════════════════
-  // UPDATE USER — local state update (after profile edit)
-  // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════
+  // UPDATE USER
+  // ════════════════════════════════════════════════════════
   const updateUser = useCallback((updates) => {
-  setUser(prev => {
-    if (!prev) return prev;
-    const updated = { ...prev, ...updates };
-    storage.set('nexsign_user', updated);
-    return updated;
-  });
-   if (updates.token) {
-    localStorage.setItem('token', updates.token);
-    setToken(updates.token);
-    api.defaults.headers.common['Authorization'] =
-      `Bearer ${updates.token}`;
-  }
-}, []);
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      storage.set('nexsign_user', updated);
+      return updated;
+    });
+    if (updates.token) {
+      localStorage.setItem('token', updates.token);
+      setToken(updates.token);
+      api.defaults.headers.common['Authorization'] =
+        `Bearer ${updates.token}`;
+    }
+  }, []);
 
-  // ════════════════════════════════════════════════════════════
-  // TOKEN VALID CHECK — component থেকে call করা যাবে
-  // ════════════════════════════════════════════════════════════
- const checkAuth = useCallback(() => {
-  const savedToken = localStorage.getItem('token');
-  if (!savedToken || isTokenExpired(savedToken)) {
-    clearAuth();
-    return false;
-  }
-  // Token ঠিক আছে, user set করো
-  const savedUser = storage.get('nexsign_user');
-  if (savedUser && !user) {
-    setUser(savedUser);
-    setToken(savedToken);
-  }
-  return true;
-}, [isTokenExpired, clearAuth, user]);
-  // ════════════════════════════════════════════════════════════
-  // COMPUTED VALUES
-  // ════════════════════════════════════════════════════════════
-  const isAdmin       = user?.role === 'admin' || 
+  // ════════════════════════════════════════════════════════
+  // CHECK AUTH
+  // ════════════════════════════════════════════════════════
+  const checkAuth = useCallback(() => {
+    const savedToken = localStorage.getItem('token');
+    if (!savedToken || isTokenExpired(savedToken)) {
+      clearAuth();
+      return false;
+    }
+    const savedUser = storage.get('nexsign_user');
+    if (savedUser && !user) {
+      setUser(savedUser);
+      setToken(savedToken);
+    }
+    return true;
+  }, [isTokenExpired, clearAuth, user]);
+
+  // ════════════════════════════════════════════════════════
+  // COMPUTED
+  // ════════════════════════════════════════════════════════
+  const isAdmin       = user?.role === 'admin' ||
                         user?.role === 'super_admin';
   const isSuperAdmin  = user?.role === 'super_admin';
   const isAuthenticated = !!user && !!token;
 
-  // ════════════════════════════════════════════════════════════
-  // CONTEXT VALUE — memoize করা হয়নি কারণ
-  // user/token change হলে সব re-render দরকার
-  // ════════════════════════════════════════════════════════════
   const value = {
-    // State
-    user,
-    token,
-    loading,
-
-    // Auth methods
-    login,
-    logout,
+    user, token, loading,
+    login, logout,
     googleLogin,
     loginWithEmail,
     registerWithEmail,
@@ -395,8 +426,6 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     updateUser,
     checkAuth,
-
-    // Computed
     isAdmin,
     isSuperAdmin,
     isAuthenticated,
@@ -412,8 +441,6 @@ export const AuthProvider = ({ children }) => {
 // ════════════════════════════════════════════════════════════════
 // HOOKS
 // ════════════════════════════════════════════════════════════════
-
-/** Main auth hook */
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
@@ -422,13 +449,11 @@ export const useAuth = () => {
   return ctx;
 };
 
-/** শুধু user দরকার হলে */
 export const useUser = () => {
   const { user, loading } = useAuth();
   return { user, loading };
 };
 
-/** শুধু admin check দরকার হলে */
 export const useIsAdmin = () => {
   const { isAdmin, isSuperAdmin } = useAuth();
   return { isAdmin, isSuperAdmin };

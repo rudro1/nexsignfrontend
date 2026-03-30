@@ -1,8 +1,12 @@
 // src/firebase.config.js
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  browserLocalPersistence,
+  setPersistence,
+} from "firebase/auth";
 
-// Vite env variables
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_apiKey,
   authDomain:        import.meta.env.VITE_authDomain,
@@ -12,9 +16,21 @@ const firebaseConfig = {
   appId:             import.meta.env.VITE_appId,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+// ✅ Persistence — page reload এ login থাকবে
+setPersistence(auth, browserLocalPersistence).catch(console.warn);
+
 const googleProvider = new GoogleAuthProvider();
+
+// ✅ Scopes
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
+
+// ✅ Always show account picker
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
 
 export { app, auth, googleProvider };
