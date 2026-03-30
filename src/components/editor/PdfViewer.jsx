@@ -17,43 +17,37 @@ import { buildProxyUrl } from '@/api/apiClient';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-// ─── Helpers ──────────────────────────────────────────────────────
 const cn = (...c) => c.filter(Boolean).join(' ');
 
 const PARTY_COLORS = [
-  '#0ea5e9', '#8b5cf6', '#f59e0b',
-  '#10b981', '#ef4444', '#ec4899',
-  '#6366f1', '#14b8a6',
+  '#0ea5e9','#8b5cf6','#f59e0b',
+  '#10b981','#ef4444','#ec4899',
+  '#6366f1','#14b8a6',
 ];
 
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5];
 
 const FIELD_META = {
-  signature: { icon: PenTool,     label: 'Signature', defaultW: 20, defaultH: 8 },
-  initial:   { icon: Fingerprint, label: 'Initial',   defaultW: 12, defaultH: 7 },
-  date:      { icon: Calendar,    label: 'Date',      defaultW: 16, defaultH: 6 },
-  text:      { icon: Type,        label: 'Text',      defaultW: 18, defaultH: 6 },
-  checkbox:  { icon: CheckSquare, label: 'Checkbox',  defaultW: 6,  defaultH: 6 },
-  number:    { icon: Hash,        label: 'Number',    defaultW: 14, defaultH: 6 },
+  signature: { icon: PenTool,     label: 'Signature', defaultW: 20, defaultH: 8  },
+  initial:   { icon: Fingerprint, label: 'Initial',   defaultW: 12, defaultH: 7  },
+  date:      { icon: Calendar,    label: 'Date',      defaultW: 16, defaultH: 6  },
+  text:      { icon: Type,        label: 'Text',      defaultW: 18, defaultH: 6  },
+  checkbox:  { icon: CheckSquare, label: 'Checkbox',  defaultW: 6,  defaultH: 6  },
+  number:    { icon: Hash,        label: 'Number',    defaultW: 14, defaultH: 6  },
 };
 
 // ─── IconBtn ──────────────────────────────────────────────────────
-const IconBtn = ({ onClick, disabled, title, children, active, className }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
+const IconBtn = ({ onClick, disabled, title, children, className }) => (
+  <button type="button" onClick={onClick} disabled={disabled} title={title}
     className={cn(
       'w-8 h-8 rounded-lg flex items-center justify-center',
       'transition-all text-slate-600 dark:text-slate-400',
-      active
-        ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400'
-        : 'hover:bg-slate-200 dark:hover:bg-slate-700',
+      'hover:bg-slate-200 dark:hover:bg-slate-700',
       'disabled:opacity-30 disabled:cursor-not-allowed',
+      // ✅ larger touch target on mobile
+      'min-w-[32px] min-h-[32px]',
       className,
-    )}
-  >
+    )}>
     {children}
   </button>
 );
@@ -69,7 +63,6 @@ const FieldOverlay = React.memo(({
   const meta      = FIELD_META[field.type] || FIELD_META.text;
   const FieldIcon = meta.icon;
 
-  // % → px
   const px = (field.x      / 100) * canvasSize.width;
   const py = (field.y      / 100) * canvasSize.height;
   const pw = (field.width  / 100) * canvasSize.width;
@@ -81,19 +74,17 @@ const FieldOverlay = React.memo(({
       position={{ x: px, y: py }}
       bounds="parent"
       disableDragging={readOnly}
-      enableResizing={
-        readOnly
-          ? false
-          : {
-              top: true, right: true, bottom: true, left: true,
-              topRight: true, bottomRight: true,
-              bottomLeft: true, topLeft: true,
-            }
-      }
+      enableResizing={readOnly ? false : {
+        top: true, right: true, bottom: true, left: true,
+        topRight: true, bottomRight: true,
+        bottomLeft: true, topLeft: true,
+      }}
       minWidth={40}
       minHeight={20}
       className="z-20"
       style={{ position: 'absolute' }}
+      // ✅ Touch support for drag
+      enableUserSelectHack={false}
       onDragStop={(_, d) => {
         const s = canvasSizeRef.current;
         onUpdate(field.id, {
@@ -132,90 +123,56 @@ const FieldOverlay = React.memo(({
             : 'none',
         }}
       >
-        {/* Icon + label */}
         <div className="flex items-center gap-1 pointer-events-none px-1">
           <FieldIcon
-            size={Math.min(pw * 0.18, 12)}
+            size={Math.min(pw * 0.18, 14)}
             style={{ color, flexShrink: 0 }}
           />
-          <span
-            className="font-black uppercase leading-none truncate"
+          <span className="font-black uppercase leading-none truncate"
             style={{
               color,
-              fontSize: Math.min(pw * 0.1, 9),
-              maxWidth:  pw - 20,
-            }}
-          >
+              fontSize: Math.max(Math.min(pw * 0.12, 11), 7),
+              maxWidth: pw - 20,
+            }}>
             {meta.label}
           </span>
         </div>
 
-        {/* Party name */}
-        <span
-          className="font-bold leading-none truncate
-                     pointer-events-none mt-0.5"
+        <span className="font-bold leading-none truncate
+                         pointer-events-none mt-0.5"
           style={{
             color:    `${color}bb`,
-            fontSize: Math.min(pw * 0.08, 7),
-            maxWidth:  pw - 8,
-          }}
-        >
+            fontSize: Math.max(Math.min(pw * 0.09, 9), 6),
+            maxWidth: pw - 8,
+          }}>
           {party?.name || `Party ${field.partyIndex + 1}`}
         </span>
 
-        {/* Font info for text */}
-        {field.type === 'text' && field.fontFamily && (
-          <span
-            className="pointer-events-none mt-0.5"
-            style={{
-              color:    `${color}88`,
-              fontSize: Math.min(pw * 0.07, 6),
-            }}
-          >
-            {field.fontFamily} {field.fontSize}px
-          </span>
-        )}
-
-        {/* Delete button */}
+        {/* Delete button — bigger on mobile */}
         {!readOnly && (
-          <button
-            type="button"
-            onPointerDown={e => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onClick={e => {
-              e.stopPropagation();
-              e.preventDefault();
-              onRemove(field.id);
-            }}
+          <button type="button"
+            onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+            onClick={e => { e.stopPropagation(); e.preventDefault(); onRemove(field.id); }}
             className={cn(
-              'absolute -top-3 -right-3 w-5 h-5',
+              'absolute -top-3 -right-3',
+              'w-6 h-6',          // ✅ bigger touch target
               'bg-red-500 hover:bg-red-600 text-white',
               'rounded-full flex items-center justify-center',
               'opacity-0 group-hover:opacity-100 shadow-md',
               'transition-opacity z-[999]',
               isSelected && 'opacity-100',
-            )}
-          >
-            <Trash2 size={9} />
+            )}>
+            <Trash2 size={10} />
           </button>
         )}
 
-        {/* Corner handles when selected */}
         {isSelected && (
           <>
-            {[
-              '-top-1 -left-1',
-              '-top-1 -right-1',
-              '-bottom-1 -left-1',
-              '-bottom-1 -right-1',
-            ].map(pos => (
-              <div
-                key={pos}
-                className={`absolute ${pos} w-2 h-2
-                            bg-amber-400 rounded-sm`}
-              />
+            {['-top-1 -left-1','-top-1 -right-1',
+              '-bottom-1 -left-1','-bottom-1 -right-1'].map(pos => (
+              <div key={pos}
+                className={`absolute ${pos} w-2.5 h-2.5
+                            bg-amber-400 rounded-sm z-10`} />
             ))}
           </>
         )}
@@ -248,7 +205,7 @@ export default function PdfViewer({
   const canvasRef     = useRef(null);
   const containerRef  = useRef(null);
   const wrapRef       = useRef(null);
-  const overlayRef    = useRef(null); // ← field overlay container
+  const overlayRef    = useRef(null);
   const renderTaskRef = useRef(null);
   const pdfDocRef     = useRef(null);
   const canvasSizeRef = useRef({ width: 0, height: 0 });
@@ -264,7 +221,6 @@ export default function PdfViewer({
   const fieldsRef = useRef(fields);
   useEffect(() => { fieldsRef.current = fields; }, [fields]);
 
-  // Fields for current page only
   const currentPageFields = useMemo(
     () => fields.filter(f => Number(f.page) === Number(currentPage)),
     [fields, currentPage],
@@ -274,7 +230,6 @@ export default function PdfViewer({
   useEffect(() => {
     if (!fileUrl) return;
     let cancelled = false;
-
     setLoading(true);
     setError(null);
     pdfDocRef.current = null;
@@ -285,11 +240,10 @@ export default function PdfViewer({
         const doc = await pdfjsLib.getDocument({
           url,
           withCredentials: false,
-          cMapPacked:      true,
+          cMapPacked: true,
         }).promise;
 
         if (cancelled) return;
-
         pdfDocRef.current = doc;
         const pages = doc.numPages;
         setTotalPages(pages);
@@ -297,9 +251,7 @@ export default function PdfViewer({
       } catch (e) {
         if (!cancelled) {
           console.error('[PdfViewer load]', e);
-          setError(
-            'Failed to load PDF. Please check the file or your connection.',
-          );
+          setError('Failed to load PDF.');
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -316,17 +268,17 @@ export default function PdfViewer({
     const container = wrapRef.current;
     if (!doc || !canvas || !container) return;
 
-    // Cancel previous render
     try { renderTaskRef.current?.cancel(); } catch (_) {}
 
     try {
       const page  = await doc.getPage(currentPage);
-      const avail = Math.max(container.clientWidth - 32, 300);
+      // ✅ mobile: use full container width
+      const avail = Math.max(container.clientWidth - 16, 280);
       const base  = page.getViewport({ scale: 1 });
       const fit   = avail / base.width;
       const scale = fit * zoom;
       const vp    = page.getViewport({ scale });
-      const dpr   = Math.min(window.devicePixelRatio || 1, 2); // max 2x
+      const dpr   = Math.min(window.devicePixelRatio || 1, 2);
 
       canvas.width        = vp.width  * dpr;
       canvas.height       = vp.height * dpr;
@@ -338,18 +290,16 @@ export default function PdfViewer({
 
       const size = { width: vp.width, height: vp.height };
       canvasSizeRef.current = size;
-      setCanvasSize({ ...size }); // spread to force re-render
+      setCanvasSize({ ...size });
 
       renderTaskRef.current = page.render({
         canvasContext: ctx,
-        viewport:      vp,
+        viewport: vp,
       });
       await renderTaskRef.current.promise;
-
     } catch (err) {
-      if (err?.name !== 'RenderingCancelledException') {
+      if (err?.name !== 'RenderingCancelledException')
         console.error('[PdfViewer render]', err);
-      }
     }
   }, [currentPage, zoom]);
 
@@ -357,63 +307,40 @@ export default function PdfViewer({
     if (!loading && !error) renderPage();
   }, [loading, error, renderPage]);
 
-  // ── ResizeObserver with debounce ────────────────────────────
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-
     const obs = new ResizeObserver(() => {
-      // Debounce 100ms — avoid rapid re-renders on resize
       clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (!loading && !error) renderPage();
       }, 100);
     });
-
     obs.observe(el);
-    return () => {
-      obs.disconnect();
-      clearTimeout(debounceRef.current);
-    };
+    return () => { obs.disconnect(); clearTimeout(debounceRef.current); };
   }, [loading, error, renderPage]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {
     if (readOnly) return;
-
     const handler = (e) => {
-      // Ignore if typing in input
       const tag = document.activeElement?.tagName;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-
-      if (
-        (e.key === 'Delete' || e.key === 'Backspace') &&
-        selectedFieldId
-      ) {
-        onFieldsChange(
-          fieldsRef.current.filter(f => f.id !== selectedFieldId),
-        );
+      if (['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFieldId) {
+        onFieldsChange(fieldsRef.current.filter(f => f.id !== selectedFieldId));
         onFieldSelect?.(null);
       }
-
-      if (e.key === 'Escape') {
-        onFieldSelect?.(null);
-      }
+      if (e.key === 'Escape') onFieldSelect?.(null);
     };
-
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [readOnly, selectedFieldId, onFieldsChange, onFieldSelect]);
 
-  // ── Place field on click ────────────────────────────────────
-  // FIXED: overlay div এ click handle করছি, canvas এ না
-  // কারণ field overlay গুলো canvas এর উপরে থাকে
-  const handleOverlayClick = useCallback((e) => {
+  // ════════════════════════════════════════════════════════════
+  // ✅ FIXED: Field placement — supports BOTH mouse AND touch
+  // ════════════════════════════════════════════════════════════
+  const placeField = useCallback((clientX, clientY) => {
     if (readOnly || !pendingFieldType || loading) return;
-
-    // শুধু direct click — field এর উপর click হলে ignore
-    if (e.target !== overlayRef.current &&
-        e.target !== canvasRef.current) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -426,9 +353,9 @@ export default function PdfViewer({
     const fW   = meta.defaultW;
     const fH   = meta.defaultH;
 
-    // Client coords → percentage
-    const xPct = ((e.clientX - rect.left)  / s.width)  * 100 - fW / 2;
-    const yPct = ((e.clientY - rect.top)   / s.height) * 100 - fH / 2;
+    // ✅ coords relative to canvas
+    const xPct = ((clientX - rect.left)  / s.width)  * 100 - fW / 2;
+    const yPct = ((clientY - rect.top)   / s.height) * 100 - fH / 2;
 
     const newField = {
       id:         `f_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -454,12 +381,27 @@ export default function PdfViewer({
     onFieldsChange, onFieldPlaced, onFieldSelect,
   ]);
 
+  // ✅ Mouse click handler
+  const handleOverlayClick = useCallback((e) => {
+    if (readOnly || !pendingFieldType || loading) return;
+    // ✅ allow click anywhere on overlay — removed strict target check
+    placeField(e.clientX, e.clientY);
+  }, [readOnly, pendingFieldType, loading, placeField]);
+
+  // ✅ Touch handler — NEW
+  const handleOverlayTouch = useCallback((e) => {
+    if (readOnly || !pendingFieldType || loading) return;
+    // Prevent scroll when placing field
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    placeField(touch.clientX, touch.clientY);
+  }, [readOnly, pendingFieldType, loading, placeField]);
+
   // ── Field update / remove ───────────────────────────────────
   const updateField = useCallback((id, patch) => {
     onFieldsChange(
-      fieldsRef.current.map(f =>
-        f.id === id ? { ...f, ...patch } : f,
-      ),
+      fieldsRef.current.map(f => f.id === id ? { ...f, ...patch } : f)
     );
   }, [onFieldsChange]);
 
@@ -472,42 +414,37 @@ export default function PdfViewer({
   const zoomIdx    = ZOOM_STEPS.indexOf(zoom);
   const canZoomIn  = zoomIdx < ZOOM_STEPS.length - 1;
   const canZoomOut = zoomIdx > 0;
-
   const zoomIn  = () => { if (canZoomIn)  setZoom(ZOOM_STEPS[zoomIdx + 1]); };
   const zoomOut = () => { if (canZoomOut) setZoom(ZOOM_STEPS[zoomIdx - 1]); };
   const zoomFit = () => setZoom(1);
 
-  // ══════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // RENDER
-  // ══════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   return (
-    <div
-      ref={wrapRef}
+    <div ref={wrapRef}
       className="flex-1 w-full flex flex-col
-                 bg-slate-100 dark:bg-slate-950 min-h-[600px]"
-    >
+                 bg-slate-100 dark:bg-slate-950
+                 overflow-hidden">
 
       {/* ── Toolbar ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-2
-                      px-4 py-2 bg-white dark:bg-slate-900
+                      px-3 py-2 bg-white dark:bg-slate-900
                       border-b border-slate-200 dark:border-slate-800
-                      sticky top-0 z-30 flex-wrap">
+                      sticky top-0 z-30 flex-wrap gap-y-1.5">
 
-        {/* Page navigation */}
+        {/* Page nav */}
         <div className="flex items-center gap-1">
           <IconBtn
             onClick={() => onPageChange?.(Math.max(1, currentPage - 1))}
-            disabled={currentPage <= 1}
-            title="Previous page"
-          >
-            <ChevronLeft size={16} />
+            disabled={currentPage <= 1} title="Previous page">
+            <ChevronLeft size={15} />
           </IconBtn>
 
-          <div className="flex items-center gap-1.5 px-3 py-1
+          <div className="flex items-center gap-1 px-2.5 py-1
                           bg-slate-100 dark:bg-slate-800 rounded-lg">
             <span className="text-xs font-black text-slate-700
-                             dark:text-slate-300 tabular-nums
-                             min-w-[3ch] text-center">
+                             dark:text-slate-300 tabular-nums">
               {currentPage}
             </span>
             <span className="text-xs text-slate-400">/</span>
@@ -517,139 +454,95 @@ export default function PdfViewer({
           </div>
 
           <IconBtn
-            onClick={() =>
-              onPageChange?.(Math.min(totalPages, currentPage + 1))
-            }
-            disabled={currentPage >= totalPages}
-            title="Next page"
-          >
-            <ChevronRight size={16} />
+            onClick={() => onPageChange?.(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage >= totalPages} title="Next page">
+            <ChevronRight size={15} />
           </IconBtn>
         </div>
 
         {/* Pending field indicator */}
         {pendingFieldType && !readOnly && (
-          <div className="flex items-center gap-2 px-3 py-1.5
+          <div className="flex items-center gap-1.5 px-2.5 py-1
                           rounded-xl bg-sky-50 dark:bg-sky-900/30
-                          border border-sky-200 dark:border-sky-800">
+                          border border-sky-200 dark:border-sky-800
+                          flex-1 min-w-0 justify-center">
             <span className="w-1.5 h-1.5 rounded-full
-                             bg-sky-400 animate-pulse" />
-            <span className="text-[11px] font-black text-sky-600
-                             dark:text-sky-400 uppercase tracking-wide">
-              Click PDF to place {pendingFieldType}
+                             bg-sky-400 animate-pulse shrink-0" />
+            <span className="text-[10px] font-black text-sky-600
+                             dark:text-sky-400 uppercase tracking-wide
+                             truncate">
+              Tap PDF → {pendingFieldType}
             </span>
-            <button
-              type="button"
-              onClick={() => onFieldPlaced?.()}
-              className="ml-1 text-sky-400 hover:text-sky-600"
-              title="Cancel"
-            >
-              <RotateCcw size={12} />
+            <button type="button" onClick={() => onFieldPlaced?.()}
+              className="text-sky-400 hover:text-sky-600 shrink-0 ml-1">
+              <RotateCcw size={11} />
             </button>
           </div>
         )}
 
-        {/* Zoom controls */}
-        <div className="flex items-center gap-1">
-          <IconBtn
-            onClick={zoomOut}
-            disabled={!canZoomOut}
-            title="Zoom out"
-          >
-            <ZoomOut size={15} />
+        {/* Zoom */}
+        <div className="flex items-center gap-0.5">
+          <IconBtn onClick={zoomOut} disabled={!canZoomOut} title="Zoom out">
+            <ZoomOut size={14} />
           </IconBtn>
-
-          <button
-            type="button"
-            onClick={zoomFit}
-            className="px-2.5 h-8 rounded-lg text-xs font-black
+          <button type="button" onClick={zoomFit}
+            className="px-2 h-8 rounded-lg text-xs font-black
                        text-slate-600 dark:text-slate-400
                        hover:bg-slate-100 dark:hover:bg-slate-800
-                       transition-colors tabular-nums min-w-[3.5rem]"
-            title="Reset zoom"
-          >
+                       transition-colors tabular-nums min-w-[2.8rem]"
+            title="Reset zoom">
             {Math.round(zoom * 100)}%
           </button>
-
-          <IconBtn
-            onClick={zoomIn}
-            disabled={!canZoomIn}
-            title="Zoom in"
-          >
-            <ZoomIn size={15} />
+          <IconBtn onClick={zoomIn} disabled={!canZoomIn} title="Zoom in">
+            <ZoomIn size={14} />
           </IconBtn>
-
           <IconBtn onClick={zoomFit} title="Fit to width">
-            <Maximize2 size={14} />
+            <Maximize2 size={13} />
           </IconBtn>
         </div>
       </div>
 
       {/* ── Canvas area ─────────────────────────────────────── */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-auto p-4 sm:p-6
-                   flex flex-col items-center"
-      >
+      <div ref={containerRef}
+        className="flex-1 overflow-auto
+                   p-2 sm:p-4
+                   flex flex-col items-center
+                   min-h-0">
 
-        {/* Loading skeleton */}
+        {/* Loading */}
         {loading && (
-          <div className="w-full max-w-2xl space-y-3">
-            <div className="bg-slate-200 dark:bg-slate-800
-                            rounded-2xl animate-pulse"
-                 style={{ height: 800 }}>
-              <div className="flex flex-col items-center
-                              justify-center h-full gap-3">
-                <Loader2
-                  size={28}
-                  className="text-slate-400 animate-spin"
-                />
-                <p className="text-[11px] font-black uppercase
-                              tracking-widest text-slate-400">
-                  Loading PDF…
-                </p>
-              </div>
+          <div className="w-full flex flex-col items-center
+                          justify-center gap-3 py-16">
+            <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800
+                            rounded-2xl animate-pulse flex items-center
+                            justify-center">
+              <Loader2 size={24} className="text-slate-400 animate-spin" />
             </div>
-            {/* Fake page dots */}
-            <div className="flex justify-center gap-1.5">
-              {[1, 2, 3].map(i => (
-                <div
-                  key={i}
-                  className="h-2 rounded-full bg-slate-200
-                             dark:bg-slate-700 animate-pulse"
-                  style={{ width: i === 1 ? 20 : 8 }}
-                />
-              ))}
-            </div>
+            <p className="text-xs font-bold uppercase tracking-widest
+                          text-slate-400">
+              Loading PDF…
+            </p>
           </div>
         )}
 
-        {/* Error state */}
+        {/* Error */}
         {error && !loading && (
-          <div className="w-full max-w-2xl flex flex-col
-                          items-center justify-center py-24 gap-4">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30
+          <div className="w-full flex flex-col items-center
+                          justify-center py-16 gap-4">
+            <div className="w-14 h-14 bg-red-100 dark:bg-red-900/30
                             rounded-2xl flex items-center justify-center">
-              <AlertTriangle size={28} className="text-red-500" />
+              <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <div className="text-center">
-              <p className="font-bold text-slate-700
-                            dark:text-slate-300 mb-1">
+            <div className="text-center px-4">
+              <p className="font-bold text-slate-700 dark:text-slate-300 mb-1">
                 Failed to load PDF
               </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400
-                            max-w-xs">
-                {error}
-              </p>
+              <p className="text-sm text-slate-500 max-w-xs">{error}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setLoadKey(k => k + 1)}
+            <button type="button" onClick={() => setLoadKey(k => k + 1)}
               className="flex items-center gap-2 px-5 py-2.5
                          bg-sky-500 hover:bg-sky-600 text-white
-                         rounded-xl text-sm font-bold
-                         transition-colors"
-            >
+                         rounded-xl text-sm font-bold transition-colors">
               <RefreshCw size={14} /> Retry
             </button>
           </div>
@@ -657,32 +550,32 @@ export default function PdfViewer({
 
         {/* PDF canvas + field overlays */}
         {!loading && !error && (
-          <div
-            className="relative bg-white shadow-2xl
-                       shadow-slate-400/20 dark:shadow-slate-900/60
-                       rounded-sm mb-8"
+          <div className="relative bg-white shadow-2xl
+                          shadow-slate-400/20 dark:shadow-slate-900/60
+                          rounded-sm mb-4"
             style={{
               width:  canvasSize.width  || 'auto',
               height: canvasSize.height || 'auto',
-            }}
-          >
-            {/* Canvas */}
-            <canvas
-              ref={canvasRef}
-              className="block rounded-sm"
-              style={{ display: 'block' }}
-            />
+            }}>
 
-            {/* ── Overlay container (click handled here) ── */}
+            {/* Canvas */}
+            <canvas ref={canvasRef}
+              className="block rounded-sm"
+              style={{ display: 'block' }} />
+
+            {/* ✅ Overlay — mouse + touch both handled */}
             <div
               ref={overlayRef}
               className="absolute inset-0"
               style={{
                 cursor: pendingFieldType && !readOnly
-                  ? 'crosshair'
-                  : 'default',
+                  ? 'crosshair' : 'default',
+                // ✅ touch-action: none — prevent scroll when placing
+                touchAction: pendingFieldType && !readOnly
+                  ? 'none' : 'auto',
               }}
               onClick={handleOverlayClick}
+              onTouchEnd={handleOverlayTouch}
             >
               {/* Field overlays */}
               {canvasSize.width > 0 && currentPageFields.map(field => (
@@ -703,7 +596,7 @@ export default function PdfViewer({
 
             {/* Field count badge */}
             {currentPageFields.length > 0 && (
-              <div className="absolute bottom-2 right-2 px-2.5 py-1
+              <div className="absolute bottom-2 right-2 px-2 py-0.5
                               bg-black/50 backdrop-blur-sm rounded-lg
                               text-[10px] font-black text-white
                               pointer-events-none">
@@ -718,51 +611,35 @@ export default function PdfViewer({
         {totalPages > 1 && totalPages <= 20 && !loading && (
           <div className="flex items-center gap-1.5 mb-4">
             {Array.from({ length: totalPages }).map((_, i) => (
-              <button
-                key={i}
-                type="button"
+              <button key={i} type="button"
                 onClick={() => onPageChange?.(i + 1)}
                 className={cn(
                   'transition-all duration-150 rounded-full',
                   currentPage === i + 1
                     ? 'w-5 h-2 bg-sky-500'
-                    : 'w-2 h-2 bg-slate-300 dark:bg-slate-600 hover:bg-slate-400',
-                )}
-              />
+                    : 'w-2 h-2 bg-slate-300 dark:bg-slate-600',
+                )} />
             ))}
           </div>
         )}
       </div>
 
-      {/* ── Keyboard hint ─────────────────────────────────────── */}
+      {/* Keyboard hint — desktop only */}
       {!readOnly && selectedFieldId && (
-        <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20
-                        border-t border-amber-200
-                        dark:border-amber-800/40
-                        flex items-center gap-2">
+        <div className="hidden sm:flex px-4 py-2
+                        bg-amber-50 dark:bg-amber-900/20
+                        border-t border-amber-200 dark:border-amber-800/40
+                        items-center gap-2">
           <span className="text-[10px] font-bold
                            text-amber-700 dark:text-amber-400">
             Field selected —
           </span>
-          <kbd className="px-1.5 py-0.5 bg-amber-100
-                          dark:bg-amber-900/40 border border-amber-300
-                          dark:border-amber-700 rounded text-[9px]
-                          font-mono text-amber-700 dark:text-amber-400">
+          <kbd className="px-1.5 py-0.5 bg-amber-100 border border-amber-300
+                          rounded text-[9px] font-mono
+                          text-amber-700 dark:text-amber-400">
             Delete
           </kbd>
-          <span className="text-[10px] text-amber-600 dark:text-amber-500">
-            to remove
-          </span>
-          <span className="mx-1 text-amber-300">·</span>
-          <kbd className="px-1.5 py-0.5 bg-amber-100
-                          dark:bg-amber-900/40 border border-amber-300
-                          dark:border-amber-700 rounded text-[9px]
-                          font-mono text-amber-700 dark:text-amber-400">
-            Esc
-          </kbd>
-          <span className="text-[10px] text-amber-600 dark:text-amber-500">
-            to deselect
-          </span>
+          <span className="text-[10px] text-amber-600">to remove</span>
         </div>
       )}
     </div>
